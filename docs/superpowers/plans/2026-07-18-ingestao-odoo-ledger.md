@@ -251,6 +251,11 @@ def provisionar(cliente):
         cliente, 'sensor_monitor.coletor', [('coletor_code', '=', COLETOR_CODE)],
         {'name': 'Coletor Simulado', 'hub_id': hub_id, 'coletor_code': COLETOR_CODE, 'tipo': 'esp32_wifi'},
     )
+    # '4-20ma' (minúsculo) é o VALOR interno do Selection em models/sensor.py — o label
+    # exibido na UI é '4-20mA'. Não confundir com a constante de mesmo nome em
+    # coletor_simulado/gerador.py, que usa '4-20mA' porque ali é texto literal do arquivo
+    # (esp32_coletor_spec.md), não um Selection do Odoo — convenções distintas, cada uma
+    # correta na sua camada.
     for sensor in SENSORES:
         measurement_type_id = _buscar_id(
             cliente, 'sensor_monitor.measurement.type', [('code', '=', sensor['measurement_type_code'])],
@@ -259,7 +264,7 @@ def provisionar(cliente):
             cliente, 'sensor_monitor.sensor', [('sensor_code', '=', sensor['sensor_code'])],
             {
                 'name': sensor['name'], 'sensor_code': sensor['sensor_code'], 'coletor_id': coletor_id,
-                'area_id': area_id, 'measurement_type_id': measurement_type_id, 'protocolo_origem': '4-20mA',
+                'area_id': area_id, 'measurement_type_id': measurement_type_id, 'protocolo_origem': '4-20ma',
             },
         )
     return {

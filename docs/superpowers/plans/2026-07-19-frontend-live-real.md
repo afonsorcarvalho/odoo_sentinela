@@ -72,6 +72,7 @@ Expected: 3 passed (os mesmos de antes — exportar uma const não muda comporta
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { realLiveApi } from './liveApi'
 import { TOKEN_STORAGE_KEY } from '../../useAuth'
+import * as metaApiModule from './metaApi'
 
 class MockEventSource {
   static instances: MockEventSource[] = []
@@ -102,7 +103,7 @@ afterEach(() => {
 describe('realLiveApi', () => {
   it('subscribe abre EventSource com sensor_code e token na URL', () => {
     localStorage.setItem(TOKEN_STORAGE_KEY, 'abc.def.ghi')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => THRESHOLD }))
+    vi.spyOn(metaApiModule.realMetaApi, 'getThreshold').mockResolvedValue(THRESHOLD)
 
     realLiveApi.subscribe('SNR-1', () => {})
 
@@ -112,11 +113,10 @@ describe('realLiveApi', () => {
   })
 
   it('onmessage computa alarm_state a partir do threshold cacheado e chama cb com LivePoint', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => THRESHOLD }))
+    vi.spyOn(metaApiModule.realMetaApi, 'getThreshold').mockResolvedValue(THRESHOLD)
     const cb = vi.fn()
 
     realLiveApi.subscribe('SNR-1', cb)
-    await Promise.resolve()
     await Promise.resolve()
 
     const es = MockEventSource.instances[0]
@@ -128,11 +128,10 @@ describe('realLiveApi', () => {
   })
 
   it('valor fora da faixa do threshold gera alarm_state crit', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => THRESHOLD }))
+    vi.spyOn(metaApiModule.realMetaApi, 'getThreshold').mockResolvedValue(THRESHOLD)
     const cb = vi.fn()
 
     realLiveApi.subscribe('SNR-1', cb)
-    await Promise.resolve()
     await Promise.resolve()
 
     const es = MockEventSource.instances[0]
@@ -142,7 +141,7 @@ describe('realLiveApi', () => {
   })
 
   it('threshold ainda nao chegou (mensagem antes do fetch resolver) cai em alarm_state ok', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => THRESHOLD }))
+    // não mocka getThreshold — simula que a promise ainda não resolveu
     const cb = vi.fn()
 
     realLiveApi.subscribe('SNR-1', cb)
@@ -155,7 +154,7 @@ describe('realLiveApi', () => {
   })
 
   it('unsubscribe fecha o EventSource', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => THRESHOLD }))
+    vi.spyOn(metaApiModule.realMetaApi, 'getThreshold').mockResolvedValue(THRESHOLD)
 
     const unsubscribe = realLiveApi.subscribe('SNR-1', () => {})
     unsubscribe()
@@ -164,6 +163,16 @@ describe('realLiveApi', () => {
   })
 })
 ```
+
+(Nota: a versão anterior deste teste mockava `global.fetch` + `await Promise.resolve()`
+duas vezes pra deixar a promise do threshold resolver antes de disparar a mensagem SSE.
+A Task 1 reproduziu e confirmou que isso falha deterministicamente — a cadeia real
+`fetch → authFetchJson → getThreshold → .then` precisa de 4 microtasks, não 2. Reescrito
+pra mockar `realMetaApi.getThreshold` direto via `vi.spyOn` — 1 `await Promise.resolve()`
+basta, e a integração `metaApi → authFetchJson → fetch` que esse mock "esconde" já está
+coberta em `metaApi.test.ts`/`http.test.ts`. Isola em `liveApi.test.ts` só o que é
+responsabilidade do adapter: URL, cache de threshold, cálculo de `alarm_state`,
+`unsubscribe`.)
 
 - [ ] **Step 4: Rodar o teste e confirmar que falha**
 

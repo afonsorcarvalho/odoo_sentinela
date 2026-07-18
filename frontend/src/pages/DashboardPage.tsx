@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSensors, useThresholds, useHistory, useAlarms } from '../lib/queries'
 import { useLiveStatuses } from '../lib/useLiveStatuses'
 import { useLiveTail } from '../lib/useLiveTail'
@@ -9,7 +10,9 @@ import { Topbar } from '../components/Topbar'
 import { AlarmPanel } from '../components/AlarmPanel'
 import { ToastContainer } from '../components/ToastContainer'
 import { SensorDetailPanel } from '../components/SensorDetailPanel'
-import type { Window } from '../lib/types'
+import { DemoBanner } from '../components/DemoBanner'
+import { isDemoMode } from '../lib/demoMode'
+import type { Window, AlarmEvent } from '../lib/types'
 
 const UNIT_NAME = import.meta.env.VITE_UNIT_NAME ?? 'Unidade não configurada'
 
@@ -20,6 +23,8 @@ function isToday(iso: string): boolean {
 export function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [window, setWindow] = useState<Window>('24h')
+  const queryClient = useQueryClient()
+  const [simulating, setSimulating] = useState(false)
 
   const sensorsQuery = useSensors()
   const sensors = sensorsQuery.data ?? []
@@ -50,6 +55,22 @@ export function DashboardPage() {
     setSearchParams(group ? { area: group.area.area_code, sensor: code } : { sensor: code })
   }
 
+  function simulateAlarm() {
+    setSimulating(true)
+    const fake: AlarmEvent = {
+      id: Date.now(), sensor_code: 'PRESS-EXP-01', area: { area_code: 'EXPURGO', name: 'Expurgo' },
+      tipo_violacao: 'abaixo_limite', status: 'aberto',
+      timestamp_deteccao: new Date().toISOString(),
+      valor_lido: -1.7, limite_configurado_snapshot: -2.5, data_resolucao: null,
+    }
+    queryClient.setQueryData<AlarmEvent[]>(['alarms'], (old) => [fake, ...(old ?? [])])
+  }
+
+  function resetDemo() {
+    setSimulating(false)
+    queryClient.invalidateQueries({ queryKey: ['alarms'] })
+  }
+
   const ready = sensorsQuery.isSuccess && thresholdResults.every((r) => r.isSuccess)
   const healthy = sensorsQuery.isSuccess && !alarmsQuery.isError
 
@@ -57,6 +78,7 @@ export function DashboardPage() {
     <div>
       <Topbar healthy={healthy} unitName={UNIT_NAME} />
       <ToastContainer alarms={alarms} loaded={!alarmsQuery.isLoading} />
+      {isDemoMode() && <DemoBanner simulating={simulating} onSimulate={simulateAlarm} onReset={resetDemo} />}
 
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
         <p className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>

@@ -69,4 +69,14 @@ describe('buildChartOption', () => {
     const opt = buildChartOption(outHist, t) as any
     expect(opt.yAxis.max).toBeGreaterThanOrEqual(25)
   })
+  it('com threshold, series[0].markArea cobre limite_min..limite_max', () => {
+    const threshold = { sensor_id: 'A', limite_min: 10, limite_max: 20, is_valor_padrao_regulatorio: false }
+    const option = buildChartOption(undefined, threshold)
+    const markArea = (option.series as any)[0].markArea
+    expect(markArea.data).toEqual([[{ yAxis: 10 }, { yAxis: 20 }]])
+  })
+  it('sem threshold, series[0].markArea e undefined', () => {
+    const option = buildChartOption(undefined, null)
+    expect((option.series as any)[0].markArea).toBeUndefined()
+  })
 })

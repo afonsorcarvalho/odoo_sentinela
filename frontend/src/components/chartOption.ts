@@ -36,6 +36,13 @@ export function buildChartOption(
       }
     : undefined
 
+  const markArea = threshold
+    ? {
+        itemStyle: { color: 'var(--color-good-soft)', opacity: 0.5 },
+        data: [[{ yAxis: threshold.limite_min }, { yAxis: threshold.limite_max }]],
+      }
+    : undefined
+
   // Eixo Y: garante que as linhas de limite fiquem SEMPRE visiveis (elas sao o
   // ponto do readout de instrumento — ver a leitura relativa a faixa segura).
   // Sem isto, `scale:true` ajusta so aos dados e clipa os limites para fora.
@@ -58,6 +65,6 @@ export function buildChartOption(
     grid: { left: 44, right: 16, top: 16, bottom: 28 },
     xAxis: { type: 'time' as const },
     yAxis: { type: 'value' as const, scale: true, min: yMin, max: yMax },
-    series: [{ type: 'line' as const, showSymbol: false, data, markLine }],
+    series: [{ type: 'line' as const, showSymbol: false, data, markLine, markArea }],
   }
 }

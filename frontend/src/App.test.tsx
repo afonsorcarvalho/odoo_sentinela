@@ -34,28 +34,20 @@ beforeEach(() => seedValidToken())
 afterEach(() => localStorage.clear())
 
 describe('App routing', () => {
-  it('"/" renderiza a Overview', async () => {
+  it('"/" renderiza a DashboardPage', async () => {
     render(wrap(<App />, '/'))
-    await waitFor(() => expect(screen.getByText('Visão geral')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument())
   })
 
-  it('"/sensor/:code" renderiza o Detalhe do sensor certo', async () => {
+  it('"/sensor/:code" redireciona para "/?sensor=:code" e abre o Detalhe do sensor certo', async () => {
     render(wrap(<App />, '/sensor/TEMP-EXP-01'))
-    await waitFor(() => expect(screen.getByText(/Temperatura — Expurgo/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Expurgo · Temperatura')).toBeInTheDocument())
   })
 
-  it('fluxo completo: Overview -> Area -> Sensor -> Voltar -> Overview', async () => {
-    render(wrap(<App />, '/'))
-    await waitFor(() => expect(screen.getByText('Expurgo')).toBeInTheDocument(), { timeout: 3000 })
-
-    await userEvent.click(screen.getByTestId('area-card-EXPURGO'))
-    await waitFor(() => expect(screen.getByText('Pressão diferencial')).toBeInTheDocument(), { timeout: 3000 })
-
-    await userEvent.click(screen.getByText('Temperatura'))
-    await waitFor(() => expect(screen.getByText(/Temperatura — Expurgo/)).toBeInTheDocument())
-
-    await userEvent.click(screen.getByRole('link', { name: /voltar/i }))
-    await waitFor(() => expect(screen.getByText('Visão geral')).toBeInTheDocument(), { timeout: 3000 })
+  it('"/area/:areaCode" redireciona para "/?area=:areaCode"', async () => {
+    render(wrap(<App />, '/area/EXPURGO'))
+    await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument())
+    expect(screen.getByTestId('area-card-EXPURGO')).toBeInTheDocument()
   })
 
   it('fluxo completo de auth: sem login redireciona, loga, navega, desloga, bloqueia de novo', async () => {
@@ -69,8 +61,8 @@ describe('App routing', () => {
     await userEvent.type(screen.getByLabelText('Senha'), 'admin')
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
-    // login ok, entra na Overview
-    await waitFor(() => expect(screen.getByText('Visão geral')).toBeInTheDocument(), { timeout: 3000 })
+    // login ok, entra na DashboardPage
+    await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument(), { timeout: 3000 })
 
     // desloga
     await userEvent.click(screen.getByRole('button', { name: /sair/i }))

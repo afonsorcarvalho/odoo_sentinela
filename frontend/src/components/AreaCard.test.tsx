@@ -1,68 +1,56 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import { AreaCard } from './AreaCard'
 import type { AreaGroup } from '../lib/aggregateStatus'
-import type { LivePoint, Threshold } from '../lib/types'
 
-function wrap(node: React.ReactNode) {
-  return <MemoryRouter>{node}</MemoryRouter>
+const group: AreaGroup = {
+  area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Expurgo' },
+  sensors: [
+    { sensor_code: 'TEMP-EXP-01', name: 'Temp', unidade: '°C', protocolo_origem: '4-20ma', measurement_type: { code: 'temperatura', name: 'Temperatura' }, area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Expurgo' } },
+    { sensor_code: 'PRESS-EXP-01', name: 'Pressao', unidade: 'Pa', protocolo_origem: '4-20ma', measurement_type: { code: 'pressao_diferencial', name: 'Pressão' }, area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Expurgo' } },
+  ],
 }
-
-const expurgo: AreaGroup = {
-  area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Refrigeração' },
-  sensors: [{
-    sensor_code: 'TEMP-EXP-01', name: 'Temperatura', unidade: 'C', protocolo_origem: 'rs485',
-    measurement_type: { code: 'temperatura', name: 'Temperatura' },
-    area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Refrigeração' },
-  }],
+const thresholdsByCode = {
+  'TEMP-EXP-01': { sensor_id: 'TEMP-EXP-01', limite_min: 18, limite_max: 26, is_valor_padrao_regulatorio: false },
+  'PRESS-EXP-01': { sensor_id: 'PRESS-EXP-01', limite_min: -15, limite_max: -2.5, is_valor_padrao_regulatorio: true },
 }
-const t: Threshold = { sensor_id: 'TEMP-EXP-01', limite_min: 18, limite_max: 22, is_valor_padrao_regulatorio: true }
+const liveByCode = {
+  'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: 1, value: 21, alarm_state: 'ok' as const },
+  'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: 1, value: -3.6, alarm_state: 'ok' as const },
+}
 
 describe('AreaCard', () => {
-  it('mostra nome e categoria da area', () => {
-    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{}} />))
-    expect(screen.getByText('Expurgo')).toBeInTheDocument()
-  })
-
-  it('e um link pra pagina da area', () => {
-    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{}} />))
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/area/EXPURGO')
-  })
-
-  it('sensor ok: mostra "Dentro da faixa", sem badge de alarme', () => {
-    const live: LivePoint = { sensor_code: 'TEMP-EXP-01', ts: 1, value: 20, alarm_state: 'ok' }
-    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />))
-    expect(screen.getByText('Dentro da faixa')).toBeInTheDocument()
-    expect(screen.queryByText(/alarme/i)).not.toBeInTheDocument()
-  })
-
-  it('sensor crit: mostra "Fora da faixa" E badge "1 alarme"', () => {
-    const live: LivePoint = { sensor_code: 'TEMP-EXP-01', ts: 1, value: 30, alarm_state: 'crit' }
-    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />))
-    expect(screen.getByText('Fora da faixa')).toBeInTheDocument()
-    expect(screen.getByText('1 alarme')).toBeInTheDocument()
-  })
-
-  it('sensor sem threshold (Arsenal): mostra "Sem limite", mesmo com feed ok', () => {
-    const arsenal: AreaGroup = {
-      area: { area_code: 'ARSENAL', name: 'Arsenal', category: 'Armazenamento' },
-      sensors: [{
-        sensor_code: 'TEMP-ARS-01', name: 'Temperatura', unidade: 'C', protocolo_origem: 'rs485',
-        measurement_type: { code: 'temperatura', name: 'Temperatura' },
-        area: { area_code: 'ARSENAL', name: 'Arsenal', category: 'Armazenamento' },
-      }],
-    }
-    const live: LivePoint = { sensor_code: 'TEMP-ARS-01', ts: 1, value: 24, alarm_state: 'ok' }
-    render(wrap(<AreaCard group={arsenal} thresholdsByCode={{ 'TEMP-ARS-01': null }} liveByCode={{ 'TEMP-ARS-01': live }} />))
-    expect(screen.getByText('Sem limite')).toBeInTheDocument()
-  })
-
-  it('status sempre vem com icone (nao so cor) — svg presente junto ao texto', () => {
-    const live: LivePoint = { sensor_code: 'TEMP-EXP-01', ts: 1, value: 30, alarm_state: 'crit' }
-    const { container } = render(
-      wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />),
+  it('mostra nome da area e cada sensor com valor mono', () => {
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
     )
-    expect(container.querySelector('svg')).not.toBeNull()
+    expect(screen.getByText('Expurgo')).toBeInTheDocument()
+    expect(screen.getByText('Temperatura')).toBeInTheDocument()
+    expect(screen.getByText(/21\.0/)).toBeInTheDocument()
+  })
+
+  it('clicar numa linha de sensor chama onSelectSensor com o codigo certo', () => {
+    const onSelectSensor = vi.fn()
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={onSelectSensor} hadAlarmToday={false} />,
+    )
+    fireEvent.click(screen.getByText('Temperatura'))
+    expect(onSelectSensor).toHaveBeenCalledWith('TEMP-EXP-01')
+  })
+
+  it('badge "!" aparece so quando hadAlarmToday=true', () => {
+    const { rerender } = render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+    )
+    expect(screen.queryByLabelText('Houve não conformidade hoje')).not.toBeInTheDocument()
+
+    rerender(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday />,
+    )
+    expect(screen.getByLabelText('Houve não conformidade hoje')).toBeInTheDocument()
   })
 })

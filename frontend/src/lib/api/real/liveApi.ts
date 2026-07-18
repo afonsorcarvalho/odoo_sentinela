@@ -7,6 +7,12 @@ import { realMetaApi } from './metaApi'
 
 export const realLiveApi: LiveApi = {
   subscribe(sensor_code, cb) {
+    // Sem isso, um `selectedCode` ainda nao resolvido (antes dos sensores
+    // carregarem) abre um EventSource pra `/sensores//live` (barra dupla) --
+    // achado na verificacao visual do redesign, mesma classe de bug ja
+    // corrigida no adapter de polling que esta versao substitui.
+    if (sensor_code === '') return () => {}
+
     let threshold: Threshold | null = null
     realMetaApi.getThreshold(sensor_code).then((t) => { threshold = t }).catch(() => {})
 

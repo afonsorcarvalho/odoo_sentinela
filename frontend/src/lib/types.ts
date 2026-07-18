@@ -35,3 +35,18 @@ export type LivePoint = {
   value: number
   alarm_state: AlarmState
 }
+
+export type AlarmEventStatus = 'aberto' | 'reconhecido' | 'resolvido'
+export type AlarmTipoViolacao = 'acima_limite' | 'abaixo_limite' | 'sensor_offline' | 'erro_leitura'
+
+export type AlarmEvent = {
+  id: number
+  sensor_code: string
+  area: { area_code: string; name: string }
+  tipo_violacao: AlarmTipoViolacao
+  status: AlarmEventStatus
+  timestamp_deteccao: string
+  valor_lido: number | null
+  limite_configurado_snapshot: number | null
+  data_resolucao: string | null
+}

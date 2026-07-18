@@ -19,10 +19,12 @@ export function TimeSeriesChart({
   // ECharts pinta em canvas e nao resolve var(--color-crit) — resolvemos aqui
   // (ver useThemeColor) e passamos o valor concreto para buildChartOption.
   const critColor = useThemeColor('--color-crit')
+  // Idem para a cor da faixa de conformidade (markArea).
+  const goodSoftColor = useThemeColor('--color-good-soft')
 
   useEffect(() => {
-    chart.current?.setOption(buildChartOption(history, threshold, critColor, tail), { notMerge: true })
-  }, [history, threshold, critColor, tail, chart])
+    chart.current?.setOption(buildChartOption(history, threshold, critColor, goodSoftColor, tail), { notMerge: true })
+  }, [history, threshold, critColor, goodSoftColor, tail, chart])
 
   return <div ref={el} style={{ width: '100%', height: 320 }} />
 }

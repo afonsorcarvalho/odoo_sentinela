@@ -52,7 +52,7 @@ describe('buildChartOption', () => {
       { sensor_code: 'S', ts: 2500, value: 20.8, alarm_state: 'ok' as const }, // novo: anexado
       { sensor_code: 'S', ts: 3000, value: 21.2, alarm_state: 'ok' as const },
     ]
-    const opt = buildChartOption(hist, t, '#ff0000', tail) as any
+    const opt = buildChartOption(hist, t, '#ff0000', 'var(--color-good-soft)', tail) as any
     expect(opt.series[0].data).toEqual([[1000, 19], [2000, 21], [2500, 20.8], [3000, 21.2]])
   })
   it('estende o eixo Y para conter as linhas de limite (senao ficariam clipadas)', () => {
@@ -68,5 +68,19 @@ describe('buildChartOption', () => {
     }
     const opt = buildChartOption(outHist, t) as any
     expect(opt.yAxis.max).toBeGreaterThanOrEqual(25)
+  })
+  it('com threshold, series[0].markArea cobre limite_min..limite_max', () => {
+    const threshold = { sensor_id: 'A', limite_min: 10, limite_max: 20, is_valor_padrao_regulatorio: false }
+    const option = buildChartOption(undefined, threshold)
+    const markArea = (option.series as any)[0].markArea
+    expect(markArea.data).toEqual([[{ yAxis: 10 }, { yAxis: 20 }]])
+  })
+  it('sem threshold, series[0].markArea e undefined', () => {
+    const option = buildChartOption(undefined, null)
+    expect((option.series as any)[0].markArea).toBeUndefined()
+  })
+  it('usa a cor resolvida recebida no markArea, nao a custom property crua', () => {
+    const opt = buildChartOption(hist, t, undefined, '#00ff00') as any
+    expect(opt.series[0].markArea.itemStyle.color).toBe('#00ff00')
   })
 })

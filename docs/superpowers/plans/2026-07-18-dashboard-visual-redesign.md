@@ -20,6 +20,24 @@
 - **Testes de backend rodam contra Odoo/Timescale reais** (`TestClient` sem mock) — os serviços do `docker-compose.yml` precisam estar de pé (`docker compose up -d`) antes de `pytest`.
 - **Escopo deliberadamente cortado** (ver spec `docs/superpowers/specs/2026-07-18-dashboard-visual-redesign-design.md` §9): "Registro íntegro" é health-flag simples (não verificação criptográfica da cadeia de ledger); modo "Ao vivo" é polling (não streaming); janela de tempo do gráfico continua sendo o seletor 1h/24h/7d/30d já existente (não o toggle binário "Ao vivo/Dia todo" do handoff — o seletor atual é estritamente mais capaz); selo "assinado na origem" por leitura fica DE FORA (sem campo de API pra isso ainda); nome da unidade no topbar vem de `VITE_UNIT_NAME` (env), não de um campo de API novo.
 
+## Amendment (post-merge, antes da execução)
+
+Entre o commit da spec e do plano, uma sessão paralela implementou (branch `feat/frontend-real-adapters`,
+merged em master `5d5f23b`) exatamente o que as Tasks 2–4 originais planejavam, com nomes diferentes:
+
+| Este plano previa | O que já existe em master (usar) |
+|---|---|
+| `frontend/src/lib/api/authToken.ts` (`getAuthToken`/`setAuthToken`/`clearAuthToken`) | `TOKEN_STORAGE_KEY` exportado de `frontend/src/lib/useAuth.tsx` — lido direto via `localStorage.getItem(TOKEN_STORAGE_KEY)` |
+| `frontend/src/lib/api/real/httpClient.ts` (`authedGet`) | `frontend/src/lib/api/real/http.ts` (`authFetchJson<T>(path)`) |
+| `frontend/src/lib/api/real/metaApi.ts` | já existe, mesmo nome/local, já wired em `index.ts` |
+| `frontend/src/lib/api/real/historyApi.ts` | já existe, mesmo nome/local, já wired em `index.ts` |
+
+**Tasks 2, 3 e 4 abaixo estão SKIP — não dispachar.** Ficam no plano só como registro do que foi
+substituído. **Tasks 5, 6 e 7 foram reescritas** (ver os blocos "SUBSTITUÍDO" dentro de cada uma) pra
+consumir `authFetchJson`/`./http` em vez de `authedGet`/`./httpClient`, e pra Task 7 fazer um ADD incremental
+em cima do `index.ts` já real (não uma reescrita completa — o arquivo atual já liga `authApi`/`metaApi`/
+`historyApi` reais).
+
 ---
 
 ## Task 1: Backend — endpoint `GET /alarmes`
@@ -177,330 +195,24 @@ git commit -m "feat: endpoint GET /alarmes (leitura de eventos de alarme)"
 
 ---
 
-## Task 2: Frontend — helper de token de auth (`authToken.ts`)
+## Task 2 (SKIP): helper de token de auth
 
-**Files:**
-- Create: `frontend/src/lib/api/authToken.ts`
-- Test: `frontend/src/lib/api/authToken.test.ts`
-- Modify: `frontend/src/lib/useAuth.tsx`
-
-**Interfaces:**
-- Produces: `getAuthToken(): string | null`, `setAuthToken(token: string): void`, `clearAuthToken(): void` — usados por todo adapter `real/*` desta fatia (Tasks 3–6) e por `useAuth.tsx`.
-
-- [ ] **Step 1: Escrever o teste**
-
-```typescript
-// frontend/src/lib/api/authToken.test.ts
-import { describe, it, expect, beforeEach } from 'vitest'
-import { getAuthToken, setAuthToken, clearAuthToken } from './authToken'
-
-describe('authToken', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('getAuthToken devolve null quando nada foi salvo', () => {
-    expect(getAuthToken()).toBeNull()
-  })
-
-  it('setAuthToken salva, getAuthToken le', () => {
-    setAuthToken('abc.def.ghi')
-    expect(getAuthToken()).toBe('abc.def.ghi')
-  })
-
-  it('clearAuthToken remove', () => {
-    setAuthToken('abc.def.ghi')
-    clearAuthToken()
-    expect(getAuthToken()).toBeNull()
-  })
-})
-```
-
-- [ ] **Step 2: Rodar e confirmar falha**
-
-Run: `cd frontend && npx vitest run src/lib/api/authToken.test.ts`
-Expected: FAIL (`Cannot find module './authToken'`).
-
-- [ ] **Step 3: Implementar**
-
-```typescript
-// frontend/src/lib/api/authToken.ts
-const STORAGE_KEY = 'sentinela_token'
-
-export function getAuthToken(): string | null {
-  return localStorage.getItem(STORAGE_KEY)
-}
-export function setAuthToken(token: string): void {
-  localStorage.setItem(STORAGE_KEY, token)
-}
-export function clearAuthToken(): void {
-  localStorage.removeItem(STORAGE_KEY)
-}
-```
-
-- [ ] **Step 4: Refatorar `useAuth.tsx` para usar o helper**
-
-```typescript
-// frontend/src/lib/useAuth.tsx — substituir integralmente
-import { createContext, useContext, useState, type ReactNode } from 'react'
-import { authApi } from './api'
-import { decodeJwtExp } from './jwt'
-import { getAuthToken, setAuthToken, clearAuthToken } from './api/authToken'
-
-type AuthContextValue = {
-  isAuthenticated: boolean
-  login: (usuario: string, senha: string) => Promise<void>
-  logout: () => void
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-function readValidToken(): string | null {
-  const token = getAuthToken()
-  if (!token) return null
-  const exp = decodeJwtExp(token)
-  if (exp === null || exp <= Date.now()) {
-    clearAuthToken()
-    return null
-  }
-  return token
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => readValidToken())
-
-  async function login(usuario: string, senha: string) {
-    const { access_token } = await authApi.login(usuario, senha)
-    setAuthToken(access_token)
-    setToken(access_token)
-  }
-
-  function logout() {
-    clearAuthToken()
-    setToken(null)
-  }
-
-  return (
-    <AuthContext.Provider value={{ isAuthenticated: token !== null, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth precisa estar dentro de AuthProvider')
-  return ctx
-}
-```
-
-- [ ] **Step 5: Rodar toda a suite de auth e confirmar que nada quebrou**
-
-Run: `cd frontend && npx vitest run src/lib/api/authToken.test.ts src/lib/useAuth.test.tsx src/components/AuthGuard.test.tsx`
-Expected: PASS (todos).
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add frontend/src/lib/api/authToken.ts frontend/src/lib/api/authToken.test.ts frontend/src/lib/useAuth.tsx
-git commit -m "refactor(frontend): extrai authToken helper de useAuth (DRY p/ adapters reais)"
-```
+**SKIP — não dispachar.** Já entregue por `frontend/src/lib/useAuth.tsx` (`TOKEN_STORAGE_KEY` exportado),
+commit `1d392ac` em master. Usar `TOKEN_STORAGE_KEY` de `useAuth.tsx` em vez de criar `authToken.ts`.
 
 ---
 
-## Task 3: Frontend — `httpClient` + `real/metaApi.ts`
+## Task 3 (SKIP): httpClient + real/metaApi.ts
 
-**Files:**
-- Create: `frontend/src/lib/api/real/httpClient.ts`
-- Create: `frontend/src/lib/api/real/metaApi.ts`
-- Test: `frontend/src/lib/api/real/httpClient.test.ts`
-- Test: `frontend/src/lib/api/real/metaApi.test.ts`
-
-**Interfaces:**
-- Consumes: `getAuthToken` de `../authToken` (Task 2).
-- Produces: `authedGet(path: string): Promise<unknown>` (usado por Tasks 4 e 6); `realMetaApi: MetaApi` (usado por Task 5 e pelo `index.ts` na Task 7).
-
-- [ ] **Step 1: Escrever os testes**
-
-```typescript
-// frontend/src/lib/api/real/httpClient.test.ts
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { authedGet } from './httpClient'
-import { setAuthToken } from '../authToken'
-
-afterEach(() => { vi.unstubAllGlobals(); localStorage.clear() })
-
-describe('authedGet', () => {
-  it('inclui Authorization Bearer com o token salvo', async () => {
-    setAuthToken('tok123')
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
-    vi.stubGlobal('fetch', mockFetch)
-
-    await authedGet('/sensores')
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/sensores'),
-      expect.objectContaining({ headers: { Authorization: 'Bearer tok123' } }),
-    )
-  })
-
-  it('resposta nao-ok lanca erro', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({}) }))
-    await expect(authedGet('/sensores/XYZ')).rejects.toThrow()
-  })
-})
-```
-
-```typescript
-// frontend/src/lib/api/real/metaApi.test.ts
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { realMetaApi } from './metaApi'
-
-afterEach(() => vi.unstubAllGlobals())
-
-function mockJson(body: unknown) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => body }))
-}
-
-describe('realMetaApi', () => {
-  it('listSensors faz GET /sensores', async () => {
-    mockJson([{ sensor_code: 'A' }])
-    const result = await realMetaApi.listSensors()
-    expect(result).toEqual([{ sensor_code: 'A' }])
-  })
-
-  it('getSensor faz GET /sensores/:code', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sensor_code: 'A' }) })
-    vi.stubGlobal('fetch', mockFetch)
-    await realMetaApi.getSensor('A')
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/sensores/A'), expect.anything())
-  })
-
-  it('getThreshold faz GET /sensores/:code/threshold', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => null })
-    vi.stubGlobal('fetch', mockFetch)
-    const result = await realMetaApi.getThreshold('A')
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/sensores/A/threshold'), expect.anything())
-    expect(result).toBeNull()
-  })
-})
-```
-
-- [ ] **Step 2: Rodar e confirmar falha**
-
-Run: `cd frontend && npx vitest run src/lib/api/real/httpClient.test.ts src/lib/api/real/metaApi.test.ts`
-Expected: FAIL (módulos não existem).
-
-- [ ] **Step 3: Implementar**
-
-```typescript
-// frontend/src/lib/api/real/httpClient.ts
-import { getAuthToken } from '../authToken'
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8001'
-
-export async function authedGet(path: string): Promise<unknown> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${getAuthToken() ?? ''}` },
-  })
-  if (!res.ok) {
-    throw new Error(`GET ${path} falhou (${res.status})`)
-  }
-  return res.json()
-}
-```
-
-```typescript
-// frontend/src/lib/api/real/metaApi.ts
-import type { MetaApi } from '../contracts'
-import type { SensorMeta, Threshold } from '../../types'
-import { authedGet } from './httpClient'
-
-export const realMetaApi: MetaApi = {
-  getSensor: (code) => authedGet(`/sensores/${code}`) as Promise<SensorMeta>,
-  getThreshold: (code) => authedGet(`/sensores/${code}/threshold`) as Promise<Threshold | null>,
-  listSensors: () => authedGet('/sensores') as Promise<SensorMeta[]>,
-}
-```
-
-- [ ] **Step 4: Rodar e confirmar sucesso**
-
-Run: `cd frontend && npx vitest run src/lib/api/real/httpClient.test.ts src/lib/api/real/metaApi.test.ts`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add frontend/src/lib/api/real/httpClient.ts frontend/src/lib/api/real/httpClient.test.ts frontend/src/lib/api/real/metaApi.ts frontend/src/lib/api/real/metaApi.test.ts
-git commit -m "feat(frontend): httpClient autenticado + realMetaApi"
-```
+**SKIP — não dispachar.** Já entregue como `frontend/src/lib/api/real/http.ts` (`authFetchJson<T>(path)`)
++ `frontend/src/lib/api/real/metaApi.ts`, commits `1d392ac`/`c5cdfbb` em master.
 
 ---
 
-## Task 4: Frontend — `real/historyApi.ts`
+## Task 4 (SKIP): real/historyApi.ts
 
-**Files:**
-- Create: `frontend/src/lib/api/real/historyApi.ts`
-- Test: `frontend/src/lib/api/real/historyApi.test.ts`
-
-**Interfaces:**
-- Consumes: `authedGet` (Task 3).
-- Produces: `realHistoryApi: HistoryApi` (usado por Task 5 e pelo `index.ts` na Task 7).
-
-- [ ] **Step 1: Escrever o teste**
-
-```typescript
-// frontend/src/lib/api/real/historyApi.test.ts
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { realHistoryApi } from './historyApi'
-
-afterEach(() => vi.unstubAllGlobals())
-
-describe('realHistoryApi', () => {
-  it('getHistory faz GET /sensores/:code/historico?window=:window', async () => {
-    const body = { sensor_code: 'A', window: '24h', resolution: 'agg', points: [] }
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => body })
-    vi.stubGlobal('fetch', mockFetch)
-
-    const result = await realHistoryApi.getHistory('A', '24h')
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/sensores/A/historico?window=24h'),
-      expect.anything(),
-    )
-    expect(result).toEqual(body)
-  })
-})
-```
-
-- [ ] **Step 2: Rodar e confirmar falha**
-
-Run: `cd frontend && npx vitest run src/lib/api/real/historyApi.test.ts`
-Expected: FAIL (módulo não existe).
-
-- [ ] **Step 3: Implementar**
-
-```typescript
-// frontend/src/lib/api/real/historyApi.ts
-import type { HistoryApi } from '../contracts'
-import type { HistoryResponse, Window } from '../../types'
-import { authedGet } from './httpClient'
-
-export const realHistoryApi: HistoryApi = {
-  getHistory: (code, window: Window) =>
-    authedGet(`/sensores/${code}/historico?window=${window}`) as Promise<HistoryResponse>,
-}
-```
-
-- [ ] **Step 4: Rodar e confirmar sucesso**
-
-Run: `cd frontend && npx vitest run src/lib/api/real/historyApi.test.ts`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add frontend/src/lib/api/real/historyApi.ts frontend/src/lib/api/real/historyApi.test.ts
-git commit -m "feat(frontend): realHistoryApi"
-```
+**SKIP — não dispachar.** Já entregue como `frontend/src/lib/api/real/historyApi.ts`, commit `fc7a472`
+em master, já wired em `index.ts`.
 
 ---
 
@@ -511,7 +223,7 @@ git commit -m "feat(frontend): realHistoryApi"
 - Test: `frontend/src/lib/api/real/liveApi.test.ts`
 
 **Interfaces:**
-- Consumes: `realMetaApi.getThreshold` (Task 3), `realHistoryApi.getHistory` (Task 4), `computeStatus` de `../../status` (já existe).
+- Consumes: `realMetaApi.getThreshold` (já existe em `frontend/src/lib/api/real/metaApi.ts`), `realHistoryApi.getHistory` (já existe em `frontend/src/lib/api/real/historyApi.ts`), `computeStatus` de `../../status` (já existe).
 - Produces: `realLiveApi: LiveApi` (usado pelo `index.ts` na Task 7). Sem endpoint de streaming dedicado — faz polling de `historico?window=1h` a cada 3s e emite o último ponto.
 
 - [ ] **Step 1: Escrever o teste**
@@ -735,10 +447,10 @@ export const mockAlarmApi: AlarmApi = {
 // frontend/src/lib/api/real/alarmApi.ts
 import type { AlarmApi } from '../contracts'
 import type { AlarmEvent } from '../../types'
-import { authedGet } from './httpClient'
+import { authFetchJson } from './http'
 
 export const realAlarmApi: AlarmApi = {
-  listAlarms: () => authedGet('/alarmes') as Promise<AlarmEvent[]>,
+  listAlarms: () => authFetchJson<AlarmEvent[]>('/alarmes'),
 }
 ```
 
@@ -765,8 +477,12 @@ git commit -m "feat(frontend): contrato AlarmApi + adapters mock/real"
 - Test: `frontend/src/lib/demoMode.test.ts`
 
 **Interfaces:**
-- Consumes: `realMetaApi`/`realHistoryApi`/`realLiveApi`/`realAlarmApi` (Tasks 3–6).
+- Consumes: `realMetaApi`/`realHistoryApi` (já existem em master), `realLiveApi` (Task 5), `realAlarmApi` (Task 6).
 - Produces: `metaApi`/`historyApi`/`liveApi`/`alarmApi` exportados de `index.ts` já resolvidos pelo modo; `isDemoMode(): boolean` (usado pela Task 17).
+- Nota: `index.ts` atual (master) já liga `authApi`/`metaApi`/`historyApi` reais com um ternário inline por
+  export (não uma const `useReal` compartilhada) e um comentário próprio. O Step 3 abaixo substitui o
+  arquivo inteiro por uma versão equivalente + `liveApi`/`alarmApi` — funcionalmente idêntica pro que já
+  existe, só reorganizada. Isso é intencional, não uma regressão.
 
 - [ ] **Step 1: Escrever os testes**
 
@@ -1443,7 +1159,7 @@ git commit -m "feat(frontend): faixa verde de conformidade no grafico (markArea)
 - Create: `frontend/src/components/LiveClock.tsx`
 - Test: `frontend/src/components/Topbar.test.tsx`
 - Test: `frontend/src/components/LiveClock.test.tsx`
-- Delete: `frontend/src/components/HeaderActions.tsx` (absorvido pelo Topbar)
+- `frontend/src/components/HeaderActions.tsx` (absorvido pelo Topbar) — **NÃO deletar nesta task**, ver Step 4. Deletado só na Task 16, junto das páginas que ainda o importam.
 
 **Interfaces:**
 - Consumes: `ThemeToggle` (Task 9), `LogoutButton` (já existe).
@@ -1596,16 +1312,17 @@ export function Topbar({ healthy, unitName }: { healthy: boolean; unitName: stri
 }
 ```
 
-- [ ] **Step 4: Deletar `HeaderActions.tsx` e o teste correspondente (se houver)**
+- [ ] **Step 4: NÃO deletar `HeaderActions.tsx` ainda**
 
-```bash
-git rm frontend/src/components/HeaderActions.tsx
-```
+Correção pós-merge: `HeaderActions.tsx` ainda é importado por `OverviewPage.tsx`/`AreaPage.tsx`/
+`SensorDetailPage.tsx` (vivas até a Task 16). Deletar agora quebra o import dessas 3 páginas — ao
+contrário do mismatch de props do `AreaCard` (Task 11), um módulo faltando é falha de resolução, não
+silenciosa. `HeaderActions.tsx` só é deletado na Task 16, junto das páginas que o importam.
 
 - [ ] **Step 5: Rodar e confirmar sucesso**
 
-Run: `cd frontend && npx vitest run src/components/LiveClock.test.tsx src/components/Topbar.test.tsx`
-Expected: PASS. (Referências a `HeaderActions` em `OverviewPage`/`SensorDetailPage`/`AreaPage` são resolvidas na Task 16, que substitui essas páginas.)
+Run: `cd frontend && npx vitest run src/components/LiveClock.test.tsx src/components/Topbar.test.tsx`, depois `npx vitest run` (suite inteira — deve continuar 100% verde, `HeaderActions.tsx` não foi tocado).
+Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -1824,7 +1541,7 @@ git commit -m "feat(frontend): AlarmPanel + AlarmItem + useAlarms"
 
 **Interfaces:**
 - Consumes: `AlarmEvent[]` (mesma lista de `useAlarms`, Task 14).
-- Produces: `<ToastContainer alarms />` — detecta `id`s novos desde a última lista recebida e dispara um toast por evento novo, auto-dispensado em 6s. Usado pela `DashboardPage` (Task 16).
+- Produces: `<ToastContainer alarms loaded />` — detecta `id`s novos desde a última lista recebida e dispara um toast por evento novo, auto-dispensado em 6s. `loaded` (bool, obrigatório) trava a captura da baseline/diff enquanto os dados ainda estão carregando (evita toast-storm de alarmes pré-existentes quando `useAlarms()` resolve pela 1a vez). Usado pela `DashboardPage` (Task 16) como `loaded={!alarmsQuery.isLoading}`. [Corrigido pós-review da Task 15 — ver `.superpowers/sdd/progress.md`]
 
 - [ ] **Step 1: Escrever o teste**
 
@@ -1965,7 +1682,7 @@ git commit -m "feat(frontend): Toast + ToastContainer (dispara em alarme/normali
 - Create: `frontend/src/pages/DashboardPage.tsx`
 - Create: `frontend/src/components/SensorDetailPanel.tsx`
 - Delete: `frontend/src/pages/OverviewPage.tsx`, `frontend/src/pages/SensorDetailPage.tsx`, `frontend/src/pages/AreaPage.tsx`
-- Delete: `frontend/src/components/SensorRow.tsx`, `frontend/src/components/LiveReadout.tsx`, `frontend/src/components/ThresholdBadge.tsx`
+- Delete: `frontend/src/components/SensorRow.tsx`, `frontend/src/components/LiveReadout.tsx`, `frontend/src/components/ThresholdBadge.tsx`, `frontend/src/components/HeaderActions.tsx` (só agora — Task 13 criou o `Topbar` que o substitui, mas não pôde deletar `HeaderActions.tsx` ainda porque as 3 páginas acima ainda o importavam; esta task deleta ambos os lados juntos)
 - Modify: `frontend/src/App.tsx`
 - Test: `frontend/src/pages/DashboardPage.test.tsx`
 - Test: `frontend/src/components/SensorDetailPanel.test.tsx`
@@ -2238,7 +1955,7 @@ export function DashboardPage() {
   return (
     <div>
       <Topbar healthy={healthy} unitName={UNIT_NAME} />
-      <ToastContainer alarms={alarms} />
+      <ToastContainer alarms={alarms} loaded={!alarmsQuery.isLoading} />
 
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
         <p className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
@@ -2329,7 +2046,8 @@ git rm frontend/src/pages/OverviewPage.tsx frontend/src/pages/OverviewPage.test.
        frontend/src/pages/AreaPage.tsx \
        frontend/src/components/SensorRow.tsx \
        frontend/src/components/LiveReadout.tsx frontend/src/components/LiveReadout.test.tsx \
-       frontend/src/components/ThresholdBadge.tsx
+       frontend/src/components/ThresholdBadge.tsx \
+       frontend/src/components/HeaderActions.tsx
 ```
 
 - [ ] **Step 8: Rodar a suite inteira e confirmar sucesso**
@@ -2496,3 +2214,119 @@ Run: `cd frontend && VITE_API_MODE=real VITE_UNIT_NAME="Hospital Demonstração 
 - [ ] **Step 6: Registrar o resultado**
 
 Se algum item falhar, abrir um ajuste pontual (não um novo plano) nos arquivos relevantes, re-rodar a suite (`npx vitest run`), commitar. Se tudo passar, este é o último passo do plano — não precisa de commit próprio.
+
+---
+
+## Task 18a (addendum, achada rodando a Task 18): bugs de modo real
+
+Rodando o app de verdade (`VITE_API_MODE=real`) pela primeira vez nesta fatia, 2 bugs reais apareceram —
+nenhum dos dois é pego pela suite (que roda 100% mock):
+
+**Bug 1 — subscribe com sensor_code vazio.** `DashboardPage.tsx` chama `useLiveTail(selectedCode ?? '')`
+antes dos sensores carregarem (`selectedCode` começa `null`). `useLiveTail`/`useLiveStatuses` não têm
+conceito de `enabled` (não são React Query) — `realLiveApi.subscribe('', cb)` dispara na hora, batendo
+`GET /sensores//threshold` e `GET /sensores//historico?window=1h` (404, barra dupla) a cada poll (3s) até
+os sensores carregarem.
+
+- **Fix:** `frontend/src/lib/api/real/liveApi.ts` — `subscribe` retorna um no-op (`() => {}`) sem chamar
+  `realMetaApi.getThreshold`/`realHistoryApi.getHistory` quando `sensor_code === ''`.
+
+**Bug 2 — cliente XML-RPC compartilhado sem lock (backend, pré-existente).** `api/odoo.py`
+(`get_cliente_servico`, `@lru_cache`) devolve o MESMO `ServerProxy` XML-RPC pra todas as requests. A
+DashboardPage é a primeira coisa no projeto a disparar várias chamadas reais em paralelo pro backend
+(sensores + alarmes + thresholds×N + polling do live) — duas requests concorrentes reusando a mesma
+conexão HTTP persistente colidem: `http.client.ResponseNotReady: Idle` → 500 sem corpo JSON limpo → como
+a exceção não tratada escapa do meio do stack do Starlette antes de `CORSMiddleware` injetar headers na
+resposta, o browser reporta "blocked by CORS policy" (sintoma enganoso — a causa real é o 500 de
+concorrência, não config de CORS).
+
+- **Fix:** lock (`threading.Lock`) em `ingestao/odoo_cliente.py` — todo `executar(...)` (a função que
+  chama `cliente.models.execute_kw`) serializa via lock module-level antes de usar a conexão XML-RPC
+  compartilhada. Fix mínimo (serializa acesso à conexão, não redesenha pooling/conexão-por-request) —
+  aceitável dado que o volume de chamadas por request do dashboard é pequeno (não é hot path de alta
+  concorrência).
+
+- [ ] **Step 1: Escrever os testes**
+
+Para o Bug 1 (`frontend/src/lib/api/real/liveApi.test.ts` — adicionar ao describe existente):
+
+```typescript
+it('sensor_code vazio: nao chama getThreshold/getHistory, devolve unsubscribe no-op', async () => {
+  const cb = vi.fn()
+  const unsub = realLiveApi.subscribe('', cb)
+  await vi.runOnlyPendingTimersAsync().catch(() => {})
+  expect(realMetaApi.getThreshold).not.toHaveBeenCalled()
+  expect(realHistoryApi.getHistory).not.toHaveBeenCalled()
+  expect(cb).not.toHaveBeenCalled()
+  expect(() => unsub()).not.toThrow()
+})
+```
+
+Para o Bug 2, um teste Python de concorrência real contra o backend (`api/tests/test_odoo_concorrencia.py`):
+
+```python
+import threading
+from api.odoo import get_cliente_servico
+from ingestao import odoo_cliente
+
+def test_chamadas_concorrentes_nao_colidem():
+    cliente = get_cliente_servico()
+    erros = []
+
+    def chamar():
+        try:
+            odoo_cliente.executar(cliente, 'sensor_monitor.sensor', 'search_read', [], fields=['sensor_code'])
+        except Exception as exc:  # noqa: BLE001 -- queremos capturar QUALQUER falha de concorrencia
+            erros.append(exc)
+
+    threads = [threading.Thread(target=chamar) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert erros == [], f"chamadas concorrentes falharam: {erros}"
+```
+
+- [ ] **Step 2: Rodar e confirmar falha**
+
+Run: `cd frontend && npx vitest run src/lib/api/real/liveApi.test.ts` — FAIL (comportamento atual chama getThreshold/getHistory mesmo com code vazio).
+Run: `python3 -m pytest api/tests/test_odoo_concorrencia.py -v` — FAIL (`ResponseNotReady` ou erro de conexão em pelo menos 1 das 8 threads, de forma não-determinística — pode precisar rodar mais de uma vez pra reproduzir, é uma race condition).
+
+- [ ] **Step 3: Implementar**
+
+`frontend/src/lib/api/real/liveApi.ts` — guarda no topo de `subscribe`:
+```typescript
+subscribe(sensor_code, cb) {
+  if (sensor_code === '') return () => {}
+  // ... resto inalterado
+```
+
+`ingestao/odoo_cliente.py` — lock module-level em torno do XML-RPC:
+```python
+import threading
+
+_lock = threading.Lock()
+
+def executar(cliente, modelo, metodo, *args, **kwargs):
+    with _lock:
+        return cliente.models.execute_kw(
+            cliente.db, cliente.uid, cliente.senha, modelo, metodo, list(args), kwargs,
+        )
+```
+(usar a assinatura/corpo REAL de `executar` já existente em `ingestao/odoo_cliente.py` — só envolver a
+chamada de rede existente com `with _lock:`, não reescrever a função.)
+
+- [ ] **Step 4: Rodar e confirmar sucesso**
+
+Run: `cd frontend && npx vitest run` — suite inteira verde.
+Run: `python3 -m pytest api/tests/ -v` — suite inteira verde, incluindo o novo teste de concorrência
+rodado umas 3x seguidas pra ganhar confiança de que não é flaky.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/lib/api/real/liveApi.ts frontend/src/lib/api/real/liveApi.test.ts \
+        ingestao/odoo_cliente.py api/tests/test_odoo_concorrencia.py
+git commit -m "fix: subscribe com sensor_code vazio e race no cliente XML-RPC compartilhado (achados na verificacao visual)"
+```

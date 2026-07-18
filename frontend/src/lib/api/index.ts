@@ -1,23 +1,24 @@
-import type { MetaApi, HistoryApi, LiveApi, AuthApi } from './contracts'
+import type { MetaApi, HistoryApi, LiveApi, AuthApi, AlarmApi } from './contracts'
 import { mockMetaApi } from './mock/metaApi'
 import { mockHistoryApi } from './mock/historyApi'
 import { mockLiveApi } from './mock/liveApi'
 import { mockAuthApi } from './mock/authApi'
+import { mockAlarmApi } from './mock/alarmApi'
 import { realAuthApi } from './real/authApi'
 import { realMetaApi } from './real/metaApi'
 import { realHistoryApi } from './real/historyApi'
 import { realLiveApi } from './real/liveApi'
+import { realAlarmApi } from './real/alarmApi'
 
-// Fase 3 (real) entra aqui sem tocar componentes: os 4 adapters ja tem impl
-// real (ver frontend/CONTRACTS.md).
 const mode = import.meta.env.VITE_API_MODE ?? 'mock'
-if (mode === 'real') {
-  console.info('VITE_API_MODE=real: todos os adapters reais (auth/meta/history/live)')
-} else if (mode !== 'mock') {
+if (mode !== 'real' && mode !== 'mock') {
   console.warn(`VITE_API_MODE=${mode} nao reconhecido; usando mock para todos os adapters`)
 }
 
-export const authApi: AuthApi = mode === 'real' ? realAuthApi : mockAuthApi
-export const metaApi: MetaApi = mode === 'real' ? realMetaApi : mockMetaApi
-export const historyApi: HistoryApi = mode === 'real' ? realHistoryApi : mockHistoryApi
-export const liveApi: LiveApi = mode === 'real' ? realLiveApi : mockLiveApi
+const useReal = mode === 'real'
+
+export const authApi: AuthApi = useReal ? realAuthApi : mockAuthApi
+export const metaApi: MetaApi = useReal ? realMetaApi : mockMetaApi
+export const historyApi: HistoryApi = useReal ? realHistoryApi : mockHistoryApi
+export const liveApi: LiveApi = useReal ? realLiveApi : mockLiveApi
+export const alarmApi: AlarmApi = useReal ? realAlarmApi : mockAlarmApi

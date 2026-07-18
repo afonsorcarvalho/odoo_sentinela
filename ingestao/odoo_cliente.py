@@ -1,5 +1,8 @@
+import threading
 import xmlrpc.client
 from datetime import datetime, timezone
+
+_lock = threading.Lock()
 
 
 class ClienteOdoo:
@@ -21,9 +24,10 @@ def conectar(url, db, usuario, senha):
 
 
 def executar(cliente, model, metodo, *args, **kwargs):
-    return cliente.models.execute_kw(
-        cliente.db, cliente.uid, cliente.senha, model, metodo, list(args), kwargs,
-    )
+    with _lock:
+        return cliente.models.execute_kw(
+            cliente.db, cliente.uid, cliente.senha, model, metodo, list(args), kwargs,
+        )
 
 
 def resolver_coletor(cliente, coletor_code):

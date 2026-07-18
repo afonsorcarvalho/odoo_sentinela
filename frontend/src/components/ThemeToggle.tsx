@@ -1,13 +1,5 @@
 import { useEffect, useState } from 'react'
 
-function prefersDark(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-}
-
-// Sol/lua minimalistas — mesmo peso visual dos ícones de status do readout
-// (stroke-based, 16x16 viewBox), para não introduzir um segundo vocabulário
-// gráfico na página.
 function SunIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
@@ -29,23 +21,25 @@ function MoonIcon() {
 }
 
 export function ThemeToggle() {
-  const [dark, setDark] = useState(prefersDark)
+  // Control (escuro) e o tema padrao recomendado p/ monitoramento continuo —
+  // nao segue mais prefers-color-scheme do SO.
+  const [control, setControl] = useState(true)
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-  }, [dark])
+    document.documentElement.classList.toggle('theme-control', control)
+  }, [control])
 
   return (
     <button
       type="button"
-      onClick={() => setDark((d) => !d)}
+      onClick={() => setControl((c) => !c)}
       className="flex min-h-11 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold outline-none transition-colors duration-200 ease-out hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
       style={{ border: '1px solid var(--color-line)', color: 'var(--color-muted)' }}
-      aria-pressed={dark}
-      aria-label={dark ? 'Trocar para tema claro' : 'Trocar para tema escuro'}
+      aria-pressed={control}
+      aria-label={control ? 'Trocar para tema claro' : 'Trocar para tema escuro'}
     >
-      {dark ? <SunIcon /> : <MoonIcon />}
-      <span>{dark ? 'Claro' : 'Escuro'}</span>
+      {control ? <SunIcon /> : <MoonIcon />}
+      <span>{control ? 'Claro' : 'Escuro'}</span>
     </button>
   )
 }

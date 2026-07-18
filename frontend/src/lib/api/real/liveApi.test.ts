@@ -90,4 +90,14 @@ describe('realLiveApi', () => {
 
     expect(MockEventSource.instances[0].closed).toBe(true)
   })
+
+  it('sensor_code vazio: nao abre EventSource, devolve unsubscribe no-op', () => {
+    const cb = vi.fn()
+
+    const unsubscribe = realLiveApi.subscribe('', cb)
+
+    expect(MockEventSource.instances).toHaveLength(0)
+    expect(cb).not.toHaveBeenCalled()
+    expect(() => unsubscribe()).not.toThrow()
+  })
 })

@@ -195,7 +195,9 @@ SELECT add_continuous_aggregate_policy('sensor_reading_daily',
 
 - [ ] **Step 2: Recriar o container do Timescale do zero (o init.sql só roda em volume vazio)**
 
-Run: `docker compose down timescaledb && docker volume rm odoo_sentinela_timescale-data && docker compose up -d timescaledb && sleep 10`
+Run: `docker compose down timescaledb && docker volume rm backend-fase1_timescale-data && docker compose up -d timescaledb && sleep 10`
+
+Note: the exact volume name is `<compose-project-name>_timescale-data` — Compose derives the project name from the working directory unless overridden. Confirm with `docker volume ls | grep timescale-data` before removing if the project name might differ.
 Expected: container sobe sem erro.
 
 - [ ] **Step 3: Verificar a hypertable e inserir/consultar uma linha de teste**

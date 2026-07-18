@@ -5,3 +5,5 @@ dist/
 .remember/
 .worktrees/
 .superpowers/
+coletor_simulado/identidade/
+coletor_simulado/output/

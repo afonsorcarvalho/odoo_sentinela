@@ -7,3 +7,4 @@ from . import hub
 from . import coletor
 from . import sensor
 from . import alarm_threshold
+from . import alarm_event

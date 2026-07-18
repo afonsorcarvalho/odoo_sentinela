@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: postgres
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  odoo:
+    image: odoo:18.0
+    depends_on:
+      - db
+    ports:
+      - "8189:8069"
+    volumes:
+      - ./addons:/mnt/extra-addons
+      - ./conf:/etc/odoo
+      - odoo-filestore:/var/lib/odoo
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16
+    environment:
+      POSTGRES_USER: sentinela
+      POSTGRES_PASSWORD: sentinela
+      POSTGRES_DB: sentinela
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale-data:/home/postgres/pgdata/data
+      - ./timescale/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+volumes:
+  odoo-db-data:
+  odoo-filestore:
+  timescale-data:

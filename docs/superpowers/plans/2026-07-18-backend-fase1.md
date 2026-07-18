@@ -31,7 +31,7 @@
 - Create: `timescale/init.sql` (vazio nesta task, populado na Task 2)
 
 **Interfaces:**
-- Produces: serviço `odoo` acessível em `http://localhost:8069`; banco `postgres-odoo` acessível internamente em `db:5432`; banco `timescaledb` acessível internamente em `timescaledb:5432` e externamente em `localhost:5433`.
+- Produces: serviço `odoo` acessível em `http://localhost:8189`; banco `postgres-odoo` acessível internamente em `db:5432`; banco `timescaledb` acessível internamente em `timescaledb:5432` e externamente em `localhost:5433`.
 
 - [ ] **Step 1: Criar `conf/odoo.conf`**
 
@@ -65,7 +65,7 @@ services:
     depends_on:
       - db
     ports:
-      - "8069:8069"
+      - "8189:8069"
     volumes:
       - ./addons:/mnt/extra-addons
       - ./conf:/etc/odoo
@@ -100,7 +100,7 @@ touch addons/.gitkeep timescale/init.sql
 
 - [ ] **Step 4: Subir os containers e verificar Odoo respondendo**
 
-Run: `docker compose up -d && sleep 15 && curl -sf -o /dev/null -w "%{http_code}\n" http://localhost:8069/web/login`
+Run: `docker compose up -d && sleep 15 && curl -sf -o /dev/null -w "%{http_code}\n" http://localhost:8189/web/login`
 Expected: `200`
 
 - [ ] **Step 5: Criar o banco de dados de desenvolvimento/teste**

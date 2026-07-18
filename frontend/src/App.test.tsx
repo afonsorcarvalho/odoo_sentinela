@@ -29,14 +29,17 @@ describe('App routing', () => {
     await waitFor(() => expect(screen.getByText(/Temperatura — Expurgo/)).toBeInTheDocument())
   })
 
-  it('clicar num cartao da Overview navega pro Detalhe, e Voltar retorna', async () => {
+  it('fluxo completo: Overview -> Area -> Sensor -> Voltar -> Overview', async () => {
     render(wrap(<App />, '/'))
     await waitFor(() => expect(screen.getByText('Expurgo')).toBeInTheDocument(), { timeout: 3000 })
 
     await userEvent.click(screen.getByTestId('area-card-EXPURGO'))
+    await waitFor(() => expect(screen.getByText('Pressão diferencial')).toBeInTheDocument(), { timeout: 3000 })
+
+    await userEvent.click(screen.getByText('Temperatura'))
     await waitFor(() => expect(screen.getByText(/Temperatura — Expurgo/)).toBeInTheDocument())
 
     await userEvent.click(screen.getByRole('link', { name: /voltar/i }))
-    await waitFor(() => expect(screen.getByText('Visão geral')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Visão geral')).toBeInTheDocument(), { timeout: 3000 })
   })
 })

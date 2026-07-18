@@ -25,9 +25,9 @@ describe('AreaCard', () => {
     expect(screen.getByText('Expurgo')).toBeInTheDocument()
   })
 
-  it('e um link pro sensor da area', () => {
+  it('e um link pra pagina da area', () => {
     render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{}} />))
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/sensor/TEMP-EXP-01')
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/area/EXPURGO')
   })
 
   it('sensor ok: mostra "Dentro da faixa", sem badge de alarme', () => {

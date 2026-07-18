@@ -44,7 +44,10 @@ describe('App routing', () => {
     await waitFor(() => expect(screen.getByText(/Temperatura — Expurgo/)).toBeInTheDocument())
   })
 
-  it('fluxo completo: Overview -> Area -> Sensor -> Voltar -> Overview', async () => {
+  // Testa a navegacao pre-fusao (Overview -> AreaPage -> SensorDetailPage via Link).
+  // AreaCard nao navega mais (Task 11); este fluxo sera substituido por testes
+  // da DashboardPage fundida (Task 16 do plano de redesign visual).
+  it.skip('fluxo completo: Overview -> Area -> Sensor -> Voltar -> Overview', async () => {
     render(wrap(<App />, '/'))
     await waitFor(() => expect(screen.getByText('Expurgo')).toBeInTheDocument(), { timeout: 3000 })
 

@@ -1,0 +1,17 @@
+<odoo>
+    <record id="measurement_type_temperatura" model="sensor_monitor.measurement.type">
+        <field name="name">Temperatura</field>
+        <field name="code">temperatura</field>
+        <field name="unidade_padrao">C</field>
+    </record>
+    <record id="measurement_type_umidade_relativa" model="sensor_monitor.measurement.type">
+        <field name="name">Umidade Relativa</field>
+        <field name="code">umidade_relativa</field>
+        <field name="unidade_padrao">%UR</field>
+    </record>
+    <record id="measurement_type_pressao_diferencial" model="sensor_monitor.measurement.type">
+        <field name="name">Pressão Diferencial</field>
+        <field name="code">pressao_diferencial</field>
+        <field name="unidade_padrao">Pa</field>
+    </record>
+</odoo>

@@ -4,7 +4,10 @@
     'category': 'Manufacturing/Maintenance',
     'summary': 'Cadastro e monitoramento de sensores industriais (CME hospitalar e outros verticais)',
     'depends': ['base', 'mail'],
-    'data': [],
+    'data': [
+        'data/area_category_data.xml',
+        'data/measurement_type_data.xml',
+    ],
     'installable': True,
     'application': True,
     'license': 'LGPL-3',

@@ -1,0 +1,17 @@
+<odoo>
+    <record id="area_category_expurgo" model="sensor_monitor.area.category">
+        <field name="name">Expurgo</field>
+        <field name="code">EXPURGO</field>
+        <field name="vertical">cme_hospitalar</field>
+    </record>
+    <record id="area_category_preparo_esterilizacao" model="sensor_monitor.area.category">
+        <field name="name">Preparo/Esterilização</field>
+        <field name="code">PREPARO_ESTERILIZACAO</field>
+        <field name="vertical">cme_hospitalar</field>
+    </record>
+    <record id="area_category_desinfeccao_quimica" model="sensor_monitor.area.category">
+        <field name="name">Desinfecção Química</field>
+        <field name="code">DESINFECCAO_QUIMICA</field>
+        <field name="vertical">cme_hospitalar</field>
+    </record>
+</odoo>

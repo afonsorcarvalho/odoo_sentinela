@@ -10,12 +10,15 @@ vi.mock('echarts', () => ({ init: () => ({ setOption: vi.fn(), dispose: vi.fn(),
 
 import { SensorDetailPage } from './SensorDetailPage'
 import * as api from '../lib/api'
+import { AuthProvider } from '../lib/useAuth'
 
 function wrap(node: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return (
     <QueryClientProvider client={qc}>
-      <MemoryRouter>{node}</MemoryRouter>
+      <MemoryRouter>
+        <AuthProvider>{node}</AuthProvider>
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }

@@ -57,4 +57,26 @@ describe('App routing', () => {
     await userEvent.click(screen.getByRole('link', { name: /voltar/i }))
     await waitFor(() => expect(screen.getByText('Visão geral')).toBeInTheDocument(), { timeout: 3000 })
   })
+
+  it('fluxo completo de auth: sem login redireciona, loga, navega, desloga, bloqueia de novo', async () => {
+    localStorage.clear() // sobrescreve o beforeEach (que semeia token valido) -- comeca deslogado de proposito
+    render(wrap(<App />, '/'))
+
+    // sem token, tentar acessar / redireciona pra tela de login
+    await waitFor(() => expect(screen.getByLabelText('Usuário')).toBeInTheDocument())
+
+    await userEvent.type(screen.getByLabelText('Usuário'), 'admin')
+    await userEvent.type(screen.getByLabelText('Senha'), 'admin')
+    await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
+
+    // login ok, entra na Overview
+    await waitFor(() => expect(screen.getByText('Visão geral')).toBeInTheDocument(), { timeout: 3000 })
+
+    // desloga
+    await userEvent.click(screen.getByRole('button', { name: /sair/i }))
+
+    // volta pra tela de login, e o token sumiu do storage
+    await waitFor(() => expect(screen.getByLabelText('Usuário')).toBeInTheDocument())
+    expect(localStorage.getItem('sentinela_token')).toBeNull()
+  })
 })

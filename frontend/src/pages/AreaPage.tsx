@@ -3,7 +3,7 @@ import { useSensors, useThresholds } from '../lib/queries'
 import { useLiveStatuses } from '../lib/useLiveStatuses'
 import { groupSensorsByArea } from '../lib/aggregateStatus'
 import { SensorRow } from '../components/SensorRow'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { HeaderActions } from '../components/HeaderActions'
 
 function SkeletonRow() {
   return (
@@ -39,7 +39,7 @@ export function AreaPage() {
         >
           ← Voltar
         </Link>
-        <ThemeToggle />
+        <HeaderActions />
       </div>
 
       {sensorsQuery.isError ? (

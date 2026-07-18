@@ -2,7 +2,7 @@ import { useSensors, useThresholds } from '../lib/queries'
 import { useLiveStatuses } from '../lib/useLiveStatuses'
 import { groupSensorsByArea } from '../lib/aggregateStatus'
 import { AreaCard } from '../components/AreaCard'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { HeaderActions } from '../components/HeaderActions'
 
 function SkeletonCard() {
   return (
@@ -33,7 +33,7 @@ export function OverviewPage() {
         <h1 className="text-xl font-bold" style={{ color: 'var(--color-ink)' }}>
           Visão geral
         </h1>
-        <ThemeToggle />
+        <HeaderActions />
       </header>
 
       {sensorsQuery.isError ? (

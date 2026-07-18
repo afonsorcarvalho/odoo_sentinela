@@ -5,15 +5,18 @@ import { MemoryRouter, Routes, Route } from 'react-router'
 import type { ReactNode } from 'react'
 
 import { AreaPage } from './AreaPage'
+import { AuthProvider } from '../lib/useAuth'
 
 function wrap(node: ReactNode, initialPath: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return (
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialPath]}>
-        <Routes>
-          <Route path="/area/:areaCode" element={node} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/area/:areaCode" element={node} />
+          </Routes>
+        </AuthProvider>
       </MemoryRouter>
     </QueryClientProvider>
   )

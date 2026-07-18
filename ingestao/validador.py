@@ -16,6 +16,9 @@ class ResultadoValidacao:
     motivo_rejeicao: str
     total_linhas: int
     coletor_id: str
+    data_referencia: str = None
+    hash_final: str = None
+    assinatura: str = None
     leituras: list = field(default_factory=list)
 
 
@@ -81,7 +84,21 @@ def validar_arquivo(caminho, registro_path):
     texto = Path(caminho).read_text()
     metadados_cab, cabecalho_canonico, linhas_corpo, metadados_rod = parse_arquivo(texto)
     coletor_id = metadados_cab.get('coletor_id')
+    data_referencia = metadados_cab.get('data_referencia')
+    hash_final_declarado = metadados_rod.get('hash_final')
+    assinatura_declarada = metadados_rod.get('assinatura')
     total_linhas = len(linhas_corpo)
+
+    def _invalido(motivo):
+        return ResultadoValidacao(
+            status_validacao='invalido',
+            motivo_rejeicao=motivo,
+            total_linhas=total_linhas,
+            coletor_id=coletor_id,
+            data_referencia=data_referencia,
+            hash_final=hash_final_declarado,
+            assinatura=assinatura_declarada,
+        )
 
     hash_atual = _hash_seed(cabecalho_canonico)
     leituras = []
@@ -89,49 +106,31 @@ def validar_arquivo(caminho, registro_path):
         parsed = parse_linha_leitura(linha)
         hash_esperado = _hash_linha(hash_atual, parsed['linha_sem_hash'])
         if hash_esperado != parsed['hash']:
-            return ResultadoValidacao(
-                status_validacao='invalido',
-                motivo_rejeicao=f"cadeia de hash quebrada na linha seq={parsed['seq']}",
-                total_linhas=total_linhas,
-                coletor_id=coletor_id,
-            )
+            return _invalido(f"cadeia de hash quebrada na linha seq={parsed['seq']}")
         hash_atual = hash_esperado
         leituras.append(parsed)
 
-    hash_final_declarado = metadados_rod.get('hash_final')
     if hash_atual != hash_final_declarado:
-        return ResultadoValidacao(
-            status_validacao='invalido',
-            motivo_rejeicao='hash_final do rodapé não bate com a cadeia recalculada',
-            total_linhas=total_linhas,
-            coletor_id=coletor_id,
-        )
+        return _invalido('hash_final do rodapé não bate com a cadeia recalculada')
 
     try:
         chave_publica = registro_coletores.obter_chave_publica(registro_path, coletor_id)
     except KeyError as exc:
-        return ResultadoValidacao(
-            status_validacao='invalido',
-            motivo_rejeicao=str(exc),
-            total_linhas=total_linhas,
-            coletor_id=coletor_id,
-        )
+        return _invalido(str(exc))
 
-    assinatura = base64.b64decode(metadados_rod.get('assinatura'))
+    assinatura = base64.b64decode(assinatura_declarada)
     try:
         chave_publica.verify(assinatura, hash_final_declarado.encode(), ec.ECDSA(hashes.SHA256()))
     except InvalidSignature:
-        return ResultadoValidacao(
-            status_validacao='invalido',
-            motivo_rejeicao='assinatura inválida',
-            total_linhas=total_linhas,
-            coletor_id=coletor_id,
-        )
+        return _invalido('assinatura inválida')
 
     return ResultadoValidacao(
         status_validacao='valido',
         motivo_rejeicao=None,
         total_linhas=total_linhas,
         coletor_id=coletor_id,
+        data_referencia=data_referencia,
+        hash_final=hash_final_declarado,
+        assinatura=assinatura_declarada,
         leituras=leituras,
     )

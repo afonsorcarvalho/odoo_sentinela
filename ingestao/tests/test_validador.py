@@ -22,13 +22,16 @@ def test_validar_arquivo_correto(tmp_path):
     assert len(resultado.leituras) == 2880
     assert resultado.coletor_id == gerador_simulado.COLETOR_ID
     assert resultado.motivo_rejeicao is None
+    assert resultado.data_referencia == '2026-07-18'
+    assert resultado.hash_final is not None
+    assert resultado.assinatura is not None
 
 
 def test_validar_arquivo_com_linha_corrompida(tmp_path):
     caminho_arquivo, registro_path = _gerar_arquivo_e_registrar(tmp_path)
     linhas = caminho_arquivo.read_text().split('\n')
-    campos = linhas[9].split('|')  # primeira linha de corpo (9 linhas de cabecalho antes)
-    campos[5] = '999.9'  # campo 'valor'
+    campos = linhas[9].split('|')
+    campos[5] = '999.9'
     linhas[9] = '|'.join(campos)
     caminho_arquivo.write_text('\n'.join(linhas))
 
@@ -36,6 +39,7 @@ def test_validar_arquivo_com_linha_corrompida(tmp_path):
     assert resultado.status_validacao == 'invalido'
     assert 'hash' in resultado.motivo_rejeicao.lower()
     assert resultado.leituras == []
+    assert resultado.data_referencia == '2026-07-18'
 
 
 def test_validar_arquivo_com_chave_errada_registrada(tmp_path):

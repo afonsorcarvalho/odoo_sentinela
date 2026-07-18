@@ -13,7 +13,7 @@ SENSORES = [
 AREA_ID = 'EXPURGO'
 COLETOR_ID = 'COL-SIM-0001'
 HUB_ID = 'HUB-SIM-0001'
-PROTOCOLO_ORIGEM = '4-20ma'
+PROTOCOLO_ORIGEM = '4-20mA'
 FIRMWARE_VERSION = '0.1.0-sim'
 TIMEZONE_OFFSET = '-03:00'
 LIMITE_MIN_PRESSAO_VIGENTE = None
@@ -107,7 +107,11 @@ def main():
     parser.add_argument('--injetar-alarme', action='store_true')
     args = parser.parse_args()
     data = date_cls.fromisoformat(args.data) if args.data else date_cls.today()
-    output_dir = gerar_dia(data, args.output_dir, args.injetar_alarme)
+    chave_path = Path(__file__).parent / 'identidade' / 'coletor_privkey.pem'
+    chave = identidade.carregar_ou_criar_chave(chave_path)
+    fingerprint = identidade.fingerprint_publica(chave)
+    output_dir = gerar_dia(data, args.output_dir, args.injetar_alarme, chave_path=chave_path)
+    print(f"Fingerprint da chave pública: {fingerprint}")
     print(f"Arquivos gerados em {output_dir}")
 
 

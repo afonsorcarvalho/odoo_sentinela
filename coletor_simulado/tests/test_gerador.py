@@ -20,10 +20,18 @@ def test_gerar_dia_com_alarme_injeta_par_entrada_saida(tmp_path):
     output_dir = gerador.gerar_dia(date(2026, 7, 18), tmp_path / 'output', injetar_alarme=True, chave_path=chave_path)
     alarmes = (output_dir / 'COL-SIM-0001_alarmes_2026-07-18.txt').read_text()
     assert '# total_eventos: 2' in alarmes
-    assert 'entrada_alarme' in alarmes
-    assert 'saida_alarme' in alarmes
-    assert 'T02:00:00' in alarmes
-    assert 'T02:07:00' in alarmes
+
+    # Verify timestamps are on the same lines as event types (no transposition)
+    linhas = alarmes.strip().split('\n')
+    corpo_linhas = [l for l in linhas if l and not l.startswith('#')]
+
+    entrada_line = next((l for l in corpo_linhas if 'entrada_alarme' in l), None)
+    saida_line = next((l for l in corpo_linhas if 'saida_alarme' in l), None)
+
+    assert entrada_line is not None, "entrada_alarme not found"
+    assert saida_line is not None, "saida_alarme not found"
+    assert 'T02:00:00' in entrada_line, "T02:00:00 should be on entrada_alarme line"
+    assert 'T02:07:00' in saida_line, "T02:07:00 should be on saida_alarme line"
 
 
 def test_assinatura_do_rodape_de_leituras_verifica(tmp_path):
@@ -31,6 +39,18 @@ def test_assinatura_do_rodape_de_leituras_verifica(tmp_path):
     output_dir = gerador.gerar_dia(date(2026, 7, 18), tmp_path / 'output', chave_path=chave_path)
     chave = identidade.carregar_ou_criar_chave(chave_path)
     conteudo = (output_dir / 'COL-SIM-0001_leituras_2026-07-18.txt').read_text()
+    linhas = conteudo.strip().split('\n')
+    hash_final = next(l for l in linhas if l.startswith('# hash_final:')).split(': ', 1)[1]
+    assinatura_b64 = next(l for l in linhas if l.startswith('# assinatura:')).split(': ', 1)[1]
+    assinatura = base64.b64decode(assinatura_b64)
+    identidade.verificar_assinatura(chave.public_key(), assinatura, hash_final.encode())
+
+
+def test_assinatura_do_rodape_de_alarmes_verifica(tmp_path):
+    chave_path = tmp_path / 'chave.pem'
+    output_dir = gerador.gerar_dia(date(2026, 7, 18), tmp_path / 'output', injetar_alarme=False, chave_path=chave_path)
+    chave = identidade.carregar_ou_criar_chave(chave_path)
+    conteudo = (output_dir / 'COL-SIM-0001_alarmes_2026-07-18.txt').read_text()
     linhas = conteudo.strip().split('\n')
     hash_final = next(l for l in linhas if l.startswith('# hash_final:')).split(': ', 1)[1]
     assinatura_b64 = next(l for l in linhas if l.startswith('# assinatura:')).split(': ', 1)[1]

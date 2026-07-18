@@ -5,6 +5,8 @@
     'summary': 'Cadastro e monitoramento de sensores industriais (CME hospitalar e outros verticais)',
     'depends': ['base', 'mail'],
     'data': [
+        'security/security_rules.xml',
+        'security/ir.model.access.csv',
         'data/area_category_data.xml',
         'data/measurement_type_data.xml',
         'data/file_ledger_cron_data.xml',

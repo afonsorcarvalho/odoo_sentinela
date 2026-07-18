@@ -1,0 +1,144 @@
+<odoo>
+    <record id="group_sensor_monitor_view" model="res.groups">
+        <field name="name">Sensor Monitor / Visualização</field>
+    </record>
+    <record id="group_sensor_monitor_operation" model="res.groups">
+        <field name="name">Sensor Monitor / Operação</field>
+    </record>
+    <record id="group_sensor_monitor_advanced_config" model="res.groups">
+        <field name="name">Sensor Monitor / Configuração Avançada</field>
+    </record>
+    <record id="group_sensor_monitor_admin" model="res.groups">
+        <field name="name">Sensor Monitor / Admin (interno SaaS)</field>
+    </record>
+
+    <record id="rule_site_tenant" model="ir.rule">
+        <field name="name">Site: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_site"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_site_admin" model="ir.rule">
+        <field name="name">Site: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_site"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_area_tenant" model="ir.rule">
+        <field name="name">Área: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_area"/>
+        <field name="domain_force">[('site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_area_admin" model="ir.rule">
+        <field name="name">Área: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_area"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_hub_tenant" model="ir.rule">
+        <field name="name">Hub: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_hub"/>
+        <field name="domain_force">[('site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_hub_admin" model="ir.rule">
+        <field name="name">Hub: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_hub"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_coletor_tenant" model="ir.rule">
+        <field name="name">Coletor: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_coletor"/>
+        <field name="domain_force">[('hub_id.site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_coletor_admin" model="ir.rule">
+        <field name="name">Coletor: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_coletor"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_sensor_tenant" model="ir.rule">
+        <field name="name">Sensor: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_sensor"/>
+        <field name="domain_force">[('coletor_id.hub_id.site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_sensor_admin" model="ir.rule">
+        <field name="name">Sensor: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_sensor"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_alarm_threshold_tenant" model="ir.rule">
+        <field name="name">Threshold: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_alarm_threshold"/>
+        <field name="domain_force">[('sensor_id.coletor_id.hub_id.site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_alarm_threshold_admin" model="ir.rule">
+        <field name="name">Threshold: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_alarm_threshold"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_alarm_event_tenant" model="ir.rule">
+        <field name="name">Evento de alarme: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_alarm_event"/>
+        <field name="domain_force">[('coletor_id.hub_id.site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_alarm_event_admin" model="ir.rule">
+        <field name="name">Evento de alarme: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_alarm_event"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_file_ledger_tenant" model="ir.rule">
+        <field name="name">Ledger: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_file_ledger"/>
+        <field name="domain_force">[('coletor_id.hub_id.site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_file_ledger_admin" model="ir.rule">
+        <field name="name">Ledger: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_file_ledger"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_rs485_bus_tenant" model="ir.rule">
+        <field name="name">Barramento RS-485: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_rs485_bus"/>
+        <field name="domain_force">[('hub_id.site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_rs485_bus_admin" model="ir.rule">
+        <field name="name">Barramento RS-485: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_rs485_bus"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
+    <record id="rule_modbus_device_tenant" model="ir.rule">
+        <field name="name">Dispositivo Modbus: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_modbus_device"/>
+        <field name="domain_force">[('rs485_bus_id.hub_id.site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_modbus_device_admin" model="ir.rule">
+        <field name="name">Dispositivo Modbus: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_modbus_device"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+</odoo>

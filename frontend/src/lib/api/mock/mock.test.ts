@@ -6,9 +6,27 @@ import { mockLiveApi } from './liveApi'
 afterEach(() => vi.useRealTimers())
 
 describe('mockMetaApi', () => {
-  it('devolve sensor e threshold da fixture', async () => {
-    expect((await mockMetaApi.getSensor('x')).sensor_code).toBe('TEMP-EXP-01')
-    expect((await mockMetaApi.getThreshold('x'))?.limite_max).toBe(22)
+  it('getSensor/getThreshold buscam pelo codigo real (TEMP-EXP-01, ja existente)', async () => {
+    expect((await mockMetaApi.getSensor('TEMP-EXP-01')).sensor_code).toBe('TEMP-EXP-01')
+    expect((await mockMetaApi.getThreshold('TEMP-EXP-01'))?.limite_max).toBe(22)
+  })
+  it('listSensors devolve os 3 sensores (Expurgo, Preparo/Esterilizacao, Arsenal)', async () => {
+    const sensors = await mockMetaApi.listSensors()
+    const codes = sensors.map((s) => s.sensor_code).sort()
+    expect(codes).toEqual(['TEMP-ARS-01', 'TEMP-EXP-01', 'TEMP-PRE-01'])
+  })
+  it('Preparo/Esterilizacao tem threshold 20-24', async () => {
+    const t = await mockMetaApi.getThreshold('TEMP-PRE-01')
+    expect(t).toEqual({ sensor_id: 'TEMP-PRE-01', limite_min: 20, limite_max: 24, is_valor_padrao_regulatorio: true })
+  })
+  it('Arsenal nao tem threshold (null, sem lancar erro)', async () => {
+    const sensor = await mockMetaApi.getSensor('TEMP-ARS-01')
+    expect(sensor.area.name).toBe('Arsenal')
+    expect(await mockMetaApi.getThreshold('TEMP-ARS-01')).toBeNull()
+  })
+  it('codigo desconhecido lanca erro em getSensor e getThreshold', async () => {
+    await expect(mockMetaApi.getSensor('NAO-EXISTE')).rejects.toThrow()
+    await expect(mockMetaApi.getThreshold('NAO-EXISTE')).rejects.toThrow()
   })
 })
 

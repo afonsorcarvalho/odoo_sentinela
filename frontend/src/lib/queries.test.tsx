@@ -13,7 +13,7 @@ function wrapper() {
 
 describe('queries', () => {
   it('useSensorMeta carrega a fixture', async () => {
-    const { result } = renderHook(() => useSensorMeta('x'), { wrapper: wrapper() })
+    const { result } = renderHook(() => useSensorMeta('TEMP-EXP-01'), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.sensor_code).toBe('TEMP-EXP-01')
   })
@@ -23,7 +23,7 @@ describe('queries', () => {
     expect(result.current.data?.resolution).toBe('raw')
   })
   it('useThreshold carrega limites', async () => {
-    const { result } = renderHook(() => useThreshold('x'), { wrapper: wrapper() })
+    const { result } = renderHook(() => useThreshold('TEMP-EXP-01'), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.limite_max).toBe(22)
   })

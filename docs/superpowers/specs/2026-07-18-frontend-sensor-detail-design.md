@@ -36,17 +36,58 @@ incrementais** e o gráfico faz `appendData`.
 
 Local do projeto: `odoo_sentinela/frontend/`.
 
-## 3. Design visual
+## 3. Design visual — direção "instrumento calibrado"
 
-- **Fonte da verdade visual**: `demo_dashboard.html`. Portar os CSS custom properties
-  para tokens do `tailwind.config` (teal `--brand:#0e7a82`, `--brand-deep:#0b545a`,
-  status `good #0ca30c` / `warn #b8860b` / `crit #d03b3b`, superfícies, sombras).
-  A SPA inteira herda o sistema de design, não só esta tela.
-- **Dark + light** desde já: tokens definidos para os dois temas; alternância por
-  classe/`prefers-color-scheme`. Demo é light — dark derivado dele.
-- **Gauge**: valor **numérico simples** grande (não radial), com cor de estado
-  (dentro/perto/fora de faixa) e unidade.
-- Guiado pelas skills `frontend-design` e `impeccable` na fase de build.
+> `demo_dashboard.html` **deixa de ser** a fonte da verdade visual. Direção nova,
+> derivada das skills `frontend-design` + `impeccable`, voltada à usabilidade de
+> **enfermeiros e responsáveis técnicos** em ambiente de CME.
+
+**Cena de uso (força as decisões)**: um enfermeiro de luvas olha um tablet de parede
+numa antessala de CME sob luz fluorescente e precisa saber, em menos de dois segundos,
+se a sala de esterilização está dentro da faixa segura; mais tarde o responsável técnico
+revisa a mesma tela no desktop para atestar conformidade RDC 15. Isso impõe:
+glanceabilidade a distância, alvos grandes (luvas), alto contraste (segurança) e leitura
+que não dependa só de cor (daltonismo + rigor regulatório).
+
+**Cor = significado, nunca decoração.** Num monitor de segurança, o trio de status
+(verde `ok` / âmbar `warn` / vermelho `crit`) representa o estado ambiental e **nada
+mais**. Consequência de design: o primary da marca **não pode** ser âmbar (colidiria com
+`warn`) nem verde/vermelho. O seed âmbar sugerido pela paleta é **rejeitado** por esse
+motivo.
+
+**Estratégia de cor: Restrained → quase-monocromático.**
+- UI em cinza-frio de instrumento (grafite/neutros frios). A interface fica quieta; o
+  status é a única cor forte e por isso salta.
+- **Primary** (azul-frio, ~`oklch(0.55 0.13 245)`) usado **só** para interativo:
+  seleção, foco, ação primária, chip de janela ativo. Nunca decorativo.
+- Status: `good ~oklch(0.65 0.16 150)`, `warn ~oklch(0.72 0.15 75)`,
+  `crit ~oklch(0.58 0.19 25)` — clareados no tema escuro. Valores finais afinados no
+  build com verificação de contraste (corpo ≥4.5:1).
+- **Status nunca só por cor**: sempre acompanhado de ícone + rótulo textual
+  ("Dentro da faixa" / "Perto do limite" / "Fora da faixa").
+
+**Tema**: light é o default (ambiente clínico claro, glanceabilidade); dark serve
+estação de monitoramento noturna/escurecida. Ambos desde já — não um derivado do outro,
+cada um afinado (bg light ~branco puro; bg dark ~preto-frio `oklch(0.16 0.008 245)`).
+
+**Tipografia**: uma família UT-sans (Inter/system) para toda a interface + **mono
+tabular** (ex. Geist Mono / IBM Plex Mono) exclusivo para os **valores de leitura** —
+reforça o caráter de instrumento. Escala rem fixa (não fluida), numerais tabulares.
+
+**Assinatura — o readout calibrado.** O valor ao vivo (decisão do usuário: numérico, não
+radial) é renderizado como leitura de instrumento: valor grande em mono tabular + unidade,
+com um **trilho de tolerância** fino logo abaixo — `min ──────●────── max` — onde o ponto
+mostra a posição do valor corrente dentro da faixa segura. Centro = verde; perto da borda
+= âmbar; fora = vermelho. É glanceável a distância e **amarra visualmente** com as
+`markLines` de limite do gráfico (mesma faixa min/max, mesma linguagem). Este é o único
+elemento "memorável"; o resto fica disciplinado.
+
+**Movimento**: só estado (150–250 ms). Atualização do valor com transição sutil; mudança
+de estado de alarme dispara **um** pulso de atenção. Sem coreografia de load. Respeita
+`prefers-reduced-motion` (crossfade/instantâneo).
+
+Tokens vivem no `tailwind.config` (OKLCH), herdados por toda a SPA. `frontend-design` +
+`impeccable` continuam guiando o build.
 
 ## 4. Seam de troca mock→real (crítico)
 
@@ -130,16 +171,17 @@ type LivePoint = {
 
 ```
 SensorDetailPage
-├── LiveGauge          — valor numérico corrente + estado (cor) + unidade
+├── LiveReadout        — readout calibrado: valor mono tabular + unidade + estado
+│                        (ícone+rótulo) + trilho de tolerância (min──●──max)
 ├── WindowSelector     — chips 1h/24h/7d/30d (dispara refetch histórico)
 ├── ThresholdBadge     — mostra min/max vigente e se é padrão regulatório
 └── TimeSeriesChart    — ECharts: histórico + cauda ao vivo (appendData) + markLines de limite
 ```
 
 Cada componente é testável isolado com fixtures. Estado ao vivo: página assina
-`liveApi`, mantém buffer da cauda em estado local, passa ao gauge (último valor) e ao
-chart (append incremental). Troca de janela invalida só a query de histórico; a cauda
-ao vivo persiste.
+`liveApi`, mantém buffer da cauda em estado local, passa ao readout (último valor +
+posição no trilho) e ao chart (append incremental). Troca de janela invalida só a query
+de histórico; a cauda ao vivo persiste.
 
 ## 7. Fluxo de dados
 
@@ -165,14 +207,16 @@ liveApi.subscribe(code) ─ EventSource-like ─→ buffer local ─→ gauge (�
 2. Chart **anexa** pontos ao vivo sem refazer a query de histórico.
 3. `markLines` correspondem a `limite_min`/`limite_max` do threshold.
 4. Trocar janela dispara novo fetch de histórico e re-render do eixo.
-5. `LiveGauge` colore por `alarm_state` e mostra unidade.
+5. `LiveReadout`: estado por `alarm_state` (cor **+ ícone + rótulo**, não só cor),
+   unidade correta, e posição do ponto no trilho de tolerância bate com o valor/limites.
 6. Estados de erro/reconexão renderizam corretamente.
 
 ## 10. Entregáveis desta fatia
 
 - `frontend/` scaffold Vite+React+TS rodando.
 - `frontend/CONTRACTS.md` — contrato de-facto dos 3 transportes.
-- `tailwind.config` com tokens do `demo_dashboard.html` (light+dark).
+- `tailwind.config` com tokens OKLCH da direção "instrumento calibrado" (light+dark),
+  contraste verificado (corpo ≥4.5:1).
 - `lib/api/` com os 3 adapters (interface + impl mock).
 - Tela Detalhe do Sensor completa com os 4 componentes.
 - Suite de testes verde.

@@ -28,4 +28,9 @@ describe('Topbar', () => {
     rerender(wrap(<Topbar healthy={false} unitName="X" />))
     expect(screen.queryByText('Registro íntegro')).not.toBeInTheDocument()
   })
+
+  it('header permite quebra de linha em telas estreitas (flex-wrap)', () => {
+    render(wrap(<Topbar healthy unitName="X" />))
+    expect(screen.getByText('Sentinela').closest('header')).toHaveClass('flex-wrap')
+  })
 })

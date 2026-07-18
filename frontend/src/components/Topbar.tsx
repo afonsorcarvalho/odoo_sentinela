@@ -14,7 +14,7 @@ function ShieldIcon() {
 export function Topbar({ healthy, unitName }: { healthy: boolean; unitName: string }) {
   return (
     <header
-      className="sticky top-0 z-10 flex items-center gap-4 px-6 py-3"
+      className="sticky top-0 z-10 flex flex-wrap items-center gap-4 gap-y-2 px-6 py-3"
       style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-line)' }}
     >
       <div className="flex items-center gap-2">
@@ -33,7 +33,7 @@ export function Topbar({ healthy, unitName }: { healthy: boolean; unitName: stri
       </div>
 
       <span
-        className="rounded-full px-3 py-1 text-sm font-semibold"
+        className="min-w-0 max-w-[200px] truncate rounded-full px-3 py-1 text-sm font-semibold"
         style={{ background: 'var(--color-panel)', border: '1px solid var(--color-line)', color: 'var(--color-ink)' }}
       >
         {unitName}

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useLiveTail } from './useLiveTail'
+import { liveApi } from './api'
 
 afterEach(() => vi.useRealTimers())
 
@@ -17,15 +18,15 @@ describe('useLiveTail', () => {
     vi.useFakeTimers()
     const { result } = renderHook(() => useLiveTail('x', 3))
     act(() => { vi.advanceTimersByTime(10000) })
-    expect(result.current.tail.length).toBeLessThanOrEqual(3)
+    expect(result.current.tail.length).toBe(3)
   })
-  it('desinscreve no unmount (nao vaza timer)', () => {
-    vi.useFakeTimers()
-    const { result, unmount } = renderHook(() => useLiveTail('x'))
-    act(() => { vi.advanceTimersByTime(2000) })
-    const n = result.current.tail.length
+  it('chama unsubscribe no unmount (sem vazar timer)', () => {
+    const unsub = vi.fn()
+    const spy = vi.spyOn(liveApi, 'subscribe').mockReturnValue(unsub)
+    const { unmount } = renderHook(() => useLiveTail('x'))
+    expect(unsub).not.toHaveBeenCalled()
     unmount()
-    act(() => { vi.advanceTimersByTime(5000) })
-    expect(result.current.tail.length).toBe(n)
+    expect(unsub).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
   })
 })

@@ -8,6 +8,8 @@ const POLL_MS = 3000
 
 export const realLiveApi: LiveApi = {
   subscribe(sensor_code, cb) {
+    if (sensor_code === '') return () => {}
+
     let cancelled = false
     let threshold: Threshold | null = null
     realMetaApi.getThreshold(sensor_code).then((t) => { threshold = t })

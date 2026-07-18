@@ -8,6 +8,7 @@ vi.mock('./historyApi', () => ({ realHistoryApi: { getHistory: vi.fn() } }))
 
 beforeEach(() => {
   vi.useFakeTimers()
+  vi.clearAllMocks()
   vi.mocked(realMetaApi.getThreshold).mockResolvedValue({
     sensor_id: 'A', limite_min: 10, limite_max: 20, is_valor_padrao_regulatorio: false,
   })
@@ -35,5 +36,15 @@ describe('realLiveApi', () => {
 
     await vi.advanceTimersByTimeAsync(10_000)
     expect(cb).not.toHaveBeenCalled()
+  })
+
+  it('sensor_code vazio: nao chama getThreshold/getHistory, devolve unsubscribe no-op', async () => {
+    const cb = vi.fn()
+    const unsub = realLiveApi.subscribe('', cb)
+    await vi.runOnlyPendingTimersAsync().catch(() => {})
+    expect(realMetaApi.getThreshold).not.toHaveBeenCalled()
+    expect(realHistoryApi.getHistory).not.toHaveBeenCalled()
+    expect(cb).not.toHaveBeenCalled()
+    expect(() => unsub()).not.toThrow()
   })
 })

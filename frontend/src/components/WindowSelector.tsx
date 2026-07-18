@@ -30,12 +30,8 @@ export function WindowSelector({
             type="button"
             aria-pressed={on}
             onClick={() => onChange(w)}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-md px-3.5 py-2 text-sm font-semibold outline-none transition-colors duration-200 ease-out hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
-            style={
-              on
-                ? { background: 'var(--color-primary)', color: 'var(--color-surface)' }
-                : { color: 'var(--color-muted)' }
-            }
+            className={`flex min-h-11 min-w-11 items-center justify-center rounded-md px-3.5 py-2 text-sm font-semibold outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none${on ? '' : ' text-[var(--color-muted)] hover:text-[var(--color-ink)]'}`}
+            style={on ? { background: 'var(--color-primary)', color: 'var(--color-surface)' } : undefined}
           >
             {w}
           </button>

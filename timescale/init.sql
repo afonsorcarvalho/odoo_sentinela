@@ -56,3 +56,22 @@ SELECT add_continuous_aggregate_policy('sensor_reading_daily',
     start_offset => INTERVAL '3 days',
     end_offset => INTERVAL '1 day',
     schedule_interval => INTERVAL '1 day');
+
+CREATE OR REPLACE FUNCTION notify_sensor_reading() RETURNS trigger AS $$
+BEGIN
+    PERFORM pg_notify(
+        'sensor_reading_new',
+        json_build_object(
+            'sensor_id', NEW.sensor_id,
+            'time', extract(epoch from NEW.time) * 1000,
+            'valor', NEW.valor
+        )::text
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS sensor_reading_notify ON sensor_reading;
+CREATE TRIGGER sensor_reading_notify
+    AFTER INSERT ON sensor_reading
+    FOR EACH ROW EXECUTE FUNCTION notify_sensor_reading();

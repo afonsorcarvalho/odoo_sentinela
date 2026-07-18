@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
@@ -8,15 +8,30 @@ import type { ReactNode } from 'react'
 vi.mock('echarts', () => ({ init: () => ({ setOption: vi.fn(), dispose: vi.fn(), resize: vi.fn() }) }))
 
 import App from './App'
+import { AuthProvider } from './lib/useAuth'
+
+function b64url(obj: object): string {
+  return btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function seedValidToken() {
+  const token = `${b64url({ alg: 'HS256' })}.${b64url({ exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`
+  localStorage.setItem('sentinela_token', token)
+}
 
 function wrap(node: ReactNode, initialPath: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return (
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[initialPath]}>{node}</MemoryRouter>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <AuthProvider>{node}</AuthProvider>
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }
+
+beforeEach(() => seedValidToken())
+afterEach(() => localStorage.clear())
 
 describe('App routing', () => {
   it('"/" renderiza a Overview', async () => {

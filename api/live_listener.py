@@ -20,11 +20,13 @@ async def escutar(dsn=DSN):
     while True:
         try:
             conn = await asyncpg.connect(dsn)
+            desconectado = asyncio.Event()
+            conn.add_termination_listener(lambda c: desconectado.set())
             try:
                 await conn.add_listener(CANAL, _receber_notificacao)
-                while True:
-                    await asyncio.sleep(3600)
+                await desconectado.wait()
             finally:
-                await conn.close()
-        except (OSError, asyncpg.PostgresError):
+                if not conn.is_closed():
+                    await conn.close()
+        except Exception:
             await asyncio.sleep(RETRY_SEGUNDOS)

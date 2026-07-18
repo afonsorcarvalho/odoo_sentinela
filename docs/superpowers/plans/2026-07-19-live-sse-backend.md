@@ -554,7 +554,7 @@ async def get_live(
     cliente=Depends(get_cliente_servico),
     _claims=Depends(verificar_token_query),
 ):
-    if obter_sensor(cliente, sensor_code) is None:
+    if await asyncio.to_thread(obter_sensor, cliente, sensor_code) is None:
         raise HTTPException(status_code=404, detail=f"sensor '{sensor_code}' não encontrado")
 
     fila = registrar(sensor_code)
@@ -569,6 +569,13 @@ async def get_live(
 
     return StreamingResponse(stream(), media_type='text/event-stream')
 ```
+
+(Nota: uma versão anterior deste bloco chamava `obter_sensor(cliente, sensor_code)` direto —
+a review de branch achou que isso bloqueava o event loop inteiro durante o round-trip
+XML-RPC síncrono ao Odoo, já que `get_live` é `async def` e por isso não recebe o
+offload automático pra threadpool que o FastAPI dá aos endpoints `def` de `meta.py`/
+`historico.py`. Isso travava o listener NOTIFY e qualquer outro stream SSE aberto no
+processo pela duração da chamada. Corrigido envolvendo em `asyncio.to_thread`.)
 
 - [ ] **Step 5: Atualizar `api/main.py`** — trocar
 

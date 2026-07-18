@@ -62,4 +62,31 @@ describe('mockLiveApi', () => {
     unsub()
     for (let i = 1; i < pts.length; i++) expect(pts[i]).toBeGreaterThan(pts[i - 1])
   })
+
+  it('TEMP-EXP-01 mantem comportamento existente: nunca cruza a faixa (sempre ok/warn)', () => {
+    vi.useFakeTimers()
+    const states = new Set<string>()
+    const unsub = mockLiveApi.subscribe('TEMP-EXP-01', (p) => states.add(p.alarm_state))
+    vi.advanceTimersByTime(20000)
+    unsub()
+    expect(states.has('crit')).toBe(false)
+  })
+
+  it('TEMP-PRE-01 (Preparo) cruza a faixa periodicamente: produz crit', () => {
+    vi.useFakeTimers()
+    const states = new Set<string>()
+    const unsub = mockLiveApi.subscribe('TEMP-PRE-01', (p) => states.add(p.alarm_state))
+    vi.advanceTimersByTime(20000)
+    unsub()
+    expect(states.has('crit')).toBe(true)
+  })
+
+  it('TEMP-ARS-01 (sem threshold) sempre reporta ok, independente do valor', () => {
+    vi.useFakeTimers()
+    const states = new Set<string>()
+    const unsub = mockLiveApi.subscribe('TEMP-ARS-01', (p) => states.add(p.alarm_state))
+    vi.advanceTimersByTime(20000)
+    unsub()
+    expect([...states]).toEqual(['ok'])
+  })
 })

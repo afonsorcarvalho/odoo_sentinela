@@ -1,7 +1,7 @@
 from datetime import date
 
 from coletor_simulado import gerador as gerador_simulado
-from ingestao import ingestor, odoo_cliente, provisionar_odoo_sim, registro_coletores, timescale
+from ingestao import ingestor, odoo_cliente, provisionar_odoo_sim, registro_coletores, timescale, validador
 
 DSN = 'postgresql://sentinela:sentinela@localhost:5433/sentinela'
 ODOO_URL = 'http://localhost:8189'
@@ -121,3 +121,30 @@ def test_ingerir_arquivo_corrompido_grava_ledger_invalido_sem_dados(tmp_path):
     finally:
         _limpar_timescale(info_coletor['site_code'])
         _limpar_ledger(cliente, info_coletor['id'], data.isoformat())
+
+
+def test_ingerir_arquivo_coletor_desconhecido_nao_grava_nada(tmp_path):
+    cliente = _cliente_odoo()
+    coletor_id_desconhecido = 'COL-INEXISTENTE-XYZ'
+    data = date(2026, 7, 23)
+
+    coletor_id_original = gerador_simulado.COLETOR_ID
+    gerador_simulado.COLETOR_ID = coletor_id_desconhecido
+    try:
+        chave_path = tmp_path / 'chave.pem'
+        output_dir = gerador_simulado.gerar_dia(data, tmp_path / 'output', chave_path=chave_path)
+    finally:
+        gerador_simulado.COLETOR_ID = coletor_id_original
+
+    registro_path = tmp_path / 'registro.json'
+    registro_coletores.registrar_a_partir_de_chave_privada(registro_path, chave_path, coletor_id_desconhecido)
+    caminho_arquivo = output_dir / f"{coletor_id_desconhecido}_leituras_{data.isoformat()}.txt"
+
+    resultado_validacao_local = validador.validar_arquivo(caminho_arquivo, registro_path)
+    assert resultado_validacao_local.status_validacao == 'valido'
+
+    resultado = ingestor.ingerir_arquivo(caminho_arquivo, registro_path, DSN, cliente)
+    assert resultado.status_validacao == 'invalido'
+    assert 'não encontrado' in resultado.motivo_rejeicao
+    assert coletor_id_desconhecido in resultado.motivo_rejeicao
+    assert resultado.total_gravado == 0

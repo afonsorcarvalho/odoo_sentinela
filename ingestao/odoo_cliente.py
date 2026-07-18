@@ -65,7 +65,7 @@ def escrever_ledger(cliente, coletor_odoo_id, tipo_arquivo, data_referencia, sta
         'total_linhas': total_linhas,
         'hash_final': hash_final or False,
         'assinatura': assinatura or False,
-        'horario_recebimento': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'horario_recebimento': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
     }
     if existentes:
         executar(cliente, 'sensor_monitor.file.ledger', 'write', existentes, valores)

@@ -10,3 +10,4 @@ coletor_simulado/output/
 __pycache__/
 *.pyc
 .venv/
+ingestao/coletores_conhecidos.json

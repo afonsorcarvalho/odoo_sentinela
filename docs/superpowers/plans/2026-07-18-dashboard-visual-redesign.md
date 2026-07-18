@@ -2214,3 +2214,119 @@ Run: `cd frontend && VITE_API_MODE=real VITE_UNIT_NAME="Hospital Demonstração 
 - [ ] **Step 6: Registrar o resultado**
 
 Se algum item falhar, abrir um ajuste pontual (não um novo plano) nos arquivos relevantes, re-rodar a suite (`npx vitest run`), commitar. Se tudo passar, este é o último passo do plano — não precisa de commit próprio.
+
+---
+
+## Task 18a (addendum, achada rodando a Task 18): bugs de modo real
+
+Rodando o app de verdade (`VITE_API_MODE=real`) pela primeira vez nesta fatia, 2 bugs reais apareceram —
+nenhum dos dois é pego pela suite (que roda 100% mock):
+
+**Bug 1 — subscribe com sensor_code vazio.** `DashboardPage.tsx` chama `useLiveTail(selectedCode ?? '')`
+antes dos sensores carregarem (`selectedCode` começa `null`). `useLiveTail`/`useLiveStatuses` não têm
+conceito de `enabled` (não são React Query) — `realLiveApi.subscribe('', cb)` dispara na hora, batendo
+`GET /sensores//threshold` e `GET /sensores//historico?window=1h` (404, barra dupla) a cada poll (3s) até
+os sensores carregarem.
+
+- **Fix:** `frontend/src/lib/api/real/liveApi.ts` — `subscribe` retorna um no-op (`() => {}`) sem chamar
+  `realMetaApi.getThreshold`/`realHistoryApi.getHistory` quando `sensor_code === ''`.
+
+**Bug 2 — cliente XML-RPC compartilhado sem lock (backend, pré-existente).** `api/odoo.py`
+(`get_cliente_servico`, `@lru_cache`) devolve o MESMO `ServerProxy` XML-RPC pra todas as requests. A
+DashboardPage é a primeira coisa no projeto a disparar várias chamadas reais em paralelo pro backend
+(sensores + alarmes + thresholds×N + polling do live) — duas requests concorrentes reusando a mesma
+conexão HTTP persistente colidem: `http.client.ResponseNotReady: Idle` → 500 sem corpo JSON limpo → como
+a exceção não tratada escapa do meio do stack do Starlette antes de `CORSMiddleware` injetar headers na
+resposta, o browser reporta "blocked by CORS policy" (sintoma enganoso — a causa real é o 500 de
+concorrência, não config de CORS).
+
+- **Fix:** lock (`threading.Lock`) em `ingestao/odoo_cliente.py` — todo `executar(...)` (a função que
+  chama `cliente.models.execute_kw`) serializa via lock module-level antes de usar a conexão XML-RPC
+  compartilhada. Fix mínimo (serializa acesso à conexão, não redesenha pooling/conexão-por-request) —
+  aceitável dado que o volume de chamadas por request do dashboard é pequeno (não é hot path de alta
+  concorrência).
+
+- [ ] **Step 1: Escrever os testes**
+
+Para o Bug 1 (`frontend/src/lib/api/real/liveApi.test.ts` — adicionar ao describe existente):
+
+```typescript
+it('sensor_code vazio: nao chama getThreshold/getHistory, devolve unsubscribe no-op', async () => {
+  const cb = vi.fn()
+  const unsub = realLiveApi.subscribe('', cb)
+  await vi.runOnlyPendingTimersAsync().catch(() => {})
+  expect(realMetaApi.getThreshold).not.toHaveBeenCalled()
+  expect(realHistoryApi.getHistory).not.toHaveBeenCalled()
+  expect(cb).not.toHaveBeenCalled()
+  expect(() => unsub()).not.toThrow()
+})
+```
+
+Para o Bug 2, um teste Python de concorrência real contra o backend (`api/tests/test_odoo_concorrencia.py`):
+
+```python
+import threading
+from api.odoo import get_cliente_servico
+from ingestao import odoo_cliente
+
+def test_chamadas_concorrentes_nao_colidem():
+    cliente = get_cliente_servico()
+    erros = []
+
+    def chamar():
+        try:
+            odoo_cliente.executar(cliente, 'sensor_monitor.sensor', 'search_read', [], fields=['sensor_code'])
+        except Exception as exc:  # noqa: BLE001 -- queremos capturar QUALQUER falha de concorrencia
+            erros.append(exc)
+
+    threads = [threading.Thread(target=chamar) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert erros == [], f"chamadas concorrentes falharam: {erros}"
+```
+
+- [ ] **Step 2: Rodar e confirmar falha**
+
+Run: `cd frontend && npx vitest run src/lib/api/real/liveApi.test.ts` — FAIL (comportamento atual chama getThreshold/getHistory mesmo com code vazio).
+Run: `python3 -m pytest api/tests/test_odoo_concorrencia.py -v` — FAIL (`ResponseNotReady` ou erro de conexão em pelo menos 1 das 8 threads, de forma não-determinística — pode precisar rodar mais de uma vez pra reproduzir, é uma race condition).
+
+- [ ] **Step 3: Implementar**
+
+`frontend/src/lib/api/real/liveApi.ts` — guarda no topo de `subscribe`:
+```typescript
+subscribe(sensor_code, cb) {
+  if (sensor_code === '') return () => {}
+  // ... resto inalterado
+```
+
+`ingestao/odoo_cliente.py` — lock module-level em torno do XML-RPC:
+```python
+import threading
+
+_lock = threading.Lock()
+
+def executar(cliente, modelo, metodo, *args, **kwargs):
+    with _lock:
+        return cliente.models.execute_kw(
+            cliente.db, cliente.uid, cliente.senha, modelo, metodo, list(args), kwargs,
+        )
+```
+(usar a assinatura/corpo REAL de `executar` já existente em `ingestao/odoo_cliente.py` — só envolver a
+chamada de rede existente com `with _lock:`, não reescrever a função.)
+
+- [ ] **Step 4: Rodar e confirmar sucesso**
+
+Run: `cd frontend && npx vitest run` — suite inteira verde.
+Run: `python3 -m pytest api/tests/ -v` — suite inteira verde, incluindo o novo teste de concorrência
+rodado umas 3x seguidas pra ganhar confiança de que não é flaky.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/lib/api/real/liveApi.ts frontend/src/lib/api/real/liveApi.test.ts \
+        ingestao/odoo_cliente.py api/tests/test_odoo_concorrencia.py
+git commit -m "fix: subscribe com sensor_code vazio e race no cliente XML-RPC compartilhado (achados na verificacao visual)"
+```

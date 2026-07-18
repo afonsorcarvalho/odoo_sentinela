@@ -1,4 +1,5 @@
 import xmlrpc.client
+from datetime import datetime
 
 
 class ClienteOdoo:
@@ -43,3 +44,30 @@ def resolver_coletor(cliente, coletor_code):
         'site_id': site_id,
         'site_code': sites[0]['site_code'],
     }
+
+
+def escrever_ledger(cliente, coletor_odoo_id, tipo_arquivo, data_referencia, status_validacao,
+                     motivo_rejeicao, total_linhas, hash_final, assinatura):
+    existentes = executar(
+        cliente, 'sensor_monitor.file.ledger', 'search',
+        [
+            ('coletor_id', '=', coletor_odoo_id),
+            ('data_referencia', '=', data_referencia),
+            ('tipo_arquivo', '=', tipo_arquivo),
+        ],
+    )
+    valores = {
+        'coletor_id': coletor_odoo_id,
+        'tipo_arquivo': tipo_arquivo,
+        'data_referencia': data_referencia,
+        'status_validacao': status_validacao,
+        'motivo_rejeicao': motivo_rejeicao or False,
+        'total_linhas': total_linhas,
+        'hash_final': hash_final or False,
+        'assinatura': assinatura or False,
+        'horario_recebimento': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    if existentes:
+        executar(cliente, 'sensor_monitor.file.ledger', 'write', existentes, valores)
+        return existentes[0]
+    return executar(cliente, 'sensor_monitor.file.ledger', 'create', valores)

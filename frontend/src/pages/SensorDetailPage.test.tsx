@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
 import type { ReactNode } from 'react'
 
 // ECharts mockado (sem canvas em jsdom)
@@ -12,7 +13,11 @@ import * as api from '../lib/api'
 
 function wrap(node: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{node}</MemoryRouter>
+    </QueryClientProvider>
+  )
 }
 
 afterEach(() => vi.useRealTimers())
@@ -46,5 +51,11 @@ describe('SensorDetailPage', () => {
     // localmente. getHistory continua com a mesma contagem.
     expect(spy.mock.calls.length).toBe(before)
     spy.mockRestore()
+  })
+
+  it('tem link "Voltar" pra Overview', async () => {
+    render(wrap(<SensorDetailPage code="TEMP-EXP-01" />))
+    await waitFor(() => expect(screen.getByText(/Temperatura — Expurgo/)).toBeInTheDocument())
+    expect(screen.getByRole('link', { name: /voltar/i })).toHaveAttribute('href', '/')
   })
 })

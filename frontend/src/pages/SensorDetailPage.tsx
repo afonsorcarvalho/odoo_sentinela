@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useSensorMeta, useThreshold, useHistory } from '../lib/queries'
 import { useLiveTail } from '../lib/useLiveTail'
 import { LiveReadout } from '../components/LiveReadout'
@@ -48,6 +49,13 @@ export function SensorDetailPage({ code }: { code: string }) {
     <div className="mx-auto max-w-4xl p-4 sm:p-6">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
+          <Link
+            to="/"
+            className="mb-2 inline-flex items-center gap-1 text-sm font-medium outline-none transition-colors duration-200 ease-out hover:text-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
+            style={{ color: 'var(--color-muted)' }}
+          >
+            ← Voltar
+          </Link>
           {meta.isLoading ? (
             <SkeletonBlock className="h-7 w-52" />
           ) : (

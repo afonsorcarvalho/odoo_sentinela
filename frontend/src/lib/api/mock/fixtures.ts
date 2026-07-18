@@ -1,12 +1,17 @@
 import type { SensorMeta, Threshold } from '../../types'
 
+// `area.category` e deliberadamente distinto de `area.name` nos fixtures
+// abaixo. No modelo de dados real (odoo_modelo_dados_spec.md), `category`
+// PODE ser igual a `name` — mas o AreaCard renderiza os dois como nos de
+// texto separados, e strings identicas quebram buscas tipo `getByText`
+// (e aparecem como texto duplicado na UI, ex.: "Expurgo / Expurgo").
 export const SENSOR: SensorMeta = {
   sensor_code: 'TEMP-EXP-01',
   name: 'Temperatura — Expurgo',
   unidade: 'C',
   protocolo_origem: 'rs485',
   measurement_type: { code: 'temperatura', name: 'Temperatura' },
-  area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Expurgo' },
+  area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Descontaminação' },
 }
 
 export const THRESHOLD: Threshold = {
@@ -22,7 +27,7 @@ const SENSOR_PREPARO: SensorMeta = {
   unidade: 'C',
   protocolo_origem: 'rs485',
   measurement_type: { code: 'temperatura', name: 'Temperatura' },
-  area: { area_code: 'PREPARO_ESTER', name: 'Preparo/Esterilização', category: 'Preparo/Esterilização' },
+  area: { area_code: 'PREPARO_ESTER', name: 'Preparo/Esterilização', category: 'Esterilização' },
 }
 
 const THRESHOLD_PREPARO: Threshold = {
@@ -38,7 +43,7 @@ const SENSOR_ARSENAL: SensorMeta = {
   unidade: 'C',
   protocolo_origem: 'rs485',
   measurement_type: { code: 'temperatura', name: 'Temperatura' },
-  area: { area_code: 'ARSENAL', name: 'Arsenal', category: 'Arsenal' },
+  area: { area_code: 'ARSENAL', name: 'Arsenal', category: 'Armazenamento' },
 }
 
 // Arsenal nao tem threshold regulatorio definido em odoo_modelo_dados_spec.md §7

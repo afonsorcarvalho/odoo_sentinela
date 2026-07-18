@@ -1,8 +1,9 @@
 import type { AuthApi } from '../contracts'
 
-// Mesma convencao das outras fixtures mock (liveApi.ts/historyApi.ts): base
-// de tempo fixa, nao Date.now(), pra manter os testes deterministicos.
-const MOCK_ISSUED_AT_S = 1_700_000_000
+// exp real (Date.now() + EXP_SECONDS) -- este token precisa interoperar com
+// checagem real de expiracao de sessao (useAuth), diferente das fixtures de
+// serie temporal (liveApi.ts/historyApi.ts) que so precisam ser
+// deterministicas pra teste.
 const EXP_SECONDS = 3600
 
 // Formato JWT genuino (3 segmentos base64url) mesmo sendo mock -- assim
@@ -14,7 +15,7 @@ function b64url(obj: object): string {
 
 function makeFakeJwt(): string {
   const header = { alg: 'HS256', typ: 'JWT' }
-  const payload = { sub: '1', partner_id: 1, exp: MOCK_ISSUED_AT_S + EXP_SECONDS }
+  const payload = { sub: '1', partner_id: 1, exp: Math.floor(Date.now() / 1000) + EXP_SECONDS }
   return `${b64url(header)}.${b64url(payload)}.mock-signature-nao-verificada`
 }
 

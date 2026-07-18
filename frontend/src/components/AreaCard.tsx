@@ -22,6 +22,7 @@ export function AreaCard({
     <div
       className="rounded-2xl p-5"
       style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)' }}
+      data-testid={`area-card-${group.area.area_code}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>

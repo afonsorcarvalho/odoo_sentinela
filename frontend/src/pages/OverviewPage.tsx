@@ -22,7 +22,10 @@ export function OverviewPage() {
   const thresholdsByCode = Object.fromEntries(codes.map((c, i) => [c, thresholdResults[i]?.data]))
   const liveByCode = useLiveStatuses(codes)
   const groups = groupSensorsByArea(sensors)
-  const ready = sensorsQuery.isSuccess && thresholdResults.every((r) => r.isSuccess)
+  const ready =
+    sensorsQuery.isSuccess &&
+    thresholdResults.every((r) => r.isSuccess) &&
+    codes.every((c) => liveByCode[c] !== undefined)
 
   return (
     <div className="mx-auto max-w-5xl p-4 sm:p-6">

@@ -35,4 +35,10 @@ describe('AreaPage', () => {
     render(wrap(<AreaPage />, '/area/ARSENAL'))
     await waitFor(() => expect(screen.getByText('Sem limite')).toBeInTheDocument(), { timeout: 3000 })
   })
+
+  it('mostra o ThemeToggle (consistente com Overview e Detalhe do Sensor)', async () => {
+    render(wrap(<AreaPage />, '/area/EXPURGO'))
+    await waitFor(() => expect(screen.getByText('Temperatura')).toBeInTheDocument(), { timeout: 3000 })
+    expect(screen.getByRole('button', { name: /escuro|claro/i })).toBeInTheDocument()
+  })
 })

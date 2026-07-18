@@ -3,6 +3,7 @@ import { useSensors, useThresholds } from '../lib/queries'
 import { useLiveStatuses } from '../lib/useLiveStatuses'
 import { groupSensorsByArea } from '../lib/aggregateStatus'
 import { SensorRow } from '../components/SensorRow'
+import { ThemeToggle } from '../components/ThemeToggle'
 
 function SkeletonRow() {
   return (
@@ -31,12 +32,15 @@ export function AreaPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
-      <Link
-        to="/"
-        className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-[var(--color-muted)] outline-none transition-colors duration-200 ease-out hover:text-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
-      >
-        ← Voltar
-      </Link>
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-muted)] outline-none transition-colors duration-200 ease-out hover:text-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
+        >
+          ← Voltar
+        </Link>
+        <ThemeToggle />
+      </div>
 
       {sensorsQuery.isError ? (
         <div

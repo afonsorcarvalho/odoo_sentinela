@@ -370,15 +370,25 @@ async def escutar(dsn=DSN):
     while True:
         try:
             conn = await asyncpg.connect(dsn)
+            desconectado = asyncio.Event()
+            conn.add_termination_listener(lambda c: desconectado.set())
             try:
                 await conn.add_listener(CANAL, _receber_notificacao)
-                while True:
-                    await asyncio.sleep(3600)
+                await desconectado.wait()
             finally:
-                await conn.close()
-        except (OSError, asyncpg.PostgresError):
+                if not conn.is_closed():
+                    await conn.close()
+        except Exception:
             await asyncio.sleep(RETRY_SEGUNDOS)
 ```
+
+(Nota: uma versão anterior deste bloco usava `except (OSError, asyncpg.PostgresError)` +
+`while True: await asyncio.sleep(3600)` como keepalive — a review da Task 3 achou que isso
+deixava `asyncpg.InterfaceError`/`asyncio.TimeoutError` escaparem do except, e que o sleep
+cego nunca detectava uma conexão morta silenciosamente. Corrigido pra `except Exception`
+(ainda deixa `asyncio.CancelledError` propagar, já que é `BaseException`) + detecção ativa via
+`add_termination_listener`. Resíduo aceito: sem `SO_KEEPALIVE`, uma desconexão silenciosa sem
+RST/FIN ainda não é detectada — fora de escopo, ver ledger da Task 3.)
 
 - [ ] **Step 5: Rodar o teste e confirmar que passa**
 

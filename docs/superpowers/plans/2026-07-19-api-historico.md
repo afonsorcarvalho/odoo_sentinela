@@ -91,12 +91,16 @@ def test_buscar_agregado_retorna_bucket_apos_refresh():
                 ),
             )
         conn.commit()
+        # refresh_continuous_aggregate() do Timescale so' roda fora de bloco de
+        # transacao (levanta ActiveSqlTransaction dentro de uma) — autocommit
+        # so' pra essa chamada, restaurado logo em seguida.
+        conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute(
                 "CALL refresh_continuous_aggregate('sensor_reading_hourly', %s, %s)",
                 (agora - timedelta(hours=2), agora + timedelta(hours=1)),
             )
-        conn.commit()
+        conn.autocommit = False
 
         pontos = api_timescale.buscar_agregado(
             conn, SENSOR_CODE_TESTE, 'sensor_reading_hourly', agora - timedelta(hours=1),
@@ -145,7 +149,7 @@ def buscar_agregado(conn, sensor_code, tabela, desde):
 - [ ] **Step 4: Rodar os testes e confirmar que passam**
 
 Run: `python3 -m pytest api/tests/test_timescale.py -v`
-Expected: 2 passed. **Se o `CALL refresh_continuous_aggregate(...)` do segundo teste falhar com um erro do próprio Postgres/Timescale sobre transação** (ex: "cannot run inside a transaction block"), não improvise uma correção — reporte o erro exato encontrado, é um ponto real em aberto sobre como o Timescale exige que esse `CALL` seja executado.
+Expected: 2 passed. (O `conn.autocommit = True` ao redor do `CALL refresh_continuous_aggregate(...)` já está no código do Step 1 — necessário porque esse procedimento do Timescale não roda dentro de um bloco de transação; sem isso, levanta `psycopg2.errors.ActiveSqlTransaction`, confirmado empiricamente nesta sessão.)
 
 - [ ] **Step 5: Commit**
 
@@ -245,12 +249,15 @@ def test_historico_24h_agregado_apos_refresh():
                 ),
             )
         conn.commit()
+        # refresh_continuous_aggregate() do Timescale so' roda fora de bloco de
+        # transacao — autocommit so' pra essa chamada, restaurado em seguida.
+        conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute(
                 "CALL refresh_continuous_aggregate('sensor_reading_hourly', %s, %s)",
                 (agora - timedelta(hours=2), agora + timedelta(hours=1)),
             )
-        conn.commit()
+        conn.autocommit = False
 
         resposta = client.get(f'/sensores/{SENSOR_CODE}/historico', params={'window': '24h'}, headers=_headers())
         assert resposta.status_code == 200

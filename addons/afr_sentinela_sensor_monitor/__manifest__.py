@@ -7,6 +7,7 @@
     'data': [
         'data/area_category_data.xml',
         'data/measurement_type_data.xml',
+        'data/file_ledger_cron_data.xml',
     ],
     'installable': True,
     'application': True,

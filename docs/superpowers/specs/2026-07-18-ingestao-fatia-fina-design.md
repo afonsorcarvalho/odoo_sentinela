@@ -58,7 +58,7 @@ Reimplementa **de forma independente** (sem importar `coletor_simulado.formato`)
 ## 4. Gravação no TimescaleDB (`timescale.py`)
 
 - `conectar(dsn) -> connection`: `psycopg2.connect(dsn)` (ou `psycopg` v3 — decisão de implementação, qualquer uma serve).
-- `inserir_leituras(conn, site_id, leituras) -> int`: `executemany`/`execute_values` inserindo cada leitura parseada na tabela `sensor_reading` (colunas: `time, site_id, coletor_id, sensor_id, area_id, tipo_medida, valor, unidade, protocolo_origem, status_leitura`), retorna quantidade de linhas gravadas. `time` vem do `timestamp` de cada leitura (parseado para `datetime` com timezone); os demais campos vêm direto do parsing de `validador.py`.
+- `inserir_leituras(conn, site_id, coletor_id, leituras) -> int`: `executemany`/`execute_values` inserindo cada leitura parseada na tabela `sensor_reading` (colunas: `time, site_id, coletor_id, sensor_id, area_id, tipo_medida, valor, unidade, protocolo_origem, status_leitura`), retorna quantidade de linhas gravadas. `time` vem do `timestamp` de cada leitura; `coletor_id` é um campo do arquivo (cabeçalho), não de cada linha do corpo, por isso entra como parâmetro à parte — os demais campos por leitura vêm direto do parsing de `validador.py`.
 
 ## 5. Orquestração + CLI (`ingestor.py`)
 

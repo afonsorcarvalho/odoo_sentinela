@@ -7,3 +7,6 @@ dist/
 .superpowers/
 coletor_simulado/identidade/
 coletor_simulado/output/
+__pycache__/
+*.pyc
+.venv/

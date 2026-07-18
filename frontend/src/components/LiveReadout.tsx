@@ -1,15 +1,8 @@
-import { computeStatus, type StatusResult } from '../lib/status'
+import { computeStatus, LABELS, type StatusResult } from '../lib/status'
 import type { Threshold, AlarmState } from '../lib/types'
 import { ToleranceRail } from './ToleranceRail'
 
 type State = StatusResult['state']
-
-const LABEL: Record<State, string> = {
-  ok: 'Dentro da faixa',
-  warn: 'Perto do limite',
-  crit: 'Fora da faixa',
-  unknown: 'Sem limite',
-}
 
 // Cor de texto/ícone derivada do token de estado, misturada com --color-ink
 // para garantir >=4.5:1 de contraste em ambos os temas (o token puro de
@@ -68,7 +61,7 @@ export function LiveReadout({
   const derived: StatusResult =
     value !== null
       ? computeStatus(value, threshold)
-      : { state: 'unknown', label: LABEL.unknown, position: null }
+      : { state: 'unknown', label: LABELS.unknown, position: null }
   const st: State = state ?? derived.state
 
   return (
@@ -96,7 +89,7 @@ export function LiveReadout({
         style={{ color: TEXT_COLOR[st] }}
       >
         <StatusIcon state={st} />
-        <span>{LABEL[st]}</span>
+        <span>{LABELS[st]}</span>
       </div>
 
       <div className="mt-5">

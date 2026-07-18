@@ -1,4 +1,5 @@
 import type { StatusResult } from '../lib/status'
+import { WARN_MARGIN } from '../lib/status'
 
 type State = StatusResult['state']
 
@@ -20,7 +21,7 @@ export function ToleranceRail({
   state,
   min,
   max,
-  warnMargin = 0.1,
+  warnMargin = WARN_MARGIN,
 }: {
   position: number | null
   state: State

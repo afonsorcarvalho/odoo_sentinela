@@ -6,7 +6,7 @@ export type StatusResult = {
   position: number | null
 }
 
-const LABELS = {
+export const LABELS = {
   ok: 'Dentro da faixa',
   warn: 'Perto do limite',
   crit: 'Fora da faixa',
@@ -14,7 +14,7 @@ const LABELS = {
 } as const
 
 // Margem de "perto do limite": 10% da largura da faixa em cada borda.
-const WARN_MARGIN = 0.1
+export const WARN_MARGIN = 0.1
 
 export function computeStatus(value: number, t: Threshold | null): StatusResult {
   if (!t) return { state: 'unknown', label: LABELS.unknown, position: null }

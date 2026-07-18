@@ -13,13 +13,9 @@ _CAMPOS_EVENTO = [
 ]
 
 
-def _serializar_evento(cliente, evento):
-    sensor = odoo_cliente.executar(
-        cliente, 'sensor_monitor.sensor', 'read', [evento['sensor_id'][0]], fields=['sensor_code'],
-    )[0]
-    area = odoo_cliente.executar(
-        cliente, 'sensor_monitor.area', 'read', [evento['area_id'][0]], fields=['area_code', 'name'],
-    )[0]
+def _serializar_evento(evento, sensores_por_id, areas_por_id):
+    sensor = sensores_por_id[evento['sensor_id'][0]]
+    area = areas_por_id[evento['area_id'][0]]
     return {
         'id': evento['id'],
         'sensor_code': sensor['sensor_code'],
@@ -39,4 +35,22 @@ def get_alarmes(cliente=Depends(get_cliente_servico), _claims=Depends(verificar_
         cliente, 'sensor_monitor.alarm.event', 'search_read', [],
         fields=_CAMPOS_EVENTO, order='timestamp_deteccao desc', limit=50,
     )
-    return [_serializar_evento(cliente, e) for e in eventos]
+
+    sensor_ids = list({e['sensor_id'][0] for e in eventos})
+    area_ids = list({e['area_id'][0] for e in eventos})
+
+    sensores_por_id = {}
+    if sensor_ids:
+        sensores = odoo_cliente.executar(
+            cliente, 'sensor_monitor.sensor', 'read', sensor_ids, fields=['sensor_code'],
+        )
+        sensores_por_id = {s['id']: s for s in sensores}
+
+    areas_por_id = {}
+    if area_ids:
+        areas = odoo_cliente.executar(
+            cliente, 'sensor_monitor.area', 'read', area_ids, fields=['area_code', 'name'],
+        )
+        areas_por_id = {a['id']: a for a in areas}
+
+    return [_serializar_evento(e, sensores_por_id, areas_por_id) for e in eventos]

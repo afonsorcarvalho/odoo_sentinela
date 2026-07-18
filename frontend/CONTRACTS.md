@@ -107,6 +107,32 @@ type LivePoint = {
 
 ---
 
+## 5. AuthApi (login)
+
+**Status: acoplado à API real** (`api/auth.py`) — diferente dos shapes
+acima (ainda mockados), este já tem implementação real funcional.
+
+### Definição TypeScript
+```ts
+type AuthApi = {
+  login(usuario: string, senha: string): Promise<{ access_token: string; token_type: string }>
+}
+```
+
+### Mapeamento real (`POST /auth/login`)
+- Body: `{usuario: string, senha: string}`.
+- Resposta 200: `{access_token: string, token_type: 'bearer'}` — exatamente
+  esse shape, sem campo de nome/partner_id solto.
+- Resposta 401: credencial inválida.
+- `access_token` é um JWT (HS256) com claims `{sub: uid, partner_id, exp}` —
+  opacos pro frontend nesta fatia; só o `exp` é lido client-side (decode sem
+  verificação de assinatura, só pra saber quando encerrar a sessão local —
+  ver `lib/jwt.ts`). Toda validação de verdade acontece no servidor a cada
+  request autenticada.
+- Anexar em requests futuras: header `Authorization: Bearer <access_token>`.
+
+---
+
 ## Notas Implementação
 
 1. **TypeScript**: Todos os shapes são exportados de `src/lib/types.ts` para reutilização.

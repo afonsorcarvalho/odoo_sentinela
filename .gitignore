@@ -1,0 +1,5 @@
+*.pptx
+*.pdf
+node_modules/
+dist/
+.remember/

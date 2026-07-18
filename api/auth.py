@@ -55,3 +55,10 @@ def verificar_token(credenciais: HTTPAuthorizationCredentials = Depends(_securit
         return jwt.decode(credenciais.credentials, SECRET, algorithms=[ALGORITHM])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail='token inválido ou expirado')
+
+
+def verificar_token_query(token: str):
+    try:
+        return jwt.decode(token, SECRET, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail='token inválido ou expirado')

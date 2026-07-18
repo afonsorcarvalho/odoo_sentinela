@@ -1,7 +1,9 @@
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import auth, historico, meta
+from . import auth, historico, live, live_listener, meta
 
 app = FastAPI(title='Sentinela API')
 
@@ -18,6 +20,12 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(meta.router)
 app.include_router(historico.router)
+app.include_router(live.router)
+
+
+@app.on_event('startup')
+async def _iniciar_live_listener():
+    asyncio.create_task(live_listener.escutar())
 
 
 @app.get('/health')

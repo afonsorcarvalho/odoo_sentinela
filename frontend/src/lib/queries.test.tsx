@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useSensorMeta, useThreshold, useHistory } from './queries'
+import { useSensorMeta, useThreshold, useHistory, useSensors, useThresholds } from './queries'
 import type { ReactNode } from 'react'
 
 function wrapper() {
@@ -26,5 +26,23 @@ describe('queries', () => {
     const { result } = renderHook(() => useThreshold('TEMP-EXP-01'), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.limite_max).toBe(22)
+  })
+
+  it('useSensors lista os 3 sensores', async () => {
+    const { result } = renderHook(() => useSensors(), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.map((s) => s.sensor_code).sort()).toEqual([
+      'TEMP-ARS-01', 'TEMP-EXP-01', 'TEMP-PRE-01',
+    ])
+  })
+
+  it('useThresholds devolve um resultado por codigo, na mesma ordem', async () => {
+    const { result } = renderHook(
+      () => useThresholds(['TEMP-EXP-01', 'TEMP-ARS-01']),
+      { wrapper: wrapper() },
+    )
+    await waitFor(() => expect(result.current.every((r) => r.isSuccess)).toBe(true))
+    expect(result.current[0].data?.limite_max).toBe(22)
+    expect(result.current[1].data).toBeNull() // Arsenal, sem threshold
   })
 })

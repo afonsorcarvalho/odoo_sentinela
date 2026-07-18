@@ -10,6 +10,9 @@ export function buildChartOption(
   // chamadores/testes existentes que nao passam cor; em runtime real o
   // chamador (TimeSeriesChart) sempre resolve e passa o valor concreto.
   critColor: string = 'var(--color-crit)',
+  // Mesmo motivo do critColor acima: canvas nao resolve var(...), entao a
+  // cor da faixa (markArea) tambem precisa vir ja resolvida do chamador.
+  goodSoftColor: string = 'var(--color-good-soft)',
   // Cauda ao vivo (buffer local de useLiveTail, ate 300 pontos). Anexada
   // localmente a serie historica, SEM refetch — a serie desenhada e
   // historico (cache) + cauda (memoria). ECharts `appendData` so suporta
@@ -38,7 +41,7 @@ export function buildChartOption(
 
   const markArea = threshold
     ? {
-        itemStyle: { color: 'var(--color-good-soft)', opacity: 0.5 },
+        itemStyle: { color: goodSoftColor, opacity: 0.5 },
         data: [[{ yAxis: threshold.limite_min }, { yAxis: threshold.limite_max }]],
       }
     : undefined

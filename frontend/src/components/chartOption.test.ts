@@ -52,7 +52,7 @@ describe('buildChartOption', () => {
       { sensor_code: 'S', ts: 2500, value: 20.8, alarm_state: 'ok' as const }, // novo: anexado
       { sensor_code: 'S', ts: 3000, value: 21.2, alarm_state: 'ok' as const },
     ]
-    const opt = buildChartOption(hist, t, '#ff0000', tail) as any
+    const opt = buildChartOption(hist, t, '#ff0000', 'var(--color-good-soft)', tail) as any
     expect(opt.series[0].data).toEqual([[1000, 19], [2000, 21], [2500, 20.8], [3000, 21.2]])
   })
   it('estende o eixo Y para conter as linhas de limite (senao ficariam clipadas)', () => {
@@ -78,5 +78,9 @@ describe('buildChartOption', () => {
   it('sem threshold, series[0].markArea e undefined', () => {
     const option = buildChartOption(undefined, null)
     expect((option.series as any)[0].markArea).toBeUndefined()
+  })
+  it('usa a cor resolvida recebida no markArea, nao a custom property crua', () => {
+    const opt = buildChartOption(hist, t, undefined, '#00ff00') as any
+    expect(opt.series[0].markArea.itemStyle.color).toBe('#00ff00')
   })
 })

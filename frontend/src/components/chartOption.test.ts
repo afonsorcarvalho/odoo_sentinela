@@ -43,4 +43,27 @@ describe('buildChartOption', () => {
     const opt = buildChartOption(hist, t) as any
     expect(opt.series[0].markLine.lineStyle.color).toBe('var(--color-crit)')
   })
+  it('anexa a cauda ao vivo apos o historico (so pontos mais novos que o ultimo ts do historico)', () => {
+    const tail = [
+      { sensor_code: 'S', ts: 1500, value: 20.5, alarm_state: 'ok' as const }, // <= ultimo hist (2000): ignorado
+      { sensor_code: 'S', ts: 2500, value: 20.8, alarm_state: 'ok' as const }, // novo: anexado
+      { sensor_code: 'S', ts: 3000, value: 21.2, alarm_state: 'ok' as const },
+    ]
+    const opt = buildChartOption(hist, t, '#ff0000', tail) as any
+    expect(opt.series[0].data).toEqual([[1000, 19], [2000, 21], [2500, 20.8], [3000, 21.2]])
+  })
+  it('estende o eixo Y para conter as linhas de limite (senao ficariam clipadas)', () => {
+    const opt = buildChartOption(hist, t) as any
+    // faixa 18..22; dados 19..21 dentro. eixo deve conter 18 e 22 com folga.
+    expect(opt.yAxis.min).toBeLessThanOrEqual(18)
+    expect(opt.yAxis.max).toBeGreaterThanOrEqual(22)
+  })
+  it('estende o eixo Y tambem para um valor lido fora da faixa', () => {
+    const outHist: HistoryResponse = {
+      sensor_code: 'S', window: '1h', resolution: 'raw',
+      points: [{ ts: 1000, value: 25 }], // acima do limite_max 22
+    }
+    const opt = buildChartOption(outHist, t) as any
+    expect(opt.yAxis.max).toBeGreaterThanOrEqual(25)
+  })
 })

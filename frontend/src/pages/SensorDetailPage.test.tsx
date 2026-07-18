@@ -34,4 +34,17 @@ describe('SensorDetailPage', () => {
     expect(spy.mock.calls.length).toBeGreaterThan(before)
     spy.mockRestore()
   })
+
+  it('cauda ao vivo NAO dispara refetch de historico (a prova: append local, sem refetch)', async () => {
+    const spy = vi.spyOn(api.historyApi, 'getHistory')
+    render(wrap(<SensorDetailPage code="TEMP-EXP-01" />))
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('TEMP-EXP-01', '24h'))
+    const before = spy.mock.calls.length
+    // liveApi emite ~1 ponto/s; deixa varios ticks ao vivo acontecerem.
+    await new Promise((r) => setTimeout(r, 3500))
+    // Nenhum tick ao vivo pode ter refetchado o historico — a cauda e anexada
+    // localmente. getHistory continua com a mesma contagem.
+    expect(spy.mock.calls.length).toBe(before)
+    spy.mockRestore()
+  })
 })

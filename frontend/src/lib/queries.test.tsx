@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useSensorMeta, useThreshold, useHistory, useSensors, useThresholds } from './queries'
+import { useSensorMeta, useThreshold, useHistory, useSensors, useThresholds, useAlarms } from './queries'
 import type { ReactNode } from 'react'
 
 function wrapper() {
@@ -44,5 +44,11 @@ describe('queries', () => {
     await waitFor(() => expect(result.current.every((r) => r.isSuccess)).toBe(true))
     expect(result.current[0].data?.limite_max).toBe(22)
     expect(result.current[1].data).toBeNull() // Arsenal, sem threshold
+  })
+
+  it('useAlarms carrega a lista de alarmes do mock', async () => {
+    const { result } = renderHook(() => useAlarms(), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.length).toBeGreaterThan(0)
   })
 })

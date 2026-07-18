@@ -1,5 +1,5 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
-import { metaApi, historyApi } from './api'
+import { metaApi, historyApi, alarmApi } from './api'
 import type { Window } from './types'
 
 export function useSensorMeta(code: string) {
@@ -9,7 +9,7 @@ export function useThreshold(code: string) {
   return useQuery({ queryKey: ['threshold', code], queryFn: () => metaApi.getThreshold(code) })
 }
 export function useHistory(code: string, window: Window) {
-  return useQuery({ queryKey: ['history', code, window], queryFn: () => historyApi.getHistory(code, window) })
+  return useQuery({ queryKey: ['history', code, window], queryFn: () => historyApi.getHistory(code, window), enabled: code !== '' })
 }
 
 export function useSensors() {
@@ -25,4 +25,8 @@ export function useThresholds(codes: string[]) {
       queryFn: () => metaApi.getThreshold(code),
     })),
   })
+}
+
+export function useAlarms() {
+  return useQuery({ queryKey: ['alarms'], queryFn: () => alarmApi.listAlarms(), refetchInterval: 5000 })
 }

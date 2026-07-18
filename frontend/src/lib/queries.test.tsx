@@ -28,11 +28,11 @@ describe('queries', () => {
     expect(result.current.data?.limite_max).toBe(22)
   })
 
-  it('useSensors lista os 3 sensores', async () => {
+  it('useSensors lista os 5 sensores', async () => {
     const { result } = renderHook(() => useSensors(), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.map((s) => s.sensor_code).sort()).toEqual([
-      'TEMP-ARS-01', 'TEMP-EXP-01', 'TEMP-PRE-01',
+      'PRESS-EXP-01', 'PRESS-PRE-01', 'TEMP-ARS-01', 'TEMP-EXP-01', 'TEMP-PRE-01',
     ])
   })
 

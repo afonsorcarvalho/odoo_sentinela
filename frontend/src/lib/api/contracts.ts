@@ -11,3 +11,7 @@ export type HistoryApi = {
 export type LiveApi = {
   subscribe(code: string, cb: (p: LivePoint) => void): () => void
 }
+
+export type AuthApi = {
+  login(usuario: string, senha: string): Promise<{ access_token: string; token_type: string }>
+}

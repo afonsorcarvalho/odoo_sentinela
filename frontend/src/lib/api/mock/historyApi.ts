@@ -1,17 +1,20 @@
 import type { HistoryApi } from '../contracts'
-import type { HistoryResponse, HistoryPoint, Window } from '../../types'
-import { THRESHOLD } from './fixtures'
+import type { HistoryResponse, HistoryPoint, Window, Threshold } from '../../types'
+import { THRESHOLD, THRESHOLDS } from './fixtures'
 
 const SPAN_MS: Record<Window, number> = {
   '1h': 3_600_000, '24h': 86_400_000, '7d': 604_800_000, '30d': 2_592_000_000,
 }
 
-// Série sintética determinística (senoide em torno do meio da faixa + ruído fixo).
-function synth(window: Window): { resolution: 'raw' | 'agg'; points: HistoryPoint[] } {
+// Série sintética determinística (senoide em torno do meio da faixa do
+// threshold DO SENSOR PEDIDO + ruído fixo). Sensor sem threshold (Arsenal) ou
+// código desconhecido cai no fallback do threshold de Expurgo — só para ter
+// uma faixa plausível de plotar, sem significado regulatório.
+function synth(window: Window, threshold: Threshold): { resolution: 'raw' | 'agg'; points: HistoryPoint[] } {
   const span = SPAN_MS[window]
   const now = 1_700_000_000_000 // base fixa (sem Date.now — determinístico p/ teste)
-  const mid = (THRESHOLD.limite_min + THRESHOLD.limite_max) / 2
-  const amp = (THRESHOLD.limite_max - THRESHOLD.limite_min) / 3
+  const mid = (threshold.limite_min + threshold.limite_max) / 2
+  const amp = (threshold.limite_max - threshold.limite_min) / 3
   const n = window === '1h' ? 240 : 720
   const step = span / n
   const raw = window === '1h'
@@ -27,7 +30,8 @@ function synth(window: Window): { resolution: 'raw' | 'agg'; points: HistoryPoin
 
 export const mockHistoryApi: HistoryApi = {
   async getHistory(sensor_code: string, window: Window): Promise<HistoryResponse> {
-    const { resolution, points } = synth(window)
+    const threshold = THRESHOLDS[sensor_code] ?? THRESHOLD
+    const { resolution, points } = synth(window, threshold)
     return { sensor_code, window, resolution, points }
   },
 }

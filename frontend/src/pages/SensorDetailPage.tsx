@@ -6,7 +6,7 @@ import { LiveReadout } from '../components/LiveReadout'
 import { WindowSelector } from '../components/WindowSelector'
 import { ThresholdBadge } from '../components/ThresholdBadge'
 import { TimeSeriesChart } from '../components/TimeSeriesChart'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { HeaderActions } from '../components/HeaderActions'
 import type { Window } from '../lib/types'
 
 // Placeholder de carregamento por painel (nunca um spinner global) — mantem o
@@ -72,7 +72,7 @@ export function SensorDetailPage({ code }: { code: string }) {
             )
           )}
         </div>
-        <ThemeToggle />
+        <HeaderActions />
       </header>
 
       {/* Instrumento: leitura + tolerancia respondem primeiro (esquerda/topo);

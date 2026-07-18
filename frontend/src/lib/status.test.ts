@@ -31,4 +31,14 @@ describe('computeStatus', () => {
     expect(r.state).toBe('unknown')
     expect(r.position).toBeNull()
   })
+  it('warn em boundary exato inferior (raw=0.1)', () => {
+    // value=18.4: raw = (18.4-18)/4 = 0.1, exatamente na margem
+    const r = computeStatus(18.4, t)
+    expect(r.state).toBe('warn')
+  })
+  it('warn em boundary exato superior (raw=0.9)', () => {
+    // value=21.6: raw = (21.6-18)/4 = 0.9, exatamente na margem
+    const r = computeStatus(21.6, t)
+    expect(r.state).toBe('warn')
+  })
 })

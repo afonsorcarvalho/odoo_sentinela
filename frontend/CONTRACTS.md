@@ -23,12 +23,13 @@ type SensorMeta = {
 ```
 
 ### Mapeamento Odoo (Fase 3)
-- `sensor_code` ← `sensor_monitor.sensor.code`
+- `sensor_code` ← `sensor_monitor.sensor.sensor_code`
 - `name` ← `sensor_monitor.sensor.name`
-- `unidade` ← `sensor_monitor.sensor.unit` (ou `measurement.type.unit`)
-- `protocolo_origem` ← `sensor_monitor.sensor.protocol`
-- `measurement_type` ← `measurement.type` (relação M2O em `sensor_monitor.sensor`)
-- `area` ← `area` (relação M2O em `sensor_monitor.sensor`)
+- `unidade` ← `sensor_monitor.sensor.unidade` (ou padrão via `sensor_monitor.measurement.type.unidade_padrao`)
+- `protocolo_origem` ← `sensor_monitor.sensor.protocolo_origem`
+- `measurement_type` ← via `sensor_monitor.sensor.measurement_type_id` → `sensor_monitor.measurement.type` (`code`, `name`)
+- `area` ← via `sensor_monitor.sensor.area_id` → `sensor_monitor.area` (`area_code`, `name`)
+  - `category` ← `sensor_monitor.area.area_category_id` → `sensor_monitor.area.category.name` (achatado para string — simplificação deliberada)
 
 ---
 
@@ -47,11 +48,10 @@ type Threshold = {
 ```
 
 ### Mapeamento Odoo (Fase 3)
-- Lido de `alarm.threshold` (relação N2M em `sensor_monitor.sensor`)
-- `sensor_id` ← `sensor_id.id`
-- `limite_min` ← `threshold_min`
-- `limite_max` ← `threshold_max`
-- `is_valor_padrao_regulatorio` ← `is_regulatory_default` (ou similar)
+- `sensor_id` ← `sensor_monitor.alarm.threshold.sensor_id` (Many2one → `sensor_monitor.sensor`; único por sensor, efetivamente 1:1)
+- `limite_min` ← `sensor_monitor.alarm.threshold.limite_min`
+- `limite_max` ← `sensor_monitor.alarm.threshold.limite_max`
+- `is_valor_padrao_regulatorio` ← `sensor_monitor.alarm.threshold.is_valor_padrao_regulatorio`
 
 ---
 
@@ -74,7 +74,7 @@ type HistoryResponse = {
 ```
 
 ### Mapeamento Odoo (Fase 3)
-- Resposta de API que lê histórico do Timescale (banco de séries temporais)
+- **NÃO é modelo Odoo** — resposta de API que lê histórico do TimescaleDB (banco de séries temporais)
 - Para janelas curtas (1h) → `resolution: 'raw'` (ponto por ponto)
 - Para janelas longas (24h, 7d, 30d) → `resolution: 'agg'` (agregado min/max/avg)
 - `ts` ← timestamp em milissegundos (Unix * 1000)
@@ -99,7 +99,7 @@ type LivePoint = {
 ```
 
 ### Mapeamento Odoo (Fase 3)
-- Publicado via SSE (Server-Sent Events) ou WebSocket feed em tempo real
+- **NÃO é modelo Odoo** — publicado via SSE (Server-Sent Events) ou WebSocket feed em tempo real
 - `sensor_code` ← código do sensor
 - `ts` ← timestamp do evento
 - `value` ← leitura atual

@@ -23,7 +23,7 @@ export function computeStatus(value: number, t: Threshold | null): StatusResult 
   const position = Math.min(1, Math.max(0, raw))
   let state: StatusResult['state']
   if (value < t.limite_min || value > t.limite_max) state = 'crit'
-  else if (raw < WARN_MARGIN || raw > 1 - WARN_MARGIN) state = 'warn'
+  else if (raw <= WARN_MARGIN || raw >= 1 - WARN_MARGIN) state = 'warn'
   else state = 'ok'
   return { state, label: LABELS[state], position }
 }

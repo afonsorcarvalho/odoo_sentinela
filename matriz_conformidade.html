@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matriz de Conformidade — Integridade de Dados e Registro Eletrônico (Sentinela CME)</title>
+<style>
+  :root{
+    --ink:#0f172a; --muted:#475569; --soft:#64748b;
+    --brand:#0e7a82; --brand-deep:#0b545a; --brand-tint:#e9f6f6;
+    --green:#0f9d58; --green-bg:#e7f6ee; --green-bd:#bfe6cf;
+    --amber:#b26a00; --amber-bg:#fef3e2; --amber-bd:#f0d09a;
+    --blue:#1d4ed8; --blue-bg:#e8eeff; --blue-bd:#c3d2fb;
+    --line:#e2e8f0; --bg:#ffffff; --bg-soft:#f7fafb;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg-soft);line-height:1.6;-webkit-font-smoothing:antialiased;padding:0 0 60px}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  .head{background:linear-gradient(160deg,#0b545a,#0e7a82);color:#fff;padding:44px 0 40px;margin-bottom:34px}
+  .head .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:12.5px;font-weight:700;color:#ffe4a3;margin-bottom:10px}
+  .head h1{font-size:31px;font-weight:800;letter-spacing:-.02em;margin-bottom:12px;max-width:820px;line-height:1.2}
+  .head p{color:rgba(255,255,255,.9);font-size:16px;max-width:800px}
+
+  .callout{background:#fff;border:1px solid var(--amber-bd);border-left:4px solid var(--amber);border-radius:12px;padding:18px 22px;margin-bottom:26px}
+  .callout b{color:var(--ink)}
+  .callout p{color:var(--muted);font-size:14.5px;margin-top:4px}
+
+  .legend{display:flex;gap:22px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 22px;margin-bottom:30px;align-items:center}
+  .legend .lg{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+  .chip{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap}
+  .c-ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+  .c-part{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd)}
+  .c-todo{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bd)}
+
+  h2.sec{font-size:20px;color:var(--brand-deep);font-weight:800;margin:34px 0 4px;letter-spacing:-.01em}
+  .sec-sub{color:var(--soft);font-size:13.5px;margin-bottom:14px}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:14.3px}
+  thead th{background:var(--brand-tint);color:var(--brand-deep);text-align:left;font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;padding:12px 16px;border-bottom:1px solid var(--line)}
+  tbody td{padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--muted)}
+  tbody tr:last-child td{border-bottom:none}
+  td .req{color:var(--ink);font-weight:600;display:block;margin-bottom:3px}
+  td .ref{font-size:12px;color:var(--soft)}
+  .col-req{width:31%}
+  .col-sys{width:52%}
+  .col-st{width:17%}
+  td.st{text-align:left}
+
+  .gaps{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px 28px;margin-top:34px}
+  .gaps h2{font-size:19px;color:var(--brand-deep);margin-bottom:6px}
+  .gaps > p{color:var(--muted);font-size:14.5px;margin-bottom:16px}
+  .gap{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line)}
+  .gap:first-of-type{border-top:none}
+  .gap .n{flex:none;width:30px;height:30px;border-radius:9px;background:var(--blue-bg);color:var(--blue);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .gap h4{font-size:15.5px;color:var(--ink);margin-bottom:3px}
+  .gap p{font-size:14px;color:var(--muted)}
+
+  footer{margin-top:34px;color:var(--soft);font-size:12.5px;text-align:center;line-height:1.7}
+  .ph{background:var(--amber-bg);border:1px dashed var(--amber-bd);color:#8a5a12;border-radius:12px;padding:14px 18px;font-size:13px;margin-top:22px}
+
+  @media(max-width:820px){
+    .head h1{font-size:24px}
+    table{font-size:13px}
+    .col-req,.col-sys,.col-st{width:auto}
+    thead{display:none}
+    tbody td{display:block;border-bottom:none;padding:6px 16px}
+    tbody tr{display:block;border-bottom:1px solid var(--line);padding:10px 0}
+    td.st{padding-top:8px}
+  }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="wrap">
+    <div class="eyebrow">Integridade de dados e registro eletrônico</div>
+    <h1>Matriz de Conformidade — alinhamento aos requisitos de integridade de dados (21 CFR Part 11, ALCOA+ e normas ANVISA)</h1>
+    <p>Mapeamento requisito a requisito entre os principais referenciais de registro eletrônico e integridade de dados e os recursos da plataforma Sentinela CME. Destinado a apoiar a decisão de compra do tier regulado (indústria farmacêutica, fabricantes de produtos para saúde, laboratórios, esterilização de produtos regulados) e a servir de base para o processo de validação do cliente.</p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="callout">
+    <b>Aviso importante — leia antes de usar como argumento de venda.</b>
+    <p>A conformidade com o 21 CFR Part 11 e com as BPF da ANVISA <b>não é uma propriedade do software isoladamente</b>: ela é alcançada pela organização regulada por meio da <b>validação do sistema (CSV — IQ/OQ/PQ, GAMP 5)</b>, procedimentos operacionais (POPs), treinamento e auditorias. Esta matriz demonstra que a plataforma foi <b>projetada segundo os princípios de integridade de dados e está preparada para validação</b> — não constitui certificação nem declaração de conformidade. Recomenda-se validação por consultoria regulatória/de validação antes de qualquer afirmação formal a clientes ou em processos licitatórios.</p>
+  </div>
+
+  <div class="legend">
+    <span style="font-weight:700;color:var(--ink);font-size:13.5px">Legenda de status:</span>
+    <span class="lg"><span class="chip c-ok">Atende</span> recurso presente e aderente</span>
+    <span class="lg"><span class="chip c-part">Atende parcial</span> presente, com configuração ou complemento necessário</span>
+    <span class="lg"><span class="chip c-todo">A implementar</span> trilha "tier regulado" do roadmap</span>
+  </div>
+
+  <!-- A -->
+  <h2 class="sec">A. Trilha de auditoria</h2>
+  <div class="sec-sub">Referência: 21 CFR Part 11 §11.10(e) • ALCOA (Atribuível, Contemporâneo) • RDC 658/665</div>
+  <table>
+    <thead><tr><th class="col-req">Requisito</th><th class="col-sys">Como a plataforma atende</th><th class="col-st">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="req">Trilha segura, gerada por computador e com data/hora</span><span class="ref">Part 11 §11.10(e)</span></td>
+        <td>Leituras geradas automaticamente pelos coletores, com data/hora no instante da medição. Eventos de alarme e recebimento de arquivos registrados em ledger no servidor. Nenhum registro depende de digitação manual.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Registro de quem / o quê / quando, com valor anterior e novo</span><span class="ref">Part 11 §11.10(e)</span></td>
+        <td>Alterações de cadastro e de configuração (ex.: limiares de alarme) registradas com autor, data/hora e valor de/para pela trilha nativa do Odoo (chatter/tracking). Ações de alarme (reconhecer/resolver) registram usuário e momento.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Imutabilidade: o dado original não pode ser apagado ou obscurecido</span><span class="ref">Part 11 §11.10(e) • ALCOA "Original/Enduring"</span></td>
+        <td>Arquivos assinados com encadeamento por hash (adulteração rompe a cadeia) e armazenamento imutável (WORM / object-lock) que as credenciais da aplicação não conseguem sobrescrever. Modelo append-only. <b>Robustez acima do típico de mercado.</b></td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- B -->
+  <h2 class="sec">B. Integridade e autenticidade do registro (ALCOA+)</h2>
+  <div class="sec-sub">Referência: ALCOA/ALCOA+ • RDC 945/2024 • MP 2.200-2/2001 (ICP-Brasil)</div>
+  <table>
+    <thead><tr><th class="col-req">Requisito</th><th class="col-sys">Como a plataforma atende</th><th class="col-st">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="req">Atribuível — o dado é vinculado à sua origem</span></td>
+        <td>Assinatura digital aplicada na origem (secure element do coletor), vinculando cada registro ao equipamento que o gerou. Ações humanas atribuídas a usuários únicos no Odoo.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Contemporâneo — registrado no momento da atividade</span></td>
+        <td>Leitura datada e assinada no instante da medição, no ponto de coleta.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Original / cópia verdadeira</span></td>
+        <td>O arquivo assinado é o registro original autoritativo, preservado em armazenamento imutável e recuperável na íntegra.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Legível e Disponível</span></td>
+        <td>Recuperação em formato legível (relatórios) e eletrônico (export), ao longo de todo o período de retenção.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Acurado — reflete a verdade dos fatos</span></td>
+        <td>A cadeia técnica preserva o valor medido sem alteração. A acurácia da <b>medição em si</b> depende de calibração periódica dos sensores e do plano de validação — responsabilidade operacional do cliente, apoiada pelo registro de proveniência e status de leitura.</td>
+        <td class="st"><span class="chip c-part">Atende parcial</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Completo / Consistente / Duradouro</span></td>
+        <td>Ledger de recebimento detecta lacunas na sequência (nenhum dia "some" silenciosamente); retenção ≥ 5 anos; backup off-box; agregados preservados por todo o período.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Validade jurídica do documento eletrônico assinado</span><span class="ref">MP 2.200-2/2001, Art. 1º e Art. 10</span></td>
+        <td>Adota assinatura digital e comprovação de autoria/integridade — meios reconhecidos pela MP 2.200-2 (Art. 10, §2º) além do ICP-Brasil. <b>Não constitui, por si, certificação ICP-Brasil.</b></td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- C -->
+  <h2 class="sec">C. Controle de acesso e autoridade</h2>
+  <div class="sec-sub">Referência: 21 CFR Part 11 §11.10(d),(g),(h)</div>
+  <table>
+    <thead><tr><th class="col-req">Requisito</th><th class="col-sys">Como a plataforma atende</th><th class="col-st">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="req">Acesso restrito a indivíduos autorizados; contas únicas (sem compartilhamento)</span></td>
+        <td>Usuários individuais no Odoo; papéis (grupos) com permissões distintas; identidade única propagada às APIs via token.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Checagem de autoridade (quem pode fazer o quê)</span></td>
+        <td>Grupos de acesso e regras de registro (ir.rule); alterações de limiar acima do padrão regulatório exigem perfil elevado + justificativa registrada.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Isolamento entre organizações (multi-tenant)</span></td>
+        <td>Isolamento por cliente aplicado na camada de aplicação (regras por parceiro); um cliente nunca acessa dado de outro.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Autenticação forte (MFA) quando apropriado</span></td>
+        <td>Suportado pelo Odoo (2FA); a habilitar/configurar conforme a política do cliente.</td>
+        <td class="st"><span class="chip c-part">Atende parcial</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- D -->
+  <h2 class="sec">D. Retenção, cópias e recuperação</h2>
+  <div class="sec-sub">Referência: 21 CFR Part 11 §11.10(b),(c) • RDC 15/2012 Art. 26 §1º</div>
+  <table>
+    <thead><tr><th class="col-req">Requisito</th><th class="col-sys">Como a plataforma atende</th><th class="col-st">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="req">Retenção pelo prazo aplicável</span></td>
+        <td>Mínimo de 5 anos garantido por object-lock (piso legal, inegociável); política pós-5-anos configurável por contrato, nunca abaixo do piso.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Geração de cópias precisas e completas (legível + eletrônico)</span></td>
+        <td>Relatórios legíveis + export eletrônico; resolução total re-hidratável a partir do arquivo assinado.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Proteção contra perda (backup / recuperação)</span></td>
+        <td>Backup contínuo (PITR) + cópia imutável em armazenamento externo, em domínio de falha separado. <b>Depende de contratação do object storage off-box antes de produção.</b></td>
+        <td class="st"><span class="chip c-part">Atende parcial</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- E -->
+  <h2 class="sec">E. Assinaturas eletrônicas</h2>
+  <div class="sec-sub">Referência: 21 CFR Part 11 Subparte C (§11.50, §11.70, §11.200)</div>
+  <table>
+    <thead><tr><th class="col-req">Requisito</th><th class="col-sys">Como a plataforma atende</th><th class="col-st">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="req">Assinatura vinculada ao registro, garantindo integridade e autoria do dado</span></td>
+        <td>Assinatura criptográfica de máquina (secure element) aplicada ao registro na origem — assegura autenticidade e integridade do dado medido.</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Assinatura eletrônica humana com "significado" (aprovado/revisado), manifestação (nome, data/hora, significado) e não-repúdio</span></td>
+        <td>Fluxo de assinatura humana formal para ações de aprovação/revisão (ex.: RT aprovar relatório, validar tratamento de não conformidade) ainda não implementado — hoje há registro de autoria via trilha do Odoo, mas não o componente de assinatura eletrônica no molde Part 11.</td>
+        <td class="st"><span class="chip c-todo">A implementar</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- F -->
+  <h2 class="sec">F. Integridade das alterações de configuração</h2>
+  <div class="sec-sub">Referência: Part 11 §11.10(e) (mudanças que afetam o significado do registro) • ALCOA</div>
+  <table>
+    <thead><tr><th class="col-req">Requisito</th><th class="col-sys">Como a plataforma atende</th><th class="col-st">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="req">Alterações de parâmetros (ex.: limiares) atribuíveis e auditáveis</span></td>
+        <td>Toda alteração registrada no Odoo (autor, data/hora, de/para) e versionada; o dispositivo reporta a versão de configuração aplicada (controle de drift).</td>
+        <td class="st"><span class="chip c-ok">Atende</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Configuração enviada ao dispositivo protegida contra adulteração no trânsito</span></td>
+        <td>Na v1, a configuração desce confiando na segurança do canal (VPN/rede local), <b>sem assinatura própria</b>. Para o tier regulado, recomenda-se assinar a configuração no servidor com verificação no dispositivo (endurecimento previsto).</td>
+        <td class="st"><span class="chip c-todo">A implementar</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- G -->
+  <h2 class="sec">G. Validação do sistema (CSV)</h2>
+  <div class="sec-sub">Referência: 21 CFR Part 11 §11.10(a) • RDC 658/665 (sistemas computadorizados) • GAMP 5</div>
+  <table>
+    <thead><tr><th class="col-req">Requisito</th><th class="col-sys">Como a plataforma atende</th><th class="col-st">Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="req">Sistema validado para o uso pretendido (IQ/OQ/PQ)</span></td>
+        <td>A validação é executada pela organização regulada. O produto deve fornecer um <b>pacote de suporte à validação</b>: especificações funcionais, categorização GAMP 5, documentação de arquitetura, ambiente de testes e roteiros de qualificação. A ser preparado.</td>
+        <td class="st"><span class="chip c-todo">A implementar</span></td>
+      </tr>
+      <tr>
+        <td><span class="req">Revisão da trilha de auditoria e capacidade de inspeção</span></td>
+        <td>Trilha consultável no Odoo + relatórios; recurso de "revisão de trilha de auditoria" dedicado pode ser formalizado como parte do pacote de validação.</td>
+        <td class="st"><span class="chip c-part">Atende parcial</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- GAPS -->
+  <div class="gaps">
+    <h2>Trilha "tier regulado" — o que fechar para atingir aderência plena</h2>
+    <p>A base de integridade de dados já é forte. Para atacar formalmente o mercado regulado (farma, dispositivos, laboratórios), três frentes concentram o esforço:</p>
+    <div class="gap">
+      <div class="n">1</div>
+      <div>
+        <h4>Módulo de assinatura eletrônica humana (molde Part 11)</h4>
+        <p>Fluxo de aprovação/revisão com manifestação de assinatura (nome, data/hora, significado do ato), vínculo ao registro e não-repúdio — para ações do RT e da qualidade.</p>
+      </div>
+    </div>
+    <div class="gap">
+      <div class="n">2</div>
+      <div>
+        <h4>Assinatura da configuração no control plane</h4>
+        <p>Reclassificar de "candidato v2" para requisito do tier regulado: servidor assina a configuração; dispositivo verifica antes de aplicar. Garante que alterações que afetam o significado do registro sejam também atribuíveis e íntegras.</p>
+      </div>
+    </div>
+    <div class="gap">
+      <div class="n">3</div>
+      <div>
+        <h4>Pacote de suporte à validação (CSV / GAMP 5)</h4>
+        <p>Especificações, categorização GAMP 5, documentação de arquitetura, roteiros de IQ/OQ/PQ e recurso de revisão de trilha de auditoria — para que o cliente valide o sistema com esforço mínimo.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="ph">
+    <b>Nota (não faz parte da peça final):</b> "Sentinela CME" é nome provisório. Esta matriz é uma <b>autoavaliação técnica</b> de alinhamento, não uma certificação. Antes de uso comercial/licitatório, recomenda-se revisão por consultoria de validação/regulatória e confirmação da redação das normas citadas.
+  </div>
+
+  <footer>
+    Matriz de Conformidade — Integridade de Dados e Registro Eletrônico • Referenciais: 21 CFR Part 11 (FDA), ALCOA+, RDC 15/2012, RDC 658/2022, RDC 665/2022, RDC 945/2024, MP 2.200-2/2001, GAMP 5.<br>
+    Documento técnico interno / de apoio comercial. A conformidade regulatória é alcançada pela organização usuária mediante validação e procedimentos próprios.
+  </footer>
+
+</div>
+</body>
+</html>

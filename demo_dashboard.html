@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinela CME — Painel de Monitoramento (Demonstração)</title>
+<style>
+  :root{
+    --brand:#0e7a82; --brand-deep:#0b545a; --brand-tint:#e9f6f6;
+    --surface:#ffffff; --plane:#f4f7f8; --panel:#ffffff;
+    --ink:#0b1220; --sec:#475569; --muted:#8a95a3;
+    --line:#e6ebef; --grid:#eef2f5;
+    --good:#0ca30c; --good-tint:#e7f6e7;
+    --warn:#b8860b; --warn-dot:#fab219; --warn-tint:#fbf3dd;
+    --crit:#d03b3b; --crit-tint:#fbe6e6;
+    --shadow:0 6px 22px rgba(11,84,90,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--plane);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .demo-flag{background:#0b545a;color:#cdeef0;font-size:12px;text-align:center;padding:5px;letter-spacing:.04em}
+  .demo-flag b{color:#fff}
+
+  .top{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.01em;color:var(--brand-deep)}
+  .brand .lg{width:34px;height:34px;border-radius:9px;background:var(--brand);display:flex;align-items:center;justify-content:center}
+  .top .site{display:flex;align-items:center;gap:8px;background:var(--brand-tint);border:1px solid #cfeaea;border-radius:9px;padding:7px 12px;font-size:13.5px;font-weight:600;color:var(--brand-deep)}
+  .spacer{flex:1}
+  .live{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--good);text-transform:uppercase;letter-spacing:.05em}
+  .live .dot{width:9px;height:9px;border-radius:50%;background:var(--good);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(12,163,12,.45)}70%{box-shadow:0 0 0 8px rgba(12,163,12,0)}100%{box-shadow:0 0 0 0 rgba(12,163,12,0)}}
+  .clock{font-size:13.5px;color:var(--sec);font-variant-numeric:tabular-nums}
+  .shield{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--brand-deep);font-weight:600;background:#fff;border:1px solid #cfeaea;border-radius:8px;padding:6px 10px}
+
+  .layout{display:grid;grid-template-columns:1fr 340px;gap:18px;padding:20px 22px 30px;max-width:1400px;margin:0 auto;align-items:start}
+  .section-h{font-size:12.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;margin:2px 0 12px}
+
+  /* area cards */
+  .areas{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .area{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:border-color .15s,transform .15s;position:relative}
+  .area:hover{transform:translateY(-2px)}
+  .area.sel{border-color:var(--brand);box-shadow:0 0 0 2px rgba(14,122,130,.14),var(--shadow)}
+  .area .nm{font-weight:700;font-size:15px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .badges{display:flex;align-items:center;gap:7px}
+  .stpill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .st-good{background:var(--good-tint);color:var(--good)}
+  .st-warn{background:var(--warn-tint);color:var(--warn)}
+  .st-crit{background:var(--crit-tint);color:var(--crit)}
+  .mrow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-top:1px solid var(--grid);font-size:13px}
+  .mrow:first-of-type{border-top:none}
+  .mrow .lbl{color:var(--sec)}
+  .mrow .val{font-weight:700;font-variant-numeric:tabular-nums}
+  .mrow .val.out{color:var(--crit)}
+  .mrow .val.near{color:var(--warn)}
+
+  /* alert badge + balloon */
+  .alertbadge{position:relative;width:22px;height:22px;border-radius:50%;background:var(--crit-tint);border:1px solid #f2c2c2;display:none;align-items:center;justify-content:center;cursor:help;animation:blink 2s infinite}
+  @keyframes blink{0%,100%{box-shadow:0 0 0 0 rgba(208,59,59,.35)}50%{box-shadow:0 0 0 5px rgba(208,59,59,0)}}
+  .alertbadge.show{display:inline-flex}
+  .balloon{position:absolute;top:130%;right:-4px;width:230px;background:#0b1220;color:#fff;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:400;line-height:1.5;box-shadow:0 12px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .12s;z-index:40}
+  .balloon::before{content:"";position:absolute;bottom:100%;right:11px;border:6px solid transparent;border-bottom-color:#0b1220}
+  .alertbadge:hover .balloon{opacity:1}
+  .balloon .bh{font-weight:700;color:#ffd0d0;display:flex;align-items:center;gap:5px;margin-bottom:4px}
+  .balloon b{color:#fff}
+  .balloon .bt{color:#aab4c2;font-variant-numeric:tabular-nums}
+
+  /* chart panel */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .panel-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+  .panel-title{font-weight:700;font-size:16px}
+  .panel-title small{display:block;color:var(--muted);font-weight:500;font-size:12.5px;margin-top:2px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--sec);cursor:pointer}
+  .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .viewbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+  .toggle{display:inline-flex;background:#eef3f4;border:1px solid var(--line);border-radius:9px;padding:3px}
+  .toggle button{border:none;background:none;font-size:12.5px;font-weight:700;color:var(--sec);padding:6px 14px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:6px}
+  .toggle button.on{background:#fff;color:var(--brand-deep);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);align-items:center}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .sw{width:16px;height:10px;border-radius:2px;display:inline-block}
+  .sw.band{background:rgba(12,163,12,.16);border:1px solid rgba(12,163,12,.4)}
+  .sw.lim{border-top:2px dashed var(--crit);width:16px;height:0}
+  .sw.ser{background:var(--brand);height:3px;border-radius:2px}
+
+  .bignum{display:flex;align-items:baseline;gap:10px;margin:2px 0 6px}
+  .bignum .n{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums}
+  .bignum .u{font-size:15px;color:var(--sec)}
+  .bignum .band{font-size:12.5px;color:var(--muted);margin-left:4px}
+  .sig{font-size:11.5px;color:var(--good);font-weight:600;display:inline-flex;align-items:center;gap:4px;margin-left:auto}
+  canvas{width:100%;height:270px;display:block}
+  .cvwrap{position:relative}
+  .tip{position:absolute;pointer-events:none;background:#0b1220;color:#fff;font-size:11.5px;border-radius:7px;padding:6px 9px;transform:translate(-50%,-120%);white-space:nowrap;opacity:0;transition:opacity .1s;font-variant-numeric:tabular-nums}
+
+  .alarms{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+  .alarms h3{font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .badge{background:var(--crit);color:#fff;font-size:12px;font-weight:700;border-radius:999px;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0 7px}
+  .badge.zero{background:var(--good)}
+  .alist{display:flex;flex-direction:column;gap:9px;max-height:560px;overflow:auto}
+  .alarm{border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:10px;padding:11px 12px}
+  .alarm.crit{border-left-color:var(--crit);background:#fef8f8}
+  .alarm.ok{border-left-color:var(--good);background:#f7fcf7}
+  .alarm .a1{display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:3px}
+  .alarm .a1 .t{color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+  .alarm .a2{font-size:12.5px;color:var(--sec)}
+  .alarm .a2 b{color:var(--ink)}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:24px 0}
+
+  .btn{font-size:13px;font-weight:700;border:none;border-radius:9px;padding:9px 14px;cursor:pointer;background:var(--brand);color:#fff}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--sec)}
+  .demo-controls{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+
+  .toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:10px;z-index:50}
+  .toast{background:#fff;border:1px solid var(--crit);border-left:4px solid var(--crit);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.16);padding:13px 16px;min-width:290px;display:flex;gap:11px;align-items:flex-start;animation:slidein .25s ease}
+  .toast.ok{border-color:var(--good);border-left-color:var(--good)}
+  @keyframes slidein{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+  .toast .ti{flex:none;width:30px;height:30px;border-radius:8px;background:var(--crit-tint);display:flex;align-items:center;justify-content:center}
+  .toast.ok .ti{background:var(--good-tint)}
+  .toast .th{font-weight:700;font-size:13.5px}
+  .toast .tt{font-size:12.5px;color:var(--sec);margin-top:2px}
+
+  @media(max-width:960px){.layout{grid-template-columns:1fr}.areas{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="demo-flag">AMBIENTE DE <b>DEMONSTRAÇÃO</b> — dados simulados para apresentação. Nenhuma medição real.</div>
+
+<div class="top">
+  <div class="brand"><span class="lg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>Sentinela <span style="opacity:.6;font-weight:600">CME</span></div>
+  <div class="site">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V7l6-4 6 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
+    Hospital Demonstração — CME Central
+  </div>
+  <div class="spacer"></div>
+  <div class="shield"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> Registro íntegro</div>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="live"><span class="dot"></span> Ao vivo</div>
+</div>
+
+<div class="layout">
+  <div>
+    <div class="section-h">Áreas monitoradas</div>
+    <div class="areas" id="areas"></div>
+
+    <div class="panel">
+      <div class="panel-top">
+        <div class="panel-title" id="chartTitle">Detalhe do sensor<small id="chartSub"></small></div>
+        <div class="chips" id="metricChips"></div>
+      </div>
+      <div class="viewbar">
+        <div class="toggle" id="rangeToggle">
+          <button data-r="live" class="on"><span style="width:8px;height:8px;border-radius:50%;background:var(--good);display:inline-block"></span> Ao vivo</button>
+          <button data-r="day"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Dia todo (24h)</button>
+        </div>
+        <div class="legend">
+          <span><span class="sw ser"></span> leitura</span>
+          <span><span class="sw band"></span> em conformidade</span>
+          <span><span class="sw lim"></span> limite (RDC 15)</span>
+        </div>
+      </div>
+      <div class="bignum">
+        <span class="n" id="bigVal">—</span><span class="u" id="bigUnit"></span>
+        <span class="band" id="bigBand"></span>
+        <span class="sig"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> assinado na origem</span>
+      </div>
+      <div class="cvwrap">
+        <canvas id="chart"></canvas>
+        <div class="tip" id="tip"></div>
+      </div>
+    </div>
+
+    <div class="demo-controls">
+      <button class="btn" id="triggerBtn">Simular não conformidade (Expurgo · pressão)</button>
+      <button class="btn ghost" id="resetBtn">Reiniciar demonstração</button>
+    </div>
+  </div>
+
+  <div class="alarms">
+    <h3>Alarmes <span class="badge zero" id="alarmBadge">0</span></h3>
+    <div class="alist" id="alist"><div class="empty">Nenhum alarme ativo.</div></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  const METRICS = { temp:{label:'Temperatura',short:'Temperatura',unit:'°C',dec:1}, umid:{label:'Umidade',short:'Umidade',unit:'%',dec:0}, press:{label:'Pressão diferencial',short:'Pressão',unit:'Pa',dec:1} };
+  const HIST=60, TICK=1000;
+  const DAY_N=288, DAY_STEP=5;                 // 288 amostras de 5 min = 24h
+  const DAY_TIMES=Array.from({length:DAY_N},(_,i)=>i*DAY_STEP);
+
+  function mk(target,min,max){ return {target,min,max,value:target,hist:[],dayHist:[]}; }
+  const AREAS = [
+    { id:'exp', nome:'Expurgo',       sensors:{ temp:mk(20,18,22), umid:mk(52,40,60), press:mk(-3.6,-6,-2.5) } },
+    { id:'pre', nome:'Preparo',       sensors:{ temp:mk(22,20,24), umid:mk(50,40,60), press:mk(3.6,2.5,6) } },
+    { id:'est', nome:'Esterilização', sensors:{ temp:mk(22,20,24), umid:mk(48,40,60), press:mk(3.8,2.5,6) } },
+    { id:'ars', nome:'Arsenal',       sensors:{ temp:mk(21,20,24), umid:mk(46,40,60), press:mk(3.2,2.5,6) } },
+  ];
+  // eventos históricos do dia (não conformidades que já aconteceram)
+  const DAY_EVENTS = [
+    { area:'exp', metric:'press', s:38, e:46, peak:-1.7 },   // ~03:10–03:50
+    { area:'est', metric:'temp',  s:172, e:180, peak:25.3 }, // ~14:20–15:00
+  ];
+
+  let selArea='exp', selMetric='press', range='live';
+  let alarms=[]; const activeAlarm={}; const areaLastNC={}; let forced=null;
+  const areaRefs={};
+
+  function rnd(n){ return (Math.random()*2-1)*n; }
+  function status(s){ if(s.value<s.min||s.value>s.max) return 'crit'; const span=s.max-s.min,e=span*0.12; if(s.value<s.min+e||s.value>s.max-e) return 'warn'; return 'good'; }
+  function areaStatus(a){ let st='good'; for(const m in a.sensors){ const x=status(a.sensors[m]); if(x==='crit')return'crit'; if(x==='warn')st='warn'; } return st; }
+  const ST={ good:{cls:'st-good',lbl:'Normal',icon:'M20 6L9 17l-5-5'}, warn:{cls:'st-warn',lbl:'Atenção',icon:'M12 9v4M12 17h.01'}, crit:{cls:'st-crit',lbl:'Crítico',icon:'M12 9v4M12 17h.01'} };
+  function fmt(v,m){ return v.toFixed(METRICS[m].dec); }
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function hhmmss(d){ return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+  function minToHHMM(min){ return pad(Math.floor(min/60))+':'+pad(Math.round(min%60)); }
+  function signed(v,m){ return (m==='press'&&v>0?'+':'')+fmt(v,m); }
+
+  // ---- gera a série do dia (com excursões) e semeia os marcadores ----
+  function buildDay(){
+    AREAS.forEach(a=>Object.keys(a.sensors).forEach(m=>{
+      const s=a.sensors[m]; s.dayHist=[];
+      for(let i=0;i<DAY_N;i++){
+        const daily=(s.max-s.min)*0.10*Math.sin(i/DAY_N*Math.PI*2 - 1);
+        let v=s.target+daily+rnd((s.max-s.min)*0.03);
+        const ev=DAY_EVENTS.find(e=>e.area===a.id&&e.metric===m&&i>=e.s&&i<=e.e);
+        if(ev){ const mid=(ev.s+ev.e)/2, k=1-Math.abs(i-mid)/((ev.e-ev.s)/2); v=s.target+(ev.peak-s.target)*Math.max(0,k); }
+        s.dayHist.push(v);
+      }
+    }));
+    seedBadges();
+  }
+  function seedBadges(){
+    for(const k in areaLastNC) delete areaLastNC[k];
+    DAY_EVENTS.forEach(e=>{
+      const a=AREAS.find(x=>x.id===e.area), s=a.sensors[e.metric];
+      const thr = e.peak>s.max ? ('máx '+signed(s.max,e.metric)+METRICS[e.metric].unit) : ('mín '+signed(s.min,e.metric)+METRICS[e.metric].unit);
+      areaLastNC[e.area]={ ts:minToHHMM(e.s*DAY_STEP), metric:METRICS[e.metric].label, value:signed(e.peak,e.metric)+METRICS[e.metric].unit, threshold:thr };
+    });
+  }
+
+  // ---- constrói os cards uma vez; atualiza em tempo real (evita piscar o balão) ----
+  function buildAreas(){
+    const el=document.getElementById('areas'); el.innerHTML='';
+    AREAS.forEach(a=>{
+      const card=document.createElement('div'); card.className='area'; card.dataset.a=a.id;
+      const nm=document.createElement('div'); nm.className='nm';
+      const anm=document.createElement('span'); anm.textContent=a.nome;
+      const badges=document.createElement('div'); badges.className='badges';
+      const alert=document.createElement('span'); alert.className='alertbadge';
+      alert.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d03b3b" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/></svg><span class="balloon"></span>';
+      const pill=document.createElement('span'); pill.className='stpill';
+      badges.appendChild(alert); badges.appendChild(pill);
+      nm.appendChild(anm); nm.appendChild(badges); card.appendChild(nm);
+      const vals={};
+      Object.keys(a.sensors).forEach(m=>{
+        const r=document.createElement('div'); r.className='mrow';
+        const l=document.createElement('span'); l.className='lbl'; l.textContent=METRICS[m].short;
+        const v=document.createElement('span'); v.className='val';
+        r.appendChild(l); r.appendChild(v); card.appendChild(r); vals[m]=v;
+      });
+      card.onclick=()=>{ selArea=a.id; refreshChartUI(); };
+      el.appendChild(card);
+      areaRefs[a.id]={card,pill,alert,balloon:alert.querySelector('.balloon'),vals};
+    });
+  }
+  function updateAreas(){
+    AREAS.forEach(a=>{
+      const R=areaRefs[a.id], ast=areaStatus(a), si=ST[ast];
+      R.card.classList.toggle('sel', selArea===a.id);
+      R.pill.className='stpill '+si.cls;
+      R.pill.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="'+si.icon+'"/></svg>'+si.lbl;
+      Object.keys(a.sensors).forEach(m=>{
+        const s=a.sensors[m], st=status(s), v=R.vals[m];
+        v.className='val'+(st==='crit'?' out':st==='warn'?' near':'');
+        v.textContent=signed(s.value,m)+' '+METRICS[m].unit;
+      });
+      const nc=areaLastNC[a.id];
+      if(nc){
+        R.alert.classList.add('show');
+        R.balloon.innerHTML='<div class="bh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff9a9a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/></svg> Não conformidade hoje</div>'
+          +'Última: <b>'+nc.metric+'</b><br><b>'+nc.value+'</b> — fora do limite ('+nc.threshold+')<br><span class="bt">registrado às '+nc.ts+'</span>';
+      } else R.alert.classList.remove('show');
+    });
+  }
+
+  function curArea(){ return AREAS.find(a=>a.id===selArea); }
+  function curSensor(){ return curArea().sensors[selMetric]; }
+
+  function renderMetricChips(){
+    const el=document.getElementById('metricChips');
+    el.innerHTML=Object.keys(METRICS).map(m=>'<button class="chip '+(selMetric===m?'on':'')+'" data-m="'+m+'">'+METRICS[m].short+'</button>').join('');
+    el.querySelectorAll('.chip').forEach(n=>n.onclick=()=>{ selMetric=n.dataset.m; refreshChartUI(); });
+  }
+  document.getElementById('rangeToggle').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    range=b.dataset.r;
+    document.getElementById('rangeToggle').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.r===range));
+    hoverIdx=-1; refreshChartUI();
+  });
+
+  function renderBig(){
+    const s=curSensor(), st=status(s);
+    document.getElementById('bigVal').textContent=signed(s.value,selMetric);
+    document.getElementById('bigUnit').textContent=METRICS[selMetric].unit;
+    document.getElementById('bigBand').textContent='agora · faixa '+signed(s.min,selMetric)+' a '+signed(s.max,selMetric)+' '+METRICS[selMetric].unit;
+    document.getElementById('chartSub').textContent=curArea().nome+' · '+METRICS[selMetric].label+(range==='day'?' · dia todo':'');
+    document.getElementById('bigVal').style.color = st==='crit'?'var(--crit)':st==='warn'?'var(--warn)':'var(--ink)';
+  }
+
+  // ---- gráfico ----
+  const cv=document.getElementById('chart'), tip=document.getElementById('tip');
+  let hoverIdx=-1;
+  function drawChart(){
+    const s=curSensor(); const isDay=range==='day';
+    const data = isDay ? s.dayHist : s.hist; const N=data.length;
+    const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+    cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext('2d'); g.scale(dpr,dpr); g.clearRect(0,0,W,H);
+    const padL=44,padR=12,padT=14,padB=24, iw=W-padL-padR, ih=H-padT-padB;
+    let lo=Math.min(s.min,...data), hi=Math.max(s.max,...data); const mm=(hi-lo)*0.15||1; lo-=mm; hi+=mm;
+    const X=i=> padL+(i/(N-1))*iw, Y=v=> padT+(1-(v-lo)/(hi-lo))*ih;
+
+    // banda em conformidade
+    g.fillStyle='rgba(12,163,12,.08)'; g.fillRect(padL,Y(s.max),iw,Y(s.min)-Y(s.max));
+
+    // faixas de não conformidade (dia): sombra vermelha nos trechos fora
+    if(isDay){
+      g.fillStyle='rgba(208,59,59,.12)';
+      let i=0; while(i<N){ if(data[i]<s.min||data[i]>s.max){ let j=i; while(j<N&&(data[j]<s.min||data[j]>s.max))j++; const x0=X(Math.max(0,i-1)), x1=X(Math.min(N-1,j)); g.fillRect(x0,padT,x1-x0,ih); i=j; } else i++; }
+    }
+
+    // grid + ticks y
+    g.strokeStyle='#eef2f5'; g.fillStyle='#8a95a3'; g.font='11px system-ui'; g.textAlign='right'; g.textBaseline='middle'; g.lineWidth=1;
+    for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=Y(v); g.beginPath();g.moveTo(padL,y);g.lineTo(W-padR,y);g.stroke(); g.fillText(v.toFixed(METRICS[selMetric].dec),padL-7,y); }
+
+    // x-axis
+    g.textAlign='center'; g.textBaseline='top'; g.fillStyle='#8a95a3';
+    if(isDay){ for(let h=0;h<=24;h+=4){ const x=padL+(h*60/1435)*iw; g.strokeStyle='#f1f4f6'; g.beginPath();g.moveTo(x,padT);g.lineTo(x,H-padB);g.stroke(); g.fillText(pad(h)+'h',x,H-padB+5); } }
+    else { g.fillText('há 60s',padL,H-padB+5); g.fillText('agora',W-padR,H-padB+5); }
+
+    // limites RDC 15
+    g.setLineDash([5,4]); g.lineWidth=1.5; g.strokeStyle='#d03b3b';
+    [s.max,s.min].forEach(v=>{ g.beginPath();g.moveTo(padL,Y(v));g.lineTo(W-padR,Y(v));g.stroke(); });
+    g.setLineDash([]); g.textAlign='left'; g.fillStyle='#d03b3b'; g.font='10.5px system-ui';
+    g.fillText('limite',padL+4,Y(s.max)-4); g.fillText('limite',padL+4,Y(s.min)+4);
+
+    // série teal
+    g.strokeStyle='#0e7a82'; g.lineWidth=2; g.lineJoin='round'; g.beginPath();
+    data.forEach((v,i)=>{ const x=X(i),y=Y(v); i?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke();
+    // trechos fora em vermelho (dia)
+    if(isDay){ g.strokeStyle='#d03b3b'; g.lineWidth=2.5; for(let i=1;i<N;i++){ const a=data[i-1],b=data[i]; const oa=(a<s.min||a>s.max),ob=(b<s.min||b>s.max); if(oa&&ob){ g.beginPath();g.moveTo(X(i-1),Y(a));g.lineTo(X(i),Y(b));g.stroke(); } } }
+    // preenchimento sutil
+    g.beginPath(); data.forEach((v,i)=>{ const x=X(i),y=Y(v); i?g.lineTo(x,y):g.moveTo(x,y); }); g.lineTo(X(N-1),Y(lo)); g.lineTo(X(0),Y(lo)); g.closePath(); g.fillStyle='rgba(14,122,130,.05)'; g.fill();
+
+    // ponto atual (só ao vivo)
+    if(!isDay){ const li=N-1,lx=X(li),ly=Y(data[li]); g.fillStyle='#0e7a82'; g.beginPath();g.arc(lx,ly,4,0,7);g.fill(); g.fillStyle='#fff'; g.beginPath();g.arc(lx,ly,1.6,0,7);g.fill(); }
+
+    // hover
+    if(hoverIdx>=0&&hoverIdx<N){
+      const hx=X(hoverIdx),hy=Y(data[hoverIdx]);
+      g.strokeStyle='rgba(11,18,32,.25)'; g.lineWidth=1; g.setLineDash([3,3]); g.beginPath();g.moveTo(hx,padT);g.lineTo(hx,H-padB);g.stroke(); g.setLineDash([]);
+      g.fillStyle='#0b545a'; g.beginPath();g.arc(hx,hy,4,0,7);g.fill();
+      const when = isDay ? minToHHMM(DAY_TIMES[hoverIdx]) : ('há '+(N-1-hoverIdx)+'s');
+      tip.style.opacity=1; tip.style.left=hx+'px'; tip.style.top=hy+'px';
+      tip.innerHTML=signed(data[hoverIdx],selMetric)+' '+METRICS[selMetric].unit+' <span style="opacity:.6">· '+when+'</span>';
+    } else tip.style.opacity=0;
+  }
+  cv.addEventListener('mousemove',e=>{ const r=cv.getBoundingClientRect(),W=cv.clientWidth,padL=44,padR=12,iw=W-padL-padR; const N=(range==='day'?DAY_N:HIST); const rel=(e.clientX-r.left-padL)/iw; hoverIdx=Math.round(rel*(N-1)); if(hoverIdx<0||hoverIdx>=N)hoverIdx=-1; drawChart(); });
+  cv.addEventListener('mouseleave',()=>{ hoverIdx=-1; drawChart(); });
+
+  function refreshChartUI(){ renderMetricChips(); renderBig(); drawChart(); }
+
+  // ---- alarmes ----
+  function addAlarm(o){ alarms.unshift(o); if(alarms.length>40)alarms.pop(); if(o.kind==='crit') areaLastNC[o.areaId]={ts:hhmmss(o.ts),metric:o.metric,value:o.value+o.unit,threshold:o.threshold}; renderAlarms(); }
+  function renderAlarms(){
+    const el=document.getElementById('alist'); const active=Object.values(activeAlarm).filter(Boolean).length;
+    const b=document.getElementById('alarmBadge'); b.textContent=active; b.className='badge'+(active?'':' zero');
+    if(!alarms.length){ el.innerHTML='<div class="empty">Nenhum alarme ativo.</div>'; return; }
+    el.innerHTML=alarms.map(a=> a.kind==='ok'
+      ? '<div class="alarm ok"><div class="a1"><span>✓ Normalizado</span><span class="t">'+hhmmss(a.ts)+'</span></div><div class="a2"><b>'+a.area+'</b> · '+a.metric+' voltou à faixa ('+a.value+a.unit+')</div></div>'
+      : '<div class="alarm crit"><div class="a1"><span>⚠ Não conformidade</span><span class="t">'+hhmmss(a.ts)+'</span></div><div class="a2"><b>'+a.area+'</b> · '+a.metric+': <b>'+a.value+a.unit+'</b> — fora do limite ('+a.threshold+')</div></div>'
+    ).join('');
+  }
+
+  function toast(kind,title,txt){
+    const wrap=document.getElementById('toasts'); const d=document.createElement('div'); d.className='toast'+(kind==='ok'?' ok':'');
+    const icon=kind==='ok'?'M20 6L9 17l-5-5':'M12 9v4M12 17h.01', col=kind==='ok'?'#0ca30c':'#d03b3b';
+    d.innerHTML='<span class="ti"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="'+icon+'"/></svg></span><div><div class="th">'+title+'</div><div class="tt">'+txt+'</div></div>';
+    wrap.appendChild(d); setTimeout(()=>{ d.style.transition='opacity .3s'; d.style.opacity=0; setTimeout(()=>d.remove(),300); },5200);
+  }
+
+  // ---- tick ----
+  function tick(){
+    const now=new Date(); document.getElementById('clock').textContent=hhmmss(now);
+    AREAS.forEach(a=>Object.keys(a.sensors).forEach(m=>{
+      const s=a.sensors[m]; let goal=s.target;
+      if(forced&&forced.area===a.id&&forced.metric===m&&now.getTime()<forced.until) goal=forced.goal;
+      s.value += (goal-s.value)*0.15 + rnd((s.max-s.min)*0.015);
+      s.hist.push(s.value); if(s.hist.length>HIST)s.hist.shift();
+      const key=a.id+':'+m, isCrit=(s.value<s.min||s.value>s.max);
+      if(isCrit&&!activeAlarm[key]){ activeAlarm[key]=true; const thr=s.value>s.max?('máx '+signed(s.max,m)+METRICS[m].unit):('mín '+signed(s.min,m)+METRICS[m].unit);
+        addAlarm({ts:now,areaId:a.id,area:a.nome,metric:METRICS[m].label,value:signed(s.value,m),unit:METRICS[m].unit,threshold:thr,kind:'crit'});
+        toast('crit','Não conformidade detectada',a.nome+' · '+METRICS[m].label+' = '+signed(s.value,m)+METRICS[m].unit+' (fora da faixa)'); }
+      else if(!isCrit&&activeAlarm[key]){ activeAlarm[key]=false;
+        addAlarm({ts:now,areaId:a.id,area:a.nome,metric:METRICS[m].label,value:signed(s.value,m),unit:METRICS[m].unit,kind:'ok'});
+        toast('ok','Condição normalizada',a.nome+' · '+METRICS[m].label+' voltou à faixa'); }
+    }));
+    updateAreas(); renderBig(); if(range==='live') drawChart();
+  }
+
+  // ---- controles ----
+  document.getElementById('triggerBtn').onclick=()=>{ forced={area:'exp',metric:'press',goal:-1.6,until:Date.now()+10000}; selArea='exp'; selMetric='press'; range='live';
+    document.getElementById('rangeToggle').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.r==='live')); refreshChartUI(); };
+  document.getElementById('resetBtn').onclick=()=>{ alarms=[]; for(const k in activeAlarm)delete activeAlarm[k]; forced=null;
+    AREAS.forEach(a=>Object.keys(a.sensors).forEach(m=>{ const s=a.sensors[m]; s.value=s.target; s.hist=Array(HIST).fill(s.target); }));
+    seedBadges(); renderAlarms(); updateAreas(); refreshChartUI(); };
+
+  // ---- início ----
+  buildDay();
+  AREAS.forEach(a=>Object.keys(a.sensors).forEach(m=>{ const s=a.sensors[m]; for(let i=0;i<HIST;i++)s.hist.push(s.target); }));
+  buildAreas(); renderMetricChips(); renderAlarms(); tick(); refreshChartUI();
+  setInterval(tick,TICK); window.addEventListener('resize',drawChart);
+})();
+</script>
+</body>
+</html>

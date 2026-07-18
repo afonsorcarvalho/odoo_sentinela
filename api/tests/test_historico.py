@@ -102,3 +102,8 @@ def test_historico_sensor_inexistente_retorna_404():
 def test_historico_window_invalida_retorna_422():
     resposta = client.get(f'/sensores/{SENSOR_CODE}/historico', params={'window': '99x'}, headers=_headers())
     assert resposta.status_code == 422
+
+
+def test_historico_sem_auth_retorna_401():
+    resposta = client.get(f'/sensores/{SENSOR_CODE}/historico', params={'window': '1h'})
+    assert resposta.status_code == 401

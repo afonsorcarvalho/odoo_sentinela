@@ -51,8 +51,7 @@ export function SensorDetailPage({ code }: { code: string }) {
         <div>
           <Link
             to="/"
-            className="mb-2 inline-flex items-center gap-1 text-sm font-medium outline-none transition-colors duration-200 ease-out hover:text-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
-            style={{ color: 'var(--color-muted)' }}
+            className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-[var(--color-muted)] outline-none transition-colors duration-200 ease-out hover:text-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
           >
             ← Voltar
           </Link>

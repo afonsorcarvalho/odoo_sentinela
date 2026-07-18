@@ -22,8 +22,8 @@ export function AreaCard({
   return (
     <Link
       to={`/sensor/${group.sensors[0].sensor_code}`}
-      className="block rounded-2xl p-5 outline-none transition-colors duration-200 ease-out hover:border-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
-      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)' }}
+      className="block rounded-2xl border border-[var(--color-line)] p-5 outline-none transition-colors duration-200 ease-out hover:border-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
+      style={{ background: 'var(--color-surface)' }}
       data-testid={`area-card-${group.area.area_code}`}
     >
       <div className="flex items-start justify-between gap-3">

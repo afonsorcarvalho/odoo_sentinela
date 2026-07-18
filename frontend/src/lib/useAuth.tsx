@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import { authApi } from './api'
 import { decodeJwtExp } from './jwt'
 
-const STORAGE_KEY = 'sentinela_token'
+export const TOKEN_STORAGE_KEY = 'sentinela_token'
 
 type AuthContextValue = {
   isAuthenticated: boolean
@@ -13,11 +13,11 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 function readValidToken(): string | null {
-  const token = localStorage.getItem(STORAGE_KEY)
+  const token = localStorage.getItem(TOKEN_STORAGE_KEY)
   if (!token) return null
   const exp = decodeJwtExp(token)
   if (exp === null || exp <= Date.now()) {
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
     return null
   }
   return token
@@ -28,12 +28,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(usuario: string, senha: string) {
     const { access_token } = await authApi.login(usuario, senha)
-    localStorage.setItem(STORAGE_KEY, access_token)
+    localStorage.setItem(TOKEN_STORAGE_KEY, access_token)
     setToken(access_token)
   }
 
   function logout() {
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
     setToken(null)
   }
 

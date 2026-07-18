@@ -39,7 +39,7 @@ async def get_live(
     cliente=Depends(get_cliente_servico),
     _claims=Depends(verificar_token_query),
 ):
-    if obter_sensor(cliente, sensor_code) is None:
+    if await asyncio.to_thread(obter_sensor, cliente, sensor_code) is None:
         raise HTTPException(status_code=404, detail=f"sensor '{sensor_code}' não encontrado")
 
     fila = registrar(sensor_code)

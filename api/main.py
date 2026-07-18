@@ -25,7 +25,12 @@ app.include_router(live.router)
 
 @app.on_event('startup')
 async def _iniciar_live_listener():
-    asyncio.create_task(live_listener.escutar())
+    # Guarda a referência em app.state: o event loop só mantém uma
+    # referência fraca à task (ver docs de asyncio.create_task) — sem isso
+    # o GC recolhe a task quase imediatamente após o startup, matando o
+    # listener de NOTIFY silenciosamente (confirmado na verificação real:
+    # "Task was destroyed but it is pending!" logo após o startup).
+    app.state.live_listener_task = asyncio.create_task(live_listener.escutar())
 
 
 @app.get('/health')

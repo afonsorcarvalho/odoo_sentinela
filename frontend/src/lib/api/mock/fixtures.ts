@@ -46,13 +46,52 @@ const SENSOR_ARSENAL: SensorMeta = {
   area: { area_code: 'ARSENAL', name: 'Arsenal', category: 'Armazenamento' },
 }
 
+// Pressao diferencial: valores reais de referencia RDC15 ja documentados em
+// odoo_modelo_dados_spec.md §7 (Expurgo negativa min 2,5 Pa; Preparo positiva
+// min 2,5 Pa). A regra real e unilateral ("mais negativa/positiva que X"),
+// sem teto rigido documentado — o piso/teto extra abaixo (-15/15) e so um
+// limite plausivel de mock p/ desenhar uma faixa, NAO e valor regulatorio.
+const SENSOR_PRESSAO_EXP: SensorMeta = {
+  sensor_code: 'PRESS-EXP-01',
+  name: 'Pressão diferencial — Expurgo',
+  unidade: 'Pa',
+  protocolo_origem: 'rs485',
+  measurement_type: { code: 'pressao_diferencial', name: 'Pressão diferencial' },
+  area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Descontaminação' },
+}
+
+const THRESHOLD_PRESSAO_EXP: Threshold = {
+  sensor_id: 'PRESS-EXP-01',
+  limite_min: -15,
+  limite_max: -2.5,
+  is_valor_padrao_regulatorio: true,
+}
+
+const SENSOR_PRESSAO_PRE: SensorMeta = {
+  sensor_code: 'PRESS-PRE-01',
+  name: 'Pressão diferencial — Preparo/Esterilização',
+  unidade: 'Pa',
+  protocolo_origem: 'rs485',
+  measurement_type: { code: 'pressao_diferencial', name: 'Pressão diferencial' },
+  area: { area_code: 'PREPARO_ESTER', name: 'Preparo/Esterilização', category: 'Esterilização' },
+}
+
+const THRESHOLD_PRESSAO_PRE: Threshold = {
+  sensor_id: 'PRESS-PRE-01',
+  limite_min: 2.5,
+  limite_max: 15,
+  is_valor_padrao_regulatorio: true,
+}
+
 // Arsenal nao tem threshold regulatorio definido em odoo_modelo_dados_spec.md §7
 // (so Expurgo e Preparo/Esterilizacao tem defaults RDC 15) — deliberadamente sem
 // limite, exercita o estado "sem limite" do ThresholdBadge/computeStatus/AreaCard.
-export const SENSORS: SensorMeta[] = [SENSOR, SENSOR_PREPARO, SENSOR_ARSENAL]
+export const SENSORS: SensorMeta[] = [SENSOR, SENSOR_PREPARO, SENSOR_ARSENAL, SENSOR_PRESSAO_EXP, SENSOR_PRESSAO_PRE]
 
 export const THRESHOLDS: Record<string, Threshold | null> = {
   [SENSOR.sensor_code]: THRESHOLD,
   [SENSOR_PREPARO.sensor_code]: THRESHOLD_PREPARO,
   [SENSOR_ARSENAL.sensor_code]: null,
+  [SENSOR_PRESSAO_EXP.sensor_code]: THRESHOLD_PRESSAO_EXP,
+  [SENSOR_PRESSAO_PRE.sensor_code]: THRESHOLD_PRESSAO_PRE,
 }

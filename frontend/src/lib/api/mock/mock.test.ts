@@ -10,10 +10,10 @@ describe('mockMetaApi', () => {
     expect((await mockMetaApi.getSensor('TEMP-EXP-01')).sensor_code).toBe('TEMP-EXP-01')
     expect((await mockMetaApi.getThreshold('TEMP-EXP-01'))?.limite_max).toBe(22)
   })
-  it('listSensors devolve os 3 sensores (Expurgo, Preparo/Esterilizacao, Arsenal)', async () => {
+  it('listSensors devolve os 5 sensores (2 areas ganham sensor de pressao)', async () => {
     const sensors = await mockMetaApi.listSensors()
     const codes = sensors.map((s) => s.sensor_code).sort()
-    expect(codes).toEqual(['TEMP-ARS-01', 'TEMP-EXP-01', 'TEMP-PRE-01'])
+    expect(codes).toEqual(['PRESS-EXP-01', 'PRESS-PRE-01', 'TEMP-ARS-01', 'TEMP-EXP-01', 'TEMP-PRE-01'])
   })
   it('Preparo/Esterilizacao tem threshold 20-24', async () => {
     const t = await mockMetaApi.getThreshold('TEMP-PRE-01')
@@ -28,6 +28,14 @@ describe('mockMetaApi', () => {
     await expect(mockMetaApi.getSensor('NAO-EXISTE')).rejects.toThrow()
     await expect(mockMetaApi.getThreshold('NAO-EXISTE')).rejects.toThrow()
   })
+  it('Expurgo pressao: negativa, faixa [-15, -2.5]', async () => {
+    const t = await mockMetaApi.getThreshold('PRESS-EXP-01')
+    expect(t).toEqual({ sensor_id: 'PRESS-EXP-01', limite_min: -15, limite_max: -2.5, is_valor_padrao_regulatorio: true })
+  })
+  it('Preparo pressao: positiva, faixa [2.5, 15]', async () => {
+    const t = await mockMetaApi.getThreshold('PRESS-PRE-01')
+    expect(t).toEqual({ sensor_id: 'PRESS-PRE-01', limite_min: 2.5, limite_max: 15, is_valor_padrao_regulatorio: true })
+  })
 })
 
 describe('mockHistoryApi', () => {
@@ -39,6 +47,13 @@ describe('mockHistoryApi', () => {
     const r = await mockHistoryApi.getHistory('x', '30d')
     expect(r.points.length).toBeLessThanOrEqual(1000)
     expect(r.points.length).toBeGreaterThan(0)
+  })
+  it('serie deriva do threshold do sensor pedido, nao sempre de Expurgo', async () => {
+    const pressao = await mockHistoryApi.getHistory('PRESS-EXP-01', '1h')
+    const valores = pressao.points.map((p) => ('value' in p ? p.value : p.avg))
+    // faixa de pressao Expurgo e negativa [-15,-2.5] — toda a serie deve estar
+    // na vizinhanca negativa, bem longe da faixa de temperatura (positiva, ~20).
+    expect(Math.max(...valores)).toBeLessThan(0)
   })
 })
 

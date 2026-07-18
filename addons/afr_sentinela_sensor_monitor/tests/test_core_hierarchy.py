@@ -32,6 +32,16 @@ class TestCoreHierarchy(TransactionCase):
         with self.assertRaises(ValidationError):
             self._create_site(site_code='SITE|001')
 
+    def test_area_code_forbids_pipe(self):
+        site = self._create_site()
+        with self.assertRaises(ValidationError):
+            self.env['sensor_monitor.area'].create({
+                'name': 'Expurgo',
+                'site_id': site.id,
+                'area_category_id': self.area_category.id,
+                'area_code': 'AREA|001',
+            })
+
     def test_sensor_requires_coletor_and_area(self):
         site = self._create_site()
         area = self.env['sensor_monitor.area'].create({

@@ -1,4 +1,6 @@
-from odoo import fields, models
+from odoo import api, fields, models
+
+from .common import validate_code
 
 
 class Area(models.Model):
@@ -13,3 +15,8 @@ class Area(models.Model):
     _sql_constraints = [
         ('area_code_unique_per_site', 'unique(site_id, area_code)', 'Código de área já usado neste site.'),
     ]
+
+    @api.constrains('area_code')
+    def _check_area_code(self):
+        for area in self:
+            validate_code(area.area_code)

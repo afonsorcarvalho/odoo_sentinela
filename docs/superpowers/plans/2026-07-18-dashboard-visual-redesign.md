@@ -1159,7 +1159,7 @@ git commit -m "feat(frontend): faixa verde de conformidade no grafico (markArea)
 - Create: `frontend/src/components/LiveClock.tsx`
 - Test: `frontend/src/components/Topbar.test.tsx`
 - Test: `frontend/src/components/LiveClock.test.tsx`
-- Delete: `frontend/src/components/HeaderActions.tsx` (absorvido pelo Topbar)
+- `frontend/src/components/HeaderActions.tsx` (absorvido pelo Topbar) — **NÃO deletar nesta task**, ver Step 4. Deletado só na Task 16, junto das páginas que ainda o importam.
 
 **Interfaces:**
 - Consumes: `ThemeToggle` (Task 9), `LogoutButton` (já existe).
@@ -1312,16 +1312,17 @@ export function Topbar({ healthy, unitName }: { healthy: boolean; unitName: stri
 }
 ```
 
-- [ ] **Step 4: Deletar `HeaderActions.tsx` e o teste correspondente (se houver)**
+- [ ] **Step 4: NÃO deletar `HeaderActions.tsx` ainda**
 
-```bash
-git rm frontend/src/components/HeaderActions.tsx
-```
+Correção pós-merge: `HeaderActions.tsx` ainda é importado por `OverviewPage.tsx`/`AreaPage.tsx`/
+`SensorDetailPage.tsx` (vivas até a Task 16). Deletar agora quebra o import dessas 3 páginas — ao
+contrário do mismatch de props do `AreaCard` (Task 11), um módulo faltando é falha de resolução, não
+silenciosa. `HeaderActions.tsx` só é deletado na Task 16, junto das páginas que o importam.
 
 - [ ] **Step 5: Rodar e confirmar sucesso**
 
-Run: `cd frontend && npx vitest run src/components/LiveClock.test.tsx src/components/Topbar.test.tsx`
-Expected: PASS. (Referências a `HeaderActions` em `OverviewPage`/`SensorDetailPage`/`AreaPage` são resolvidas na Task 16, que substitui essas páginas.)
+Run: `cd frontend && npx vitest run src/components/LiveClock.test.tsx src/components/Topbar.test.tsx`, depois `npx vitest run` (suite inteira — deve continuar 100% verde, `HeaderActions.tsx` não foi tocado).
+Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -1681,7 +1682,7 @@ git commit -m "feat(frontend): Toast + ToastContainer (dispara em alarme/normali
 - Create: `frontend/src/pages/DashboardPage.tsx`
 - Create: `frontend/src/components/SensorDetailPanel.tsx`
 - Delete: `frontend/src/pages/OverviewPage.tsx`, `frontend/src/pages/SensorDetailPage.tsx`, `frontend/src/pages/AreaPage.tsx`
-- Delete: `frontend/src/components/SensorRow.tsx`, `frontend/src/components/LiveReadout.tsx`, `frontend/src/components/ThresholdBadge.tsx`
+- Delete: `frontend/src/components/SensorRow.tsx`, `frontend/src/components/LiveReadout.tsx`, `frontend/src/components/ThresholdBadge.tsx`, `frontend/src/components/HeaderActions.tsx` (só agora — Task 13 criou o `Topbar` que o substitui, mas não pôde deletar `HeaderActions.tsx` ainda porque as 3 páginas acima ainda o importavam; esta task deleta ambos os lados juntos)
 - Modify: `frontend/src/App.tsx`
 - Test: `frontend/src/pages/DashboardPage.test.tsx`
 - Test: `frontend/src/components/SensorDetailPanel.test.tsx`
@@ -2045,7 +2046,8 @@ git rm frontend/src/pages/OverviewPage.tsx frontend/src/pages/OverviewPage.test.
        frontend/src/pages/AreaPage.tsx \
        frontend/src/components/SensorRow.tsx \
        frontend/src/components/LiveReadout.tsx frontend/src/components/LiveReadout.test.tsx \
-       frontend/src/components/ThresholdBadge.tsx
+       frontend/src/components/ThresholdBadge.tsx \
+       frontend/src/components/HeaderActions.tsx
 ```
 
 - [ ] **Step 8: Rodar a suite inteira e confirmar sucesso**

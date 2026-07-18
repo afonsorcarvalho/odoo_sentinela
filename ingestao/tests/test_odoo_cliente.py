@@ -106,6 +106,18 @@ def test_processar_entrada_e_saida_alarme(cliente):
 def test_processar_saida_alarme_sem_entrada_aberta_retorna_none(cliente):
     provisionar_odoo_sim.provisionar(cliente)
     info_sensor = odoo_cliente.resolver_sensor(cliente, 'SNR-SIM-TEMP-01')
+
+    # Garante a pre-condicao do teste (nenhuma entrada aberta pra esse sensor)
+    # em vez de assumir estado ambiente do Odoo compartilhado — sem isso, um
+    # alarm.event orfao de outra execucao faz este teste falhar de forma
+    # dificil de diagnosticar (o proprio ato de testar resolve o orfao).
+    abertos_previos = odoo_cliente.executar(
+        cliente, 'sensor_monitor.alarm.event', 'search',
+        [('sensor_id', '=', info_sensor['id']), ('timestamp_resolucao_sensor', '=', False)],
+    )
+    if abertos_previos:
+        odoo_cliente.executar(cliente, 'sensor_monitor.alarm.event', 'unlink', abertos_previos)
+
     evento_saida = {'timestamp': '2020-03-03T03:00:00-03:00'}
     resultado = odoo_cliente.processar_saida_alarme(cliente, evento_saida, info_sensor['id'])
     assert resultado is None

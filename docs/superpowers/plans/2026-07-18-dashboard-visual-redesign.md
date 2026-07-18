@@ -1541,7 +1541,7 @@ git commit -m "feat(frontend): AlarmPanel + AlarmItem + useAlarms"
 
 **Interfaces:**
 - Consumes: `AlarmEvent[]` (mesma lista de `useAlarms`, Task 14).
-- Produces: `<ToastContainer alarms />` — detecta `id`s novos desde a última lista recebida e dispara um toast por evento novo, auto-dispensado em 6s. Usado pela `DashboardPage` (Task 16).
+- Produces: `<ToastContainer alarms loaded />` — detecta `id`s novos desde a última lista recebida e dispara um toast por evento novo, auto-dispensado em 6s. `loaded` (bool, obrigatório) trava a captura da baseline/diff enquanto os dados ainda estão carregando (evita toast-storm de alarmes pré-existentes quando `useAlarms()` resolve pela 1a vez). Usado pela `DashboardPage` (Task 16) como `loaded={!alarmsQuery.isLoading}`. [Corrigido pós-review da Task 15 — ver `.superpowers/sdd/progress.md`]
 
 - [ ] **Step 1: Escrever o teste**
 
@@ -1955,7 +1955,7 @@ export function DashboardPage() {
   return (
     <div>
       <Topbar healthy={healthy} unitName={UNIT_NAME} />
-      <ToastContainer alarms={alarms} />
+      <ToastContainer alarms={alarms} loaded={!alarmsQuery.isLoading} />
 
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
         <p className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>

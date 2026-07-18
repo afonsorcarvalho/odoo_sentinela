@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import auth, historico, meta
+from . import alarmes, auth, historico, meta
 
 app = FastAPI(title='Sentinela API')
 
@@ -15,6 +15,7 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+app.include_router(alarmes.router)
 app.include_router(auth.router)
 app.include_router(meta.router)
 app.include_router(historico.router)

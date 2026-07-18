@@ -12,7 +12,7 @@ beforeEach(() => {
     sensor_id: 'A', limite_min: 10, limite_max: 20, is_valor_padrao_regulatorio: false,
   })
   vi.mocked(realHistoryApi.getHistory).mockResolvedValue({
-    sensor_code: 'A', window: '1h', resolution: 'raw', points: [{ ts: 1000, value: 15 }],
+    sensor_code: 'A', window: '1h', resolution: 'raw', points: [{ ts: 1000, value: 25 }],
   })
 })
 afterEach(() => vi.useRealTimers())
@@ -23,7 +23,7 @@ describe('realLiveApi', () => {
     realLiveApi.subscribe('A', cb)
     await vi.runOnlyPendingTimersAsync()
 
-    expect(cb).toHaveBeenCalledWith({ sensor_code: 'A', ts: 1000, value: 15, alarm_state: 'ok' })
+    expect(cb).toHaveBeenCalledWith({ sensor_code: 'A', ts: 1000, value: 25, alarm_state: 'crit' })
   })
 
   it('unsubscribe para o polling', async () => {

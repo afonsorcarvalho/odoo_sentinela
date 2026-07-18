@@ -1,41 +1,62 @@
+/* frontend/src/index.css */
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @theme {
-  --color-bg: oklch(0.99 0.002 245);
-  --color-surface: oklch(1 0 0);
-  --color-panel: oklch(0.975 0.003 245);
+  /* ---------- Document (claro) — default, mesmo papel de :root de antes ---------- */
+  --color-bg:              #f7f9fb;
+  --color-surface:         #ffffff;
+  --color-panel:           #f1f4f7;
   /* Matiz "none" (nao 0): color-mix(in oklch, ...) interpola matiz pelo arco
      mais curto entre os dois endpoints. Com ink carregando um matiz de baixa
-     saturacao mas nao-zero (245, azulado), misturar status crit/warn com ele
-     fazia o resultado atravessar a roda de cores pelo lado errado -- crit
-     (vermelho, 25deg) virava roxo (329deg), warn (ambar, 75deg) virava verde
-     (143deg), podendo ser confundido com o estado 'ok'. A palavra-chave CSS
-     `none` marca o matiz como "ausente" (powerless hue, CSS Color 4) e faz
-     color-mix usar so o matiz da cor de status, sem nenhum desvio (verificado:
-     mistura de crit fica em 25deg, identico ao token). IMPORTANTE: chroma 0
-     sozinho NAO basta -- `oklch(L 0 0)` tem matiz 0deg EXPLICITO (nao "ausente"),
-     e ainda causa desvio; só `oklch(L 0 none)` funciona. Ver components/statusVisuals.tsx. */
-  --color-ink: oklch(0.24 0 none);
-  --color-muted: oklch(0.52 0.01 245);
-  --color-line: oklch(0.92 0.004 245);
-  --color-primary: oklch(0.55 0.13 245);
-  --color-good: oklch(0.62 0.15 150);
-  --color-warn: oklch(0.68 0.15 75);
-  --color-crit: oklch(0.55 0.19 25);
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+     saturacao mas nao-zero, misturar status crit/warn com ele fazia o
+     resultado atravessar a roda de cores pelo lado errado -- crit (vermelho)
+     virava roxo, warn (ambar) virava verde, podendo ser confundido com o
+     estado 'ok'. A palavra-chave CSS `none` marca o matiz como "ausente"
+     (powerless hue, CSS Color 4) e faz color-mix usar so o matiz do operando
+     de status, sem nenhum desvio. IMPORTANTE: chroma 0 sozinho NAO basta --
+     `oklch(L 0 0)` tem matiz 0deg EXPLICITO (nao "ausente"), e ainda causa
+     desvio; só `oklch(L 0 none)` funciona. Ver components/statusVisuals.tsx.
+     Este token NAO muda nesta migracao -- so os operandos de status abaixo
+     trocam para os valores AFR (hex e seguro: color-mix converte p/ oklch
+     internamente e adota o hue do operando nao-"none"). */
+  --color-ink:              oklch(0.24 0 none);
+  --color-muted:            #4a5968;
+  --color-line:             #e2e7ec;
+  --color-line-strong:      #c9d1da;
+  --color-primary:          #008a9b;
+  --color-good:             #14794d;
+  --color-good-soft:        #def4e9;
+  --color-warn:             #a86b00;
+  --color-warn-soft:        #fbecd0;
+  --color-crit:             #c2241a;
+  --color-crit-soft:        #fbe2df;
+  --shadow-menu:            0 8px 24px rgb(16 24 32 / 0.10), 0 0 0 1px var(--color-line);
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.dark {
-  --color-bg: oklch(0.16 0.008 245);
-  --color-surface: oklch(0.21 0.01 245);
-  --color-panel: oklch(0.19 0.009 245);
-  --color-ink: oklch(0.95 0 none); /* mesma razao do bloco light acima */
-  --color-muted: oklch(0.68 0.01 245);
-  --color-line: oklch(0.30 0.01 245);
-  --color-primary: oklch(0.70 0.13 245);
-  --color-good: oklch(0.72 0.16 150);
-  --color-warn: oklch(0.78 0.15 75);
-  --color-crit: oklch(0.68 0.20 25);
+/* ---------- Control (escuro) — tema padrao recomendado p/ monitoramento continuo ---------- */
+.theme-control {
+  --color-bg:              #0b1620;
+  --color-surface:         #101f2c;
+  --color-panel:           #132635;
+  --color-ink:              oklch(0.95 0 none); /* mesma razao do bloco claro acima */
+  --color-muted:            #a8b7c6;
+  --color-line:             #22384d;
+  --color-line-strong:      #31506c;
+  --color-primary:          #00b3c7;
+  --color-good:             #22c57a;
+  --color-good-soft:        #0e2e20;
+  --color-warn:             #f5b23d;
+  --color-warn-soft:        #2e2209;
+  --color-crit:             #ef4444;
+  --color-crit-soft:        #2e0b0b;
+  --shadow-menu:            0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px var(--color-line);
 }
 
-body { background: var(--color-bg); color: var(--color-ink); }
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}

@@ -6,3 +6,4 @@ from . import area
 from . import hub
 from . import coletor
 from . import sensor
+from . import alarm_threshold

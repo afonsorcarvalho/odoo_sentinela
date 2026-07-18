@@ -4,12 +4,15 @@
     </record>
     <record id="group_sensor_monitor_operation" model="res.groups">
         <field name="name">Sensor Monitor / Operação</field>
+        <field name="implied_ids" eval="[(4, ref('group_sensor_monitor_view'))]"/>
     </record>
     <record id="group_sensor_monitor_advanced_config" model="res.groups">
         <field name="name">Sensor Monitor / Configuração Avançada</field>
+        <field name="implied_ids" eval="[(4, ref('group_sensor_monitor_operation'))]"/>
     </record>
     <record id="group_sensor_monitor_admin" model="res.groups">
         <field name="name">Sensor Monitor / Admin (interno SaaS)</field>
+        <field name="implied_ids" eval="[(4, ref('group_sensor_monitor_advanced_config'))]"/>
     </record>
 
     <record id="rule_site_tenant" model="ir.rule">

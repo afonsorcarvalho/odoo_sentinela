@@ -1,3 +1,4 @@
+from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase
 
 
@@ -36,3 +37,21 @@ class TestSecurityRules(TransactionCase):
         sites = self.env['sensor_monitor.site'].with_user(admin_user).search([])
         self.assertIn(self.site_a, sites)
         self.assertIn(self.site_b, sites)
+
+    def test_operation_only_user_can_read_sensor(self):
+        # Operação deve implicar Visualização: sem isso, um usuário apenas em
+        # "Operação" não tem ACL de leitura em sensor/area/coletor/site, e o
+        # form de alarm.event (que exibe esses Many2one) levanta AccessError.
+        operation_group = self.env.ref('afr_sentinela_sensor_monitor.group_sensor_monitor_operation')
+        user_op = self.env['res.users'].create({
+            'name': 'Usuário Operação', 'login': 'usuario_op@teste.com',
+            'partner_id': self.partner_a.id,
+            'groups_id': [(6, 0, [operation_group.id, self.env.ref('base.group_user').id])],
+        })
+        try:
+            self.env['sensor_monitor.sensor'].with_user(user_op).search([])
+        except AccessError:
+            self.fail(
+                "Usuário só em 'Operação' deveria herdar leitura de 'Visualização' "
+                "via implied_ids, mas AccessError foi levantado."
+            )

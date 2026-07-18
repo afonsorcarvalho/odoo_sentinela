@@ -23,9 +23,12 @@ describe('buildChartOption', () => {
     const opt = buildChartOption(hist, null) as any
     expect(opt.series[0].markLine).toBeUndefined()
   })
-  it('sem historico devolve serie vazia', () => {
+  it('sem historico devolve serie vazia (e eixo Y ainda contem os limites, sem NaN)', () => {
     const opt = buildChartOption(undefined, t) as any
     expect(opt.series[0].data).toEqual([])
+    expect(opt.yAxis.min).toBeLessThanOrEqual(18)
+    expect(opt.yAxis.max).toBeGreaterThanOrEqual(22)
+    expect(Number.isNaN(opt.yAxis.min)).toBe(false)
   })
   it('resolucao agg usa o avg de cada ponto (min/max ignorados na serie)', () => {
     const aggHist: HistoryResponse = {

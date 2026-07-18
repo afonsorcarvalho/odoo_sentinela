@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
 // ECharts mockado (sem canvas em jsdom)
-vi.mock('echarts', () => ({ init: () => ({ setOption: vi.fn(), appendData: vi.fn(), dispose: vi.fn(), resize: vi.fn() }) }))
+vi.mock('echarts', () => ({ init: () => ({ setOption: vi.fn(), dispose: vi.fn(), resize: vi.fn() }) }))
 
 import { SensorDetailPage } from './SensorDetailPage'
 import * as api from '../lib/api'

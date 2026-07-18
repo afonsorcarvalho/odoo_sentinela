@@ -44,9 +44,10 @@ export function buildChartOption(
   let yMin: number | undefined
   let yMax: number | undefined
   if (threshold) {
-    const vals = data.map((d) => d[1])
-    const lo = Math.min(threshold.limite_min, ...vals)
-    const hi = Math.max(threshold.limite_max, ...vals)
+    // reduce (nao spread) — series reais nao-decimadas podem ter dezenas de
+    // milhares de pontos e `Math.min(...vals)` estouraria a pilha de argumentos.
+    const lo = data.reduce((acc, d) => Math.min(acc, d[1]), threshold.limite_min)
+    const hi = data.reduce((acc, d) => Math.max(acc, d[1]), threshold.limite_max)
     const pad = (threshold.limite_max - threshold.limite_min) * 0.15 || 1
     yMin = lo - pad
     yMax = hi + pad

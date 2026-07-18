@@ -457,25 +457,39 @@ def test_live_sensor_inexistente_retorna_404():
 
 
 def test_live_recebe_ponto_publicado_no_registry():
-    token = _obter_token()
-
+    # Nota (desvio do brief): a versão original deste teste usava
+    # httpx.ASGITransport + client.stream() sobre a rota HTTP real. Isso
+    # trava indefinidamente com qualquer versão atual do httpx (testado
+    # 0.27.2 e 0.28.1): ASGITransport só retorna a Response depois que
+    # `self.app(scope, receive, send)` termina por completo, ou seja, só
+    # depois que o body ASGI fecha com more_body=False — o que nunca
+    # acontece para um StreamingResponse infinito como o do SSE aqui.
+    # Reproduzido de forma isolada (sem Odoo/DB) para confirmar que é uma
+    # limitação da lib, não um bug do endpoint. O teste abaixo chama a
+    # coroutine `get_live` diretamente (mesmo caminho de produção:
+    # obter_sensor -> registrar -> stream()), o que cobre a mesma lógica
+    # sem depender do transporte ASGI. A cobertura HTTP real (200 +
+    # publicação via trigger/listener) fica por conta do Step 8
+    # (verificação end-to-end com uvicorn de verdade).
     async def cenario():
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url='http://test') as client:
-            async with client.stream(
-                'GET', f'/sensores/{SENSOR_CODE}/live', params={'token': token},
-            ) as resposta:
-                assert resposta.status_code == 200
-                await asyncio.sleep(0.2)  # da tempo do endpoint registrar a fila antes de publicar
-                live.publicar(SENSOR_CODE, {'sensor_id': SENSOR_CODE, 'time': 1700000000000, 'valor': 25.0})
-                async for linha in resposta.aiter_lines():
-                    if linha.startswith('data: '):
-                        payload = json.loads(linha[len('data: '):])
-                        assert payload['valor'] == 25.0
-                        break
+        cliente = get_cliente_servico()
+        resposta = await live.get_live(SENSOR_CODE, cliente=cliente, _claims={})
+        agen = resposta.body_iterator
+        try:
+            live.publicar(SENSOR_CODE, {'sensor_id': SENSOR_CODE, 'time': 1700000000000, 'valor': 25.0})
+            linha = await asyncio.wait_for(agen.__anext__(), timeout=2)
+            assert linha.startswith('data: ')
+            payload = json.loads(linha[len('data: '):].strip())
+            assert payload['valor'] == 25.0
+        finally:
+            await agen.aclose()
 
     asyncio.run(cenario())
 ```
+
+Import extra que esse teste precisa, no topo do arquivo: `from api.odoo import
+get_cliente_servico` (além de `asyncio`, `json`, `TestClient`, `live`, `app` já
+usados pelos outros testes deste arquivo).
 
 - [ ] **Step 2: Rodar os testes e confirmar que falham**
 
@@ -616,13 +630,20 @@ app.include_router(live.router)
 
 @app.on_event('startup')
 async def _iniciar_live_listener():
-    asyncio.create_task(live_listener.escutar())
+    app.state.live_listener_task = asyncio.create_task(live_listener.escutar())
 
 
 @app.get('/health')
 def health():
     return {'status': 'ok'}
 ```
+
+(Nota: a versão anterior deste bloco fazia `asyncio.create_task(...)` sem guardar a
+referência — a Task 4 achou isso na verificação real com servidor de verdade: sem
+referência guardada, o event loop garbage-colletava a task quase imediatamente
+(`Task was destroyed but it is pending!`), matando o listener silenciosamente e o
+SSE nunca entregava nada. Corrigido guardando em `app.state.live_listener_task`. Sem
+handler de shutdown cancelando essa task ainda — resíduo minor aceito, ver ledger.)
 
 - [ ] **Step 6: Rodar os testes e confirmar que passam**
 

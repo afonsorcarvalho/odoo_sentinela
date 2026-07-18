@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { AreaCard } from './AreaCard'
 import type { AreaGroup } from '../lib/aggregateStatus'
 import type { LivePoint, Threshold } from '../lib/types'
+
+function wrap(node: React.ReactNode) {
+  return <MemoryRouter>{node}</MemoryRouter>
+}
 
 const expurgo: AreaGroup = {
   area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Refrigeração' },
@@ -16,20 +21,25 @@ const t: Threshold = { sensor_id: 'TEMP-EXP-01', limite_min: 18, limite_max: 22,
 
 describe('AreaCard', () => {
   it('mostra nome e categoria da area', () => {
-    render(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{}} />)
+    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{}} />))
     expect(screen.getByText('Expurgo')).toBeInTheDocument()
+  })
+
+  it('e um link pro sensor da area', () => {
+    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{}} />))
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/sensor/TEMP-EXP-01')
   })
 
   it('sensor ok: mostra "Dentro da faixa", sem badge de alarme', () => {
     const live: LivePoint = { sensor_code: 'TEMP-EXP-01', ts: 1, value: 20, alarm_state: 'ok' }
-    render(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />)
+    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />))
     expect(screen.getByText('Dentro da faixa')).toBeInTheDocument()
     expect(screen.queryByText(/alarme/i)).not.toBeInTheDocument()
   })
 
   it('sensor crit: mostra "Fora da faixa" E badge "1 alarme"', () => {
     const live: LivePoint = { sensor_code: 'TEMP-EXP-01', ts: 1, value: 30, alarm_state: 'crit' }
-    render(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />)
+    render(wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />))
     expect(screen.getByText('Fora da faixa')).toBeInTheDocument()
     expect(screen.getByText('1 alarme')).toBeInTheDocument()
   })
@@ -44,14 +54,14 @@ describe('AreaCard', () => {
       }],
     }
     const live: LivePoint = { sensor_code: 'TEMP-ARS-01', ts: 1, value: 24, alarm_state: 'ok' }
-    render(<AreaCard group={arsenal} thresholdsByCode={{ 'TEMP-ARS-01': null }} liveByCode={{ 'TEMP-ARS-01': live }} />)
+    render(wrap(<AreaCard group={arsenal} thresholdsByCode={{ 'TEMP-ARS-01': null }} liveByCode={{ 'TEMP-ARS-01': live }} />))
     expect(screen.getByText('Sem limite')).toBeInTheDocument()
   })
 
   it('status sempre vem com icone (nao so cor) — svg presente junto ao texto', () => {
     const live: LivePoint = { sensor_code: 'TEMP-EXP-01', ts: 1, value: 30, alarm_state: 'crit' }
     const { container } = render(
-      <AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />,
+      wrap(<AreaCard group={expurgo} thresholdsByCode={{ 'TEMP-EXP-01': t }} liveByCode={{ 'TEMP-EXP-01': live }} />),
     )
     expect(container.querySelector('svg')).not.toBeNull()
   })

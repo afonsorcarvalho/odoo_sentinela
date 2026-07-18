@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { LABELS } from '../lib/status'
 import { sensorDisplayState, worstAlarmState, type AreaGroup } from '../lib/aggregateStatus'
 import { StatusIcon, statusTextColor } from './statusVisuals'
@@ -19,8 +20,9 @@ export function AreaCard({
   const critCount = states.filter((s) => s === 'crit').length
 
   return (
-    <div
-      className="rounded-2xl p-5"
+    <Link
+      to={`/sensor/${group.sensors[0].sensor_code}`}
+      className="block rounded-2xl p-5 outline-none transition-colors duration-200 ease-out hover:border-[var(--color-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
       style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)' }}
       data-testid={`area-card-${group.area.area_code}`}
     >
@@ -50,6 +52,6 @@ export function AreaCard({
         <StatusIcon state={aggregate} />
         <span>{LABELS[aggregate]}</span>
       </div>
-    </div>
+    </Link>
   )
 }

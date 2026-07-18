@@ -1,0 +1,81 @@
+<odoo>
+    <record id="view_rs485_bus_list" model="ir.ui.view">
+        <field name="name">sensor_monitor.rs485.bus.list</field>
+        <field name="model">sensor_monitor.rs485.bus</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="hub_id"/>
+                <field name="bus_code"/>
+                <field name="serial_port"/>
+                <field name="baud_rate"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_rs485_bus" model="ir.actions.act_window">
+        <field name="name">Barramentos RS-485</field>
+        <field name="res_model">sensor_monitor.rs485.bus</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_modbus_profile_list" model="ir.ui.view">
+        <field name="name">sensor_monitor.modbus.profile.list</field>
+        <field name="model">sensor_monitor.modbus.profile</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="fabricante"/>
+                <field name="modelo"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_modbus_profile_form" model="ir.ui.view">
+        <field name="name">sensor_monitor.modbus.profile.form</field>
+        <field name="model">sensor_monitor.modbus.profile</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="fabricante"/>
+                        <field name="modelo"/>
+                    </group>
+                    <field name="register_ids">
+                        <list editable="bottom">
+                            <field name="name"/>
+                            <field name="measurement_type_id"/>
+                            <field name="function_code"/>
+                            <field name="register_address"/>
+                            <field name="data_type"/>
+                            <field name="byte_order"/>
+                            <field name="scale"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_modbus_profile" model="ir.actions.act_window">
+        <field name="name">Perfis Modbus</field>
+        <field name="res_model">sensor_monitor.modbus.profile</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_modbus_device_list" model="ir.ui.view">
+        <field name="name">sensor_monitor.modbus.device.list</field>
+        <field name="model">sensor_monitor.modbus.device</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="rs485_bus_id"/>
+                <field name="slave_address"/>
+                <field name="profile_id"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_modbus_device" model="ir.actions.act_window">
+        <field name="name">Dispositivos Modbus</field>
+        <field name="res_model">sensor_monitor.modbus.device</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -1,0 +1,21 @@
+<odoo>
+    <menuitem id="menu_sensor_monitor_root" name="Sensor Monitor"/>
+    <menuitem id="menu_sensor_monitor_cadastro" name="Cadastro" parent="menu_sensor_monitor_root" sequence="10"/>
+    <menuitem id="menu_site" name="Sites" parent="menu_sensor_monitor_cadastro" action="action_site" sequence="10"/>
+    <menuitem id="menu_area" name="Áreas" parent="menu_sensor_monitor_cadastro" action="action_area" sequence="20"/>
+    <menuitem id="menu_hub" name="Hubs" parent="menu_sensor_monitor_cadastro" action="action_hub" sequence="30"/>
+    <menuitem id="menu_coletor" name="Coletores" parent="menu_sensor_monitor_cadastro" action="action_coletor" sequence="40"/>
+    <menuitem id="menu_sensor" name="Sensores" parent="menu_sensor_monitor_cadastro" action="action_sensor" sequence="50"/>
+
+    <menuitem id="menu_sensor_monitor_alarmes" name="Alarmes" parent="menu_sensor_monitor_root" sequence="20"/>
+    <menuitem id="menu_alarm_threshold" name="Limiares" parent="menu_sensor_monitor_alarmes" action="action_alarm_threshold" sequence="10"/>
+    <menuitem id="menu_alarm_event" name="Eventos" parent="menu_sensor_monitor_alarmes" action="action_alarm_event" sequence="20"/>
+
+    <menuitem id="menu_sensor_monitor_rs485" name="RS-485/Modbus" parent="menu_sensor_monitor_root" sequence="30"/>
+    <menuitem id="menu_rs485_bus" name="Barramentos" parent="menu_sensor_monitor_rs485" action="action_rs485_bus" sequence="10"/>
+    <menuitem id="menu_modbus_profile" name="Perfis" parent="menu_sensor_monitor_rs485" action="action_modbus_profile" sequence="20"/>
+    <menuitem id="menu_modbus_device" name="Dispositivos" parent="menu_sensor_monitor_rs485" action="action_modbus_device" sequence="30"/>
+
+    <menuitem id="menu_sensor_monitor_operacao" name="Operação" parent="menu_sensor_monitor_root" sequence="40"/>
+    <menuitem id="menu_file_ledger" name="Ledger de Arquivos" parent="menu_sensor_monitor_operacao" action="action_file_ledger" sequence="10"/>
+</odoo>

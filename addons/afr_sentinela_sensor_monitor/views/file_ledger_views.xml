@@ -1,0 +1,20 @@
+<odoo>
+    <record id="view_file_ledger_list" model="ir.ui.view">
+        <field name="name">sensor_monitor.file.ledger.list</field>
+        <field name="model">sensor_monitor.file.ledger</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="coletor_id"/>
+                <field name="hub_id"/>
+                <field name="tipo_arquivo"/>
+                <field name="data_referencia"/>
+                <field name="status_validacao"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_file_ledger" model="ir.actions.act_window">
+        <field name="name">Ledger de Arquivos</field>
+        <field name="res_model">sensor_monitor.file.ledger</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -1,0 +1,44 @@
+<odoo>
+    <record id="view_hub_list" model="ir.ui.view">
+        <field name="name">sensor_monitor.hub.list</field>
+        <field name="model">sensor_monitor.hub</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="site_id"/>
+                <field name="hub_code"/>
+                <field name="status"/>
+                <field name="ultimo_contato"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_hub_form" model="ir.ui.view">
+        <field name="name">sensor_monitor.hub.form</field>
+        <field name="model">sensor_monitor.hub</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="site_id"/>
+                        <field name="hub_code"/>
+                        <field name="modelo_hardware"/>
+                        <field name="status"/>
+                        <field name="firmware_version"/>
+                        <field name="ultimo_contato"/>
+                    </group>
+                    <group string="Segurança">
+                        <field name="openvpn_cert_fingerprint"/>
+                        <field name="possui_secure_element"/>
+                        <field name="secure_element_pubkey_fingerprint"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_hub" model="ir.actions.act_window">
+        <field name="name">Hubs</field>
+        <field name="res_model">sensor_monitor.hub</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

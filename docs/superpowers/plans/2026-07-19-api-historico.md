@@ -15,6 +15,7 @@
 - `ts` nos pontos de resposta em **milissegundos** (Unix × 1000).
 - Nome de tabela agregada nunca vem de input do usuário — sempre de uma constante interna (`_JANELAS`), sem risco de injeção SQL por f-string.
 - TimescaleDB e Odoo já rodam (`localhost:5433`/`http://localhost:8189`) — não subir/derrubar containers.
+- **Limitação aceita nesta rodada**: `buscar_agregado`'s `WHERE bucket >= desde` compara contra o início do bucket (truncado pra hora/dia) — na borda de uma janela grande, o bucket mais antigo pode ter começado um pouco antes de `desde` e ficar de fora (perda de no máximo ~1 bucket na ponta, ex.: até 1h numa janela de 24h). Aceitável nesta fatia fina; refinar (`desde - largura_do_bucket`) fica para quando isso importar de verdade.
 
 ---
 
@@ -102,8 +103,13 @@ def test_buscar_agregado_retorna_bucket_apos_refresh():
             )
         conn.autocommit = False
 
+        # desde com margem de 2h (nao 1h): o bucket horario trunca pro inicio
+        # da hora, entao uma leitura de "10 min atras" pode cair num bucket
+        # que comeca ANTES de "agora - 1h" se o teste rodar nos primeiros
+        # minutos da hora corrente — 2h de margem garante que o teste nao
+        # dependa do minuto do relogio em que roda (achado real, nao suposicao).
         pontos = api_timescale.buscar_agregado(
-            conn, SENSOR_CODE_TESTE, 'sensor_reading_hourly', agora - timedelta(hours=1),
+            conn, SENSOR_CODE_TESTE, 'sensor_reading_hourly', agora - timedelta(hours=2),
         )
         assert len(pontos) == 1
         assert pontos[0]['avg'] == 21.5

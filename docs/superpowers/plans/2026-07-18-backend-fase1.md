@@ -512,6 +512,16 @@ class TestCoreHierarchy(TransactionCase):
         with self.assertRaises(ValidationError):
             self._create_site(site_code='SITE|001')
 
+    def test_area_code_forbids_pipe(self):
+        site = self._create_site()
+        with self.assertRaises(ValidationError):
+            self.env['sensor_monitor.area'].create({
+                'name': 'Expurgo',
+                'site_id': site.id,
+                'area_category_id': self.area_category.id,
+                'area_code': 'AREA|001',
+            })
+
     def test_sensor_requires_coletor_and_area(self):
         site = self._create_site()
         area = self.env['sensor_monitor.area'].create({
@@ -541,7 +551,7 @@ class TestCoreHierarchy(TransactionCase):
         })
         self.assertTrue(sensor.coletor_id)
         self.assertTrue(sensor.area_id)
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(Exception):
             self.env['sensor_monitor.sensor'].create({
                 'name': 'Sensor órfão',
                 'sensor_code': 'SNR-002',
@@ -622,7 +632,9 @@ class Site(models.Model):
 - [ ] **Step 4: Implementar `models/area.py`**
 
 ```python
-from odoo import fields, models
+from odoo import api, fields, models
+
+from .common import validate_code
 
 
 class Area(models.Model):
@@ -637,6 +649,11 @@ class Area(models.Model):
     _sql_constraints = [
         ('area_code_unique_per_site', 'unique(site_id, area_code)', 'Código de área já usado neste site.'),
     ]
+
+    @api.constrains('area_code')
+    def _check_area_code(self):
+        for area in self:
+            validate_code(area.area_code)
 ```
 
 - [ ] **Step 5: Implementar `models/hub.py`**

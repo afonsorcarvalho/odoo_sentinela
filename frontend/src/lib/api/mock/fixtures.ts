@@ -6,7 +6,7 @@ export const SENSOR: SensorMeta = {
   unidade: 'C',
   protocolo_origem: 'rs485',
   measurement_type: { code: 'temperatura', name: 'Temperatura' },
-  area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Expurgo' },
+  area: { area_code: 'EXPURGO', name: 'Expurgo', category: 'Refrigeração' },
 }
 
 export const THRESHOLD: Threshold = {
@@ -22,7 +22,7 @@ const SENSOR_PREPARO: SensorMeta = {
   unidade: 'C',
   protocolo_origem: 'rs485',
   measurement_type: { code: 'temperatura', name: 'Temperatura' },
-  area: { area_code: 'PREPARO_ESTER', name: 'Preparo/Esterilização', category: 'Preparo/Esterilização' },
+  area: { area_code: 'PREPARO_ESTER', name: 'Preparo/Esterilização', category: 'Esterilização' },
 }
 
 const THRESHOLD_PREPARO: Threshold = {
@@ -38,7 +38,7 @@ const SENSOR_ARSENAL: SensorMeta = {
   unidade: 'C',
   protocolo_origem: 'rs485',
   measurement_type: { code: 'temperatura', name: 'Temperatura' },
-  area: { area_code: 'ARSENAL', name: 'Arsenal', category: 'Arsenal' },
+  area: { area_code: 'ARSENAL', name: 'Arsenal', category: 'Armazenamento' },
 }
 
 // Arsenal nao tem threshold regulatorio definido em odoo_modelo_dados_spec.md §7

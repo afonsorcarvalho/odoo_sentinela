@@ -1,5 +1,5 @@
-import { SensorDetailPage } from './pages/SensorDetailPage'
+import { OverviewPage } from './pages/OverviewPage'
 
 export default function App() {
-  return <SensorDetailPage code="TEMP-EXP-01" />
+  return <OverviewPage />
 }

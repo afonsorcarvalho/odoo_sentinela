@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -12,7 +13,7 @@ from .odoo import get_cliente_servico
 
 router = APIRouter()
 
-DSN = 'postgresql://sentinela:sentinela@localhost:5433/sentinela'
+DSN = os.environ.get('TIMESCALE_DSN', 'postgresql://sentinela:sentinela@localhost:5433/sentinela')
 
 _JANELAS = {
     '1h': {'resolution': 'raw', 'delta': timedelta(hours=1)},

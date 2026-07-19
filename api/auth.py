@@ -41,9 +41,26 @@ def login(dados: LoginRequest):
     )
     partner_id = usuarios[0]['partner_id'][0]
 
+    # `has_group` via XML-RPC execute_kw não aceita a assinatura direta
+    # (falha em runtime: "missing 1 required positional argument: 'group_ext_id'").
+    # Alternativa equivalente: localizar o grupo Administration/Settings e
+    # checar se o uid logado pertence a ele.
+    grupo = odoo_cliente.executar(
+        cliente_servico, 'res.groups', 'search',
+        [('full_name', '=', 'Administration / Settings')], limit=1,
+    )
+    is_admin = False
+    if grupo:
+        usuarios_admin = odoo_cliente.executar(
+            cliente_servico, 'res.users', 'search_read',
+            [('id', '=', cliente_usuario.uid), ('groups_id', 'in', grupo)], fields=['id'],
+        )
+        is_admin = bool(usuarios_admin)
+
     payload = {
         'sub': str(cliente_usuario.uid),
         'partner_id': partner_id,
+        'is_admin': is_admin,
         'exp': int(time.time()) + EXPIRACAO_SEGUNDOS,
     }
     token = jwt.encode(payload, SECRET, algorithm=ALGORITHM)
@@ -62,3 +79,9 @@ def verificar_token_query(token: str):
         return jwt.decode(token, SECRET, algorithms=[ALGORITHM])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail='token inválido ou expirado')
+
+
+def exigir_admin(claims: dict = Depends(verificar_token)):
+    if not claims.get('is_admin'):
+        raise HTTPException(status_code=403, detail='requer privilégio de administrador')
+    return claims

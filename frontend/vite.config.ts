@@ -5,6 +5,14 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // react-draggable (via react-grid-layout) referencia process.env.DRAGGABLE_DEBUG
+  // no seu util `log`, chamado em handleDragStart. Vite nao polyfilla `process`
+  // no browser (ao contrario de webpack/CRA), entao qualquer drag/resize estoura
+  // ReferenceError: process is not defined. NODE_ENV o Vite ja substitui sozinho;
+  // esta flag de debug nao, entao a fixamos como false.
+  define: {
+    'process.env.DRAGGABLE_DEBUG': 'false',
+  },
   test: {
     environment: 'jsdom',
     globals: true,

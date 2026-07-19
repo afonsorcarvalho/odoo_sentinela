@@ -1,4 +1,4 @@
-import type { SensorMeta, Threshold, HistoryResponse, LivePoint, Window, AlarmEvent } from '../types'
+import type { SensorMeta, Threshold, HistoryResponse, LivePoint, Window, AlarmEvent, DashboardConfig } from '../types'
 
 export type MetaApi = {
   getSensor(code: string): Promise<SensorMeta>
@@ -17,4 +17,7 @@ export type AuthApi = {
 }
 export type AlarmApi = {
   listAlarms(): Promise<AlarmEvent[]>
+}
+export type ConfigApi = {
+  getConfig(): Promise<DashboardConfig>
 }

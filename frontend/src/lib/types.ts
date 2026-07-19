@@ -16,6 +16,10 @@ export type Threshold = {
   is_valor_padrao_regulatorio: boolean
 }
 
+export type DashboardConfig = {
+  carousel_interval_ms: number
+}
+
 export type HistoryPoint =
   | { ts: number; value: number }
   | { ts: number; min: number; max: number; avg: number }

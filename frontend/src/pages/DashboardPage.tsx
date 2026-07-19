@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { useSensors, useThresholds, useHistory, useAlarms } from '../lib/queries'
+import { useSensors, useThresholds, useHistory, useAlarms, useConfig } from '../lib/queries'
 import { useLiveStatuses } from '../lib/useLiveStatuses'
 import { useLiveTail } from '../lib/useLiveTail'
 import { groupSensorsByArea } from '../lib/aggregateStatus'
@@ -31,6 +31,8 @@ export function DashboardPage() {
   const [alarmsModalOpen, setAlarmsModalOpen] = useState(false)
 
   const sensorsQuery = useSensors()
+  const configQuery = useConfig()
+  const carouselIntervalMs = configQuery.data?.carousel_interval_ms ?? 3000
   const sensors = sensorsQuery.data ?? []
   const codes = sensors.map((s) => s.sensor_code)
   const thresholdResults = useThresholds(codes)
@@ -106,6 +108,7 @@ export function DashboardPage() {
                     selectedSensorCode={selectedCode}
                     onSelectSensor={selectSensor}
                     hadAlarmToday={alarms.some((a) => a.area_code === g.area.area_code && isToday(a.timestamp_deteccao))}
+                    carouselIntervalMs={carouselIntervalMs}
                   />
                 ))}
               </div>

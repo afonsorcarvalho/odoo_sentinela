@@ -1,5 +1,5 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
-import { metaApi, historyApi, alarmApi } from './api'
+import { metaApi, historyApi, alarmApi, configApi } from './api'
 import type { Window } from './types'
 
 export function useSensorMeta(code: string) {
@@ -29,4 +29,8 @@ export function useThresholds(codes: string[]) {
 
 export function useAlarms() {
   return useQuery({ queryKey: ['alarms'], queryFn: () => alarmApi.listAlarms(), refetchInterval: 5000 })
+}
+
+export function useConfig() {
+  return useQuery({ queryKey: ['config'], queryFn: () => configApi.getConfig(), staleTime: 5 * 60 * 1000 })
 }

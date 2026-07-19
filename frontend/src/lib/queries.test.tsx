@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useSensorMeta, useThreshold, useHistory, useSensors, useThresholds, useAlarms } from './queries'
+import { useSensorMeta, useThreshold, useHistory, useSensors, useThresholds, useAlarms, useConfig } from './queries'
 import type { ReactNode } from 'react'
 
 function wrapper() {
@@ -50,5 +50,11 @@ describe('queries', () => {
     const { result } = renderHook(() => useAlarms(), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.length).toBeGreaterThan(0)
+  })
+
+  it('useConfig carrega o intervalo do carrossel do mock', async () => {
+    const { result } = renderHook(() => useConfig(), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.carousel_interval_ms).toBe(3000)
   })
 })

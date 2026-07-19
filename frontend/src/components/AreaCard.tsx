@@ -12,8 +12,6 @@ const BORDER_COLOR: Record<ReturnType<typeof worstAlarmState>, string> = {
   unknown: 'var(--color-line)',
 }
 
-const CAROUSEL_INTERVAL_MS = 3000
-
 export function AreaCard({
   group,
   thresholdsByCode,
@@ -21,6 +19,7 @@ export function AreaCard({
   selectedSensorCode,
   onSelectSensor,
   hadAlarmToday,
+  carouselIntervalMs,
 }: {
   group: AreaGroup
   thresholdsByCode: Record<string, Threshold | null | undefined>
@@ -28,12 +27,13 @@ export function AreaCard({
   selectedSensorCode: string | null
   onSelectSensor: (code: string) => void
   hadAlarmToday: boolean
+  carouselIntervalMs: number
 }) {
   const states = group.sensors.map((s) =>
     sensorDisplayState(thresholdsByCode[s.sensor_code] ?? null, liveByCode[s.sensor_code]),
   )
   const aggregate = worstAlarmState(states)
-  const carousel = useSensorCarousel(group.sensors.length, CAROUSEL_INTERVAL_MS)
+  const carousel = useSensorCarousel(group.sensors.length, carouselIntervalMs)
   const activeSensor = group.sensors[carousel.activeIndex] ?? group.sensors[0]
   const activeState = sensorDisplayState(
     thresholdsByCode[activeSensor.sensor_code] ?? null,

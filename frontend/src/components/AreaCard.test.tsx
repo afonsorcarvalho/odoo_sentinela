@@ -30,7 +30,7 @@ describe('AreaCard', () => {
   it('mostra nome da area e o sensor ativo (1o da lista) com valor mono', () => {
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     expect(screen.getByText('Expurgo')).toBeInTheDocument()
     expect(screen.getByText('Temperatura')).toBeInTheDocument()
@@ -41,7 +41,7 @@ describe('AreaCard', () => {
     const onSelectSensor = vi.fn()
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={onSelectSensor} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={onSelectSensor} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     fireEvent.click(screen.getByText('Temperatura'))
     expect(onSelectSensor).toHaveBeenCalledWith('TEMP-EXP-01')
@@ -50,13 +50,13 @@ describe('AreaCard', () => {
   it('badge "!" aparece so quando hadAlarmToday=true', () => {
     const { rerender } = render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     expect(screen.queryByLabelText('Houve não conformidade hoje')).not.toBeInTheDocument()
 
     rerender(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday carouselIntervalMs={3000} />,
     )
     expect(screen.getByLabelText('Houve não conformidade hoje')).toBeInTheDocument()
   })
@@ -64,7 +64,7 @@ describe('AreaCard', () => {
   it('area com 1 sensor nao mostra dots', () => {
     render(
       <AreaCard group={singleGroup} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
@@ -72,7 +72,7 @@ describe('AreaCard', () => {
   it('area com N sensores mostra 1 dot por sensor', () => {
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     expect(screen.getAllByRole('tab')).toHaveLength(2)
   })
@@ -81,7 +81,7 @@ describe('AreaCard', () => {
     vi.useFakeTimers()
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     expect(screen.getByText('Temperatura')).toBeInTheDocument()
     act(() => {
@@ -95,7 +95,7 @@ describe('AreaCard', () => {
     vi.useFakeTimers()
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     const card = screen.getByTestId('area-card-EXPURGO')
     fireEvent.mouseEnter(card)
@@ -119,7 +119,7 @@ describe('AreaCard', () => {
     vi.useFakeTimers()
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     const card = screen.getByTestId('area-card-EXPURGO')
     fireEvent.focus(card)
@@ -143,7 +143,7 @@ describe('AreaCard', () => {
     vi.useFakeTimers()
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     const dots = screen.getAllByRole('tab')
     fireEvent.click(dots[1])
@@ -166,9 +166,26 @@ describe('AreaCard', () => {
     }
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={critLive}
-        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     const value = screen.getByText(/30\.0/)
     expect(value.style.color).toBe(statusTextColor('crit'))
+  })
+
+  it('carouselIntervalMs vindo por prop governa o intervalo (nao mais fixo em 3000)', () => {
+    vi.useFakeTimers()
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={100} />,
+    )
+    expect(screen.getByText('Temperatura')).toBeInTheDocument()
+    act(() => {
+      vi.advanceTimersByTime(99)
+    })
+    expect(screen.getByText('Temperatura')).toBeInTheDocument()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(screen.getByText('Pressão')).toBeInTheDocument()
   })
 })

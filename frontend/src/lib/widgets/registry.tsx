@@ -1,0 +1,46 @@
+import type { ReactNode } from 'react'
+import type { WidgetInstance, WidgetType } from '../layout/schema'
+import { AreaWidget } from '../../components/widgets/AreaWidget'
+import { TimeseriesWidget } from '../../components/widgets/TimeseriesWidget'
+import { AlarmsWidget } from '../../components/widgets/AlarmsWidget'
+import { KpiWidget } from '../../components/widgets/KpiWidget'
+import { WidgetPlaceholder } from '../../components/widgets/WidgetPlaceholder'
+import type { Window } from '../types'
+
+export type WidgetDescriptor = {
+  type: WidgetType
+  label: string
+  needs: 'area' | 'sensor' | 'none'
+  defaultSize: { w: number; h: number }
+  minSize: { w: number; h: number }
+  render: (widget: WidgetInstance) => ReactNode
+}
+
+export const WIDGET_REGISTRY: Record<WidgetType, WidgetDescriptor> = {
+  area: {
+    type: 'area', label: 'Card de área', needs: 'area',
+    defaultSize: { w: 3, h: 3 }, minSize: { w: 2, h: 2 },
+    render: (w) => w.binding.areaCode
+      ? <AreaWidget areaCode={w.binding.areaCode} />
+      : <WidgetPlaceholder texto="Configurar área" />,
+  },
+  timeseries: {
+    type: 'timeseries', label: 'Gráfico temporal', needs: 'sensor',
+    defaultSize: { w: 6, h: 4 }, minSize: { w: 3, h: 3 },
+    render: (w) => w.binding.sensorCode
+      ? <TimeseriesWidget sensorCode={w.binding.sensorCode} defaultWindow={w.options?.defaultWindow as Window | undefined} />
+      : <WidgetPlaceholder texto="Configurar sensor" />,
+  },
+  alarms: {
+    type: 'alarms', label: 'Painel de alarmes', needs: 'none',
+    defaultSize: { w: 3, h: 6 }, minSize: { w: 2, h: 3 },
+    render: (w) => <AlarmsWidget scope={(w.options?.scope as 'site' | 'area') ?? 'site'} areaCode={w.binding.areaCode} />,
+  },
+  kpi: {
+    type: 'kpi', label: 'KPI (valor único)', needs: 'sensor',
+    defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 },
+    render: (w) => w.binding.sensorCode
+      ? <KpiWidget sensorCode={w.binding.sensorCode} label={w.options?.label as string | undefined} />
+      : <WidgetPlaceholder texto="Configurar sensor" />,
+  },
+}

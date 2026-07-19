@@ -37,3 +37,23 @@ class TestDashboardConfig(TransactionCase):
                 'site_id': self.site.id,
                 'carousel_interval_ms': 500,
             })
+
+    def test_layout_json_persiste(self):
+        config = self.env['sensor_monitor.dashboard.config'].create({
+            'site_id': self.site.id,
+            'layout_json': '{"version": 1, "grid": {"cols": 12, "rowHeight": 40, "margin": [8, 8]}, "widgets": []}',
+            'layout_version': 1,
+        })
+        self.assertEqual(config.layout_version, 1)
+        self.assertIn('"version": 1', config.layout_json)
+
+    def test_layout_json_invalido_rejeitado(self):
+        with self.assertRaises(ValidationError):
+            self.env['sensor_monitor.dashboard.config'].create({
+                'site_id': self.site.id,
+                'layout_json': 'isso nao e json',
+            })
+
+    def test_layout_version_default_um(self):
+        config = self.env['sensor_monitor.dashboard.config'].create({'site_id': self.site.id})
+        self.assertEqual(config.layout_version, 1)

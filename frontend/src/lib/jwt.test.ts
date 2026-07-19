@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { decodeJwtExp } from './jwt'
+import { decodeJwtExp, decodeJwtClaim } from './jwt'
 
 function b64url(obj: object): string {
   return btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -32,5 +32,27 @@ describe('decodeJwtExp', () => {
 
   it('payload nao-JSON valido devolve null, nao lanca', () => {
     expect(decodeJwtExp('abc.###.def')).toBeNull()
+  })
+})
+
+describe('decodeJwtClaim', () => {
+  it('le is_admin true', () => {
+    expect(decodeJwtClaim(makeJwt({ is_admin: true }), 'is_admin')).toBe(true)
+  })
+
+  it('le is_admin false', () => {
+    expect(decodeJwtClaim(makeJwt({ is_admin: false }), 'is_admin')).toBe(false)
+  })
+
+  it('devolve null pra claim ausente', () => {
+    expect(decodeJwtClaim(makeJwt({ sub: '2' }), 'is_admin')).toBeNull()
+  })
+
+  it('devolve null para token malformado (sem 3 segmentos)', () => {
+    expect(decodeJwtClaim('xxx', 'is_admin')).toBeNull()
+  })
+
+  it('devolve null para payload nao-JSON valido, nao lanca', () => {
+    expect(decodeJwtClaim('abc.###.def', 'is_admin')).toBeNull()
   })
 })

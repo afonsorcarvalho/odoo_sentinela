@@ -1,3 +1,5 @@
+import type { DashboardLayout } from './layout/schema'
+
 export type Window = '1h' | '24h' | '7d' | '30d'
 
 export type SensorMeta = {
@@ -18,6 +20,7 @@ export type Threshold = {
 
 export type DashboardConfig = {
   carousel_interval_ms: number
+  layout?: DashboardLayout | null
 }
 
 export type HistoryPoint =

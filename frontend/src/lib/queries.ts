@@ -1,6 +1,7 @@
-import { useQuery, useQueries } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { metaApi, historyApi, alarmApi, configApi } from './api'
 import type { Window } from './types'
+import type { DashboardLayout } from './layout/schema'
 
 export function useSensorMeta(code: string) {
   return useQuery({ queryKey: ['sensor', code], queryFn: () => metaApi.getSensor(code) })
@@ -33,4 +34,12 @@ export function useAlarms() {
 
 export function useConfig() {
   return useQuery({ queryKey: ['config'], queryFn: () => configApi.getConfig(), staleTime: 5 * 60 * 1000 })
+}
+
+export function useSaveLayout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (layout: DashboardLayout) => configApi.saveLayout(layout),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['config'] }) },
+  })
 }

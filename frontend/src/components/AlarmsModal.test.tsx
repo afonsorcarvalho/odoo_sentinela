@@ -65,4 +65,29 @@ describe('AlarmsModal', () => {
     fireEvent.click(screen.getByTestId('alarms-modal-overlay'))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('filtra por data usando fuso local, nao UTC', () => {
+    // Cria um alarme com timestamp perto da meia-noite UTC
+    // para testar que a comparacao usa data local e nao UTC slicing
+    const lateNightUTC = '2026-07-18T23:30:00Z'
+    const alarm = makeAlarm({ id: 99, timestamp_deteccao: lateNightUTC })
+
+    // Calcula a data local do alarme usando o mesmo metodo do componente
+    const d = new Date(lateNightUTC)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const localDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const utcSlicedDate = lateNightUTC.slice(0, 10) // '2026-07-18'
+
+    render(<AlarmsModal alarms={[alarm]} onClose={() => {}} />)
+
+    // Filtro pela data local deve incluir o alarme
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: localDate } })
+    expect(screen.getByText(/PRESS-EXP-01/)).toBeInTheDocument()
+
+    // Se local e UTC diferem, filtra por UTC nao deve incluir
+    if (localDate !== utcSlicedDate) {
+      fireEvent.change(screen.getByLabelText('Data'), { target: { value: utcSlicedDate } })
+      expect(screen.queryByText(/PRESS-EXP-01/)).not.toBeInTheDocument()
+    }
+  })
 })

@@ -8,9 +8,15 @@ function matchesQuery(alarm: AlarmEvent, query: string): boolean {
   return alarm.sensor_code.toLowerCase().includes(q) || alarm.area.name.toLowerCase().includes(q)
 }
 
+function localDateString(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 function matchesDate(alarm: AlarmEvent, date: string): boolean {
   if (!date) return true
-  return alarm.timestamp_deteccao.slice(0, 10) === date
+  return localDateString(alarm.timestamp_deteccao) === date
 }
 
 export function AlarmsModal({ alarms, onClose }: { alarms: AlarmEvent[]; onClose: () => void }) {
@@ -73,7 +79,7 @@ export function AlarmsModal({ alarms, onClose }: { alarms: AlarmEvent[]; onClose
               aria-label="Data"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="bg-transparent text-sm outline-none"
+              className="bg-transparent text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]"
               style={{ color: 'var(--color-ink)' }}
             />
           </label>

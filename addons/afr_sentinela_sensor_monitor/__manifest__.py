@@ -11,6 +11,7 @@
         'data/measurement_type_data.xml',
         'data/file_ledger_cron_data.xml',
         'views/site_views.xml',
+        'views/dashboard_config_views.xml',
         'views/area_views.xml',
         'views/hub_views.xml',
         'views/coletor_views.xml',

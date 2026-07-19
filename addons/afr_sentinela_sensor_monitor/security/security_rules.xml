@@ -28,6 +28,19 @@
         <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
     </record>
 
+    <record id="rule_dashboard_config_tenant" model="ir.rule">
+        <field name="name">Config de dashboard: isolamento por cliente</field>
+        <field name="model_id" ref="model_sensor_monitor_dashboard_config"/>
+        <field name="domain_force">[('site_id.partner_id', '=', user.partner_id.commercial_partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_view')), (4, ref('group_sensor_monitor_operation')), (4, ref('group_sensor_monitor_advanced_config'))]"/>
+    </record>
+    <record id="rule_dashboard_config_admin" model="ir.rule">
+        <field name="name">Config de dashboard: admin vê tudo</field>
+        <field name="model_id" ref="model_sensor_monitor_dashboard_config"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
+
     <record id="rule_area_tenant" model="ir.rule">
         <field name="name">Área: isolamento por cliente</field>
         <field name="model_id" ref="model_sensor_monitor_area"/>

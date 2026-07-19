@@ -2,6 +2,7 @@
     <menuitem id="menu_sensor_monitor_root" name="Sensor Monitor"/>
     <menuitem id="menu_sensor_monitor_cadastro" name="Cadastro" parent="menu_sensor_monitor_root" sequence="10"/>
     <menuitem id="menu_site" name="Sites" parent="menu_sensor_monitor_cadastro" action="action_site" sequence="10"/>
+    <menuitem id="menu_dashboard_config" name="Configuração do Dashboard" parent="menu_sensor_monitor_cadastro" action="action_dashboard_config" sequence="15"/>
     <menuitem id="menu_area" name="Áreas" parent="menu_sensor_monitor_cadastro" action="action_area" sequence="20"/>
     <menuitem id="menu_hub" name="Hubs" parent="menu_sensor_monitor_cadastro" action="action_hub" sequence="30"/>
     <menuitem id="menu_coletor" name="Coletores" parent="menu_sensor_monitor_cadastro" action="action_coletor" sequence="40"/>

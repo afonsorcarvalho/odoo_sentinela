@@ -2,6 +2,7 @@ from . import common
 from . import area_category
 from . import measurement_type
 from . import site
+from . import dashboard_config
 from . import area
 from . import hub
 from . import coletor

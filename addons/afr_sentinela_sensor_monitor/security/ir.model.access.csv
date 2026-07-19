@@ -5,6 +5,8 @@ access_measurement_type_view,measurement.type.view,model_sensor_monitor_measurem
 access_measurement_type_admin,measurement.type.admin,model_sensor_monitor_measurement_type,group_sensor_monitor_admin,1,1,1,1
 access_site_view,site.view,model_sensor_monitor_site,group_sensor_monitor_view,1,0,0,0
 access_site_admin,site.admin,model_sensor_monitor_site,group_sensor_monitor_admin,1,1,1,1
+access_dashboard_config_view,dashboard.config.view,model_sensor_monitor_dashboard_config,group_sensor_monitor_view,1,0,0,0
+access_dashboard_config_admin,dashboard.config.admin,model_sensor_monitor_dashboard_config,group_sensor_monitor_admin,1,1,1,1
 access_area_view,area.view,model_sensor_monitor_area,group_sensor_monitor_view,1,0,0,0
 access_area_admin,area.admin,model_sensor_monitor_area,group_sensor_monitor_admin,1,1,1,1
 access_hub_view,hub.view,model_sensor_monitor_hub,group_sensor_monitor_view,1,0,0,0

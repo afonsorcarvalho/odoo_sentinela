@@ -67,27 +67,32 @@ describe('AlarmsModal', () => {
   })
 
   it('filtra por data usando fuso local, nao UTC', () => {
-    // Cria um alarme com timestamp perto da meia-noite UTC
-    // para testar que a comparacao usa data local e nao UTC slicing
-    const lateNightUTC = '2026-07-18T23:30:00Z'
-    const alarm = makeAlarm({ id: 99, timestamp_deteccao: lateNightUTC })
+    // Testa que a comparacao usa Date getters (data local), nao slice(0, 10) (UTC).
+    // Mocka os getters para garantir que local e UTC diferem, independente do timezone da maquina.
+    const utcTimestamp = '2026-07-18T23:30:00Z'
+    const alarm = makeAlarm({ id: 99, timestamp_deteccao: utcTimestamp })
 
-    // Calcula a data local do alarme usando o mesmo metodo do componente
-    const d = new Date(lateNightUTC)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const localDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    const utcSlicedDate = lateNightUTC.slice(0, 10) // '2026-07-18'
+    // Mock Date.getters para retornar uma data DIFERENTE do slice UTC
+    // Quando a data local seria 2026-07-19 mas UTC slice é 2026-07-18
+    const getFullYearSpy = vi.spyOn(Date.prototype, 'getFullYear').mockReturnValue(2026)
+    const getMonthSpy = vi.spyOn(Date.prototype, 'getMonth').mockReturnValue(6) // 0-indexed, entao julho
+    const getDateSpy = vi.spyOn(Date.prototype, 'getDate').mockReturnValue(19) // dia local = 19
 
-    render(<AlarmsModal alarms={[alarm]} onClose={() => {}} />)
+    try {
+      render(<AlarmsModal alarms={[alarm]} onClose={() => {}} />)
 
-    // Filtro pela data local deve incluir o alarme
-    fireEvent.change(screen.getByLabelText('Data'), { target: { value: localDate } })
-    expect(screen.getByText(/PRESS-EXP-01/)).toBeInTheDocument()
+      // Filtro pela data local (mocked) = '2026-07-19' deve incluir o alarme
+      fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-07-19' } })
+      expect(screen.getByText(/PRESS-EXP-01/)).toBeInTheDocument()
 
-    // Se local e UTC diferem, filtra por UTC nao deve incluir
-    if (localDate !== utcSlicedDate) {
-      fireEvent.change(screen.getByLabelText('Data'), { target: { value: utcSlicedDate } })
+      // Filtro pela data UTC slice = '2026-07-18' NAO deve incluir o alarme
+      // (prova que nao esta usando .slice(0, 10))
+      fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-07-18' } })
       expect(screen.queryByText(/PRESS-EXP-01/)).not.toBeInTheDocument()
+    } finally {
+      getFullYearSpy.mockRestore()
+      getMonthSpy.mockRestore()
+      getDateSpy.mockRestore()
     }
   })
 })

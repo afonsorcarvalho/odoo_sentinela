@@ -1,4 +1,4 @@
-import { Responsive, WidthProvider, type Layout } from 'react-grid-layout'
+import { Responsive, WidthProvider, type Layout, type Layouts } from 'react-grid-layout'
 import type { DashboardLayout } from '../lib/layout/schema'
 import { WidgetFrame } from './WidgetFrame'
 import 'react-grid-layout/css/styles.css'
@@ -29,9 +29,18 @@ export function DashboardGrid({ layout, editing, onLayoutChange, onConfigure, on
     .sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x)
     .map((w, i) => ({ i: w.id, x: 0, y: i, w: 1, h: w.layout.h }))
 
-  function handleChange(current: Layout[]) {
+  // react-grid-layout chama onLayoutChange(currentLayout, allLayouts) tanto ao
+  // arrastar/redimensionar quanto ao montar ou trocar de breakpoint. Se
+  // mapeassemos de `current` (o layout do breakpoint ativo), uma janela
+  // estreitada durante a edicao em desktop cruzaria para `xxs` e gravaria o
+  // layout mobile de 1 coluna (x:0, w:1) por cima do `lg` salvo. Por isso
+  // sempre mapeamos de volta a partir de `allLayouts.lg`, nunca do breakpoint
+  // corrente.
+  function handleChange(_current: Layout[], allLayouts: Layouts) {
     if (!editing || !onLayoutChange) return
-    const byId = Object.fromEntries(current.map((l) => [l.i, l]))
+    const lgLayout = allLayouts.lg
+    if (!lgLayout) return
+    const byId = Object.fromEntries(lgLayout.map((l) => [l.i, l]))
     onLayoutChange({
       ...layout,
       widgets: layout.widgets.map((w) => {

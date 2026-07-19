@@ -42,11 +42,14 @@ export type AlarmTipoViolacao = 'acima_limite' | 'abaixo_limite' | 'sensor_offli
 export type AlarmEvent = {
   id: number
   sensor_code: string
-  area: { area_code: string; name: string }
+  area_code: string
+  timestamp_deteccao: number
+  timestamp_resolucao_sensor: number | null
+  valor_lido: number
   tipo_violacao: AlarmTipoViolacao
+  limite_configurado_snapshot: number
   status: AlarmEventStatus
-  timestamp_deteccao: string
-  valor_lido: number | null
-  limite_configurado_snapshot: number | null
-  data_resolucao: string | null
+  usuario_responsavel: string | null
+  data_resolucao: number | null
+  observacoes: string | null
 }

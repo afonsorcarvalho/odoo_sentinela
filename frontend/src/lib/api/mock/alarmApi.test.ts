@@ -7,6 +7,6 @@ describe('mockAlarmApi', () => {
     expect(alarms.some((a) => a.status === 'aberto')).toBe(true)
     expect(alarms.some((a) => a.status === 'resolvido')).toBe(true)
     const timestamps = alarms.map((a) => a.timestamp_deteccao)
-    expect(timestamps).toEqual([...timestamps].sort().reverse())
+    expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a))
   })
 })

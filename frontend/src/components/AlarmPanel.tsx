@@ -1,8 +1,18 @@
 import { AlarmItem } from './AlarmItem'
 import type { AlarmEvent } from '../lib/types'
 
-export function AlarmPanel({ alarms }: { alarms: AlarmEvent[] }) {
+export const VISIBLE_LIMIT = 8
+
+export function AlarmPanel({
+  alarms,
+  onVerMais,
+}: {
+  alarms: AlarmEvent[]
+  onVerMais?: () => void
+}) {
   const ativos = alarms.filter((a) => a.status !== 'resolvido').length
+  const visiveis = alarms.slice(0, VISIBLE_LIMIT)
+  const restantes = alarms.length - VISIBLE_LIMIT
 
   return (
     <aside
@@ -33,11 +43,23 @@ export function AlarmPanel({ alarms }: { alarms: AlarmEvent[] }) {
           Nenhum alarme ativo.
         </p>
       ) : (
-        <ul className="space-y-2">
-          {alarms.map((a) => (
-            <AlarmItem key={a.id} alarm={a} />
-          ))}
-        </ul>
+        <>
+          <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+            {visiveis.map((a) => (
+              <AlarmItem key={a.id} alarm={a} />
+            ))}
+          </ul>
+          {restantes > 0 && onVerMais && (
+            <button
+              type="button"
+              onClick={onVerMais}
+              className="min-h-11 w-full rounded-md text-sm font-semibold outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
+              style={{ color: 'var(--color-primary)' }}
+            >
+              Ver mais ({restantes})
+            </button>
+          )}
+        </>
       )}
     </aside>
   )

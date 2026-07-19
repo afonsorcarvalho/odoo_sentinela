@@ -115,6 +115,30 @@ describe('AreaCard', () => {
     expect(screen.getByText('Pressão')).toBeInTheDocument()
   })
 
+  it('foco por teclado pausa avanco automatico; blur retoma o ciclo do zero', () => {
+    vi.useFakeTimers()
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} />,
+    )
+    const card = screen.getByTestId('area-card-EXPURGO')
+    fireEvent.focus(card)
+    act(() => {
+      vi.advanceTimersByTime(10000)
+    })
+    expect(screen.getByText('Temperatura')).toBeInTheDocument()
+
+    fireEvent.blur(card)
+    act(() => {
+      vi.advanceTimersByTime(2999)
+    })
+    expect(screen.getByText('Temperatura')).toBeInTheDocument()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(screen.getByText('Pressão')).toBeInTheDocument()
+  })
+
   it('clicar no dot pula pro sensor certo e reinicia o ciclo de 3s', () => {
     vi.useFakeTimers()
     render(

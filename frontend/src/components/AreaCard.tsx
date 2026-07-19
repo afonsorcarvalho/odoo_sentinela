@@ -53,6 +53,8 @@ export function AreaCard({
       data-testid={`area-card-${group.area.area_code}`}
       onMouseEnter={carousel.pause}
       onMouseLeave={carousel.resume}
+      onFocus={carousel.pause}
+      onBlur={carousel.resume}
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold" style={{ color: 'var(--color-ink)' }}>

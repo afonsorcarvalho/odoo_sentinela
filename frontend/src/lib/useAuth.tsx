@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import { authApi } from './api'
-import { decodeJwtExp } from './jwt'
+import { decodeJwtExp, decodeJwtClaim } from './jwt'
 
 export const TOKEN_STORAGE_KEY = 'sentinela_token'
 
 type AuthContextValue = {
   isAuthenticated: boolean
+  isAdmin: boolean
   login: (usuario: string, senha: string) => Promise<void>
   logout: () => void
 }
@@ -37,8 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null)
   }
 
+  const isAdmin = token !== null && decodeJwtClaim(token, 'is_admin') === true
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated: token !== null, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated: token !== null, isAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

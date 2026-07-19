@@ -15,3 +15,16 @@ export function decodeJwtExp(token: string): number | null {
     return null
   }
 }
+
+// Le um claim qualquer do payload de um JWT (base64url, 2o segmento).
+// NAO verifica assinatura -- mesma ressalva de decodeJwtExp acima.
+export function decodeJwtClaim(token: string, claim: string): unknown {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    return json[claim] ?? null
+  } catch {
+    return null
+  }
+}

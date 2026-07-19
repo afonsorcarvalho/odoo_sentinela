@@ -8,10 +8,11 @@ function b64url(obj: object): string {
 }
 
 function Probe() {
-  const { isAuthenticated, login, logout } = useAuth()
+  const { isAuthenticated, isAdmin, login, logout } = useAuth()
   return (
     <div>
       <span data-testid="status">{isAuthenticated ? 'dentro' : 'fora'}</span>
+      <span data-testid="admin">{isAdmin ? 'sim' : 'nao'}</span>
       <button onClick={() => login('admin', 'admin')}>entrar</button>
       <button onClick={() => logout()}>sair</button>
     </div>
@@ -48,5 +49,28 @@ describe('AuthProvider/useAuth', () => {
     render(<AuthProvider><Probe /></AuthProvider>)
     expect(screen.getByTestId('status')).toHaveTextContent('fora')
     expect(localStorage.getItem('sentinela_token')).toBeNull()
+  })
+
+  it('isAdmin comeca false sem token no storage', () => {
+    render(<AuthProvider><Probe /></AuthProvider>)
+    expect(screen.getByTestId('admin')).toHaveTextContent('nao')
+  })
+
+  it('isAdmin true quando token valido no storage tem is_admin true', () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const token = `${b64url({ alg: 'HS256' })}.${b64url({ is_admin: true, exp })}.sig`
+    localStorage.setItem('sentinela_token', token)
+    render(<AuthProvider><Probe /></AuthProvider>)
+    expect(screen.getByTestId('status')).toHaveTextContent('dentro')
+    expect(screen.getByTestId('admin')).toHaveTextContent('sim')
+  })
+
+  it('isAdmin false quando token valido no storage tem is_admin false', () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const token = `${b64url({ alg: 'HS256' })}.${b64url({ is_admin: false, exp })}.sig`
+    localStorage.setItem('sentinela_token', token)
+    render(<AuthProvider><Probe /></AuthProvider>)
+    expect(screen.getByTestId('status')).toHaveTextContent('dentro')
+    expect(screen.getByTestId('admin')).toHaveTextContent('nao')
   })
 })

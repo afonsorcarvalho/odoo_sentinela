@@ -8,6 +8,7 @@ import { groupSensorsByArea } from '../lib/aggregateStatus'
 import { AreaCard } from '../components/AreaCard'
 import { Topbar } from '../components/Topbar'
 import { AlarmPanel } from '../components/AlarmPanel'
+import { AlarmsModal } from '../components/AlarmsModal'
 import { ToastContainer } from '../components/ToastContainer'
 import { SensorDetailPanel } from '../components/SensorDetailPanel'
 import { DemoBanner } from '../components/DemoBanner'
@@ -25,6 +26,7 @@ export function DashboardPage() {
   const [window, setWindow] = useState<Window>('24h')
   const queryClient = useQueryClient()
   const [simulating, setSimulating] = useState(false)
+  const [alarmsModalOpen, setAlarmsModalOpen] = useState(false)
 
   const sensorsQuery = useSensors()
   const sensors = sensorsQuery.data ?? []
@@ -124,9 +126,11 @@ export function DashboardPage() {
             )}
           </div>
 
-          <AlarmPanel alarms={alarms} />
+          <AlarmPanel alarms={alarms} onVerMais={() => setAlarmsModalOpen(true)} />
         </div>
       </div>
+
+      {alarmsModalOpen && <AlarmsModal alarms={alarms} onClose={() => setAlarmsModalOpen(false)} />}
     </div>
   )
 }

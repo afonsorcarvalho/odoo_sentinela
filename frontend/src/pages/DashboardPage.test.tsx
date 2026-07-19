@@ -9,11 +9,44 @@ vi.mock('echarts', () => ({ init: () => ({ setOption: vi.fn(), dispose: vi.fn(),
 
 import { DashboardPage } from './DashboardPage'
 import { AuthProvider } from '../lib/useAuth'
+import type { AlarmEvent } from '../lib/types'
 
 // AuthProvider necessario: Topbar -> LogoutButton usa useAuth(), que lanca
 // erro fora de um AuthProvider (o brief original nao incluia este wrapper).
 function renderWithProviders(initialEntries: string[]) {
   const client = new QueryClient()
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={initialEntries}>
+        <AuthProvider>
+          <DashboardPage />
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+function makeAlarms(count: number): AlarmEvent[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: 1000 + i,
+    sensor_code: `TEMP-PRE-0${i + 1}`,
+    area: { area_code: 'PREPARO', name: 'Preparo' },
+    tipo_violacao: 'acima_limite',
+    status: 'aberto',
+    timestamp_deteccao: new Date(1_700_000_000_000 - i * 60_000).toISOString(),
+    valor_lido: 24 + i,
+    limite_configurado_snapshot: 23,
+    data_resolucao: null,
+  }))
+}
+
+// Semeia o cache de ['alarms'] antes do render, com staleTime: Infinity para
+// que o useAlarms() (refetchInterval: 5000, real hook) nao dispare um refetch
+// em background que sobrescreveria os alarmes semeados com o fixture mock
+// (que so tem 2 alarmes, insuficiente pra acionar o botao "Ver mais").
+function renderWithAlarms(alarms: AlarmEvent[], initialEntries: string[] = ['/']) {
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+  client.setQueryData(['alarms'], alarms)
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={initialEntries}>
@@ -60,5 +93,19 @@ describe('DashboardPage', () => {
 
     await waitFor(() => expect(screen.getByText('Preparo/Esterilização · Temperatura')).toBeInTheDocument())
     expect(screen.queryByText('Expurgo · Temperatura')).not.toBeInTheDocument()
+  })
+
+  it('abre o modal de alarmes ao clicar em "Ver mais" e fecha ao clicar em Fechar', async () => {
+    renderWithAlarms(makeAlarms(9))
+
+    const verMaisButton = await screen.findByRole('button', { name: /Ver mais/ })
+    await userEvent.click(verMaisButton)
+
+    const dialog = screen.getByRole('dialog', { name: 'Todos os alarmes' })
+    expect(dialog).toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Todos os alarmes' })).not.toBeInTheDocument()
   })
 })

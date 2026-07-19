@@ -16,12 +16,15 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // e2e/*.spec.ts sao testes Playwright (browser real), rodados por `npm run
+    // shot`/playwright — nao pelo vitest (que quebraria ao importar @playwright/test).
+    exclude: ['**/node_modules/**', '**/e2e/**'],
     setupFiles: ['./src/test/setup.ts'],
     // Vite carrega .env.local em qualquer modo, incluindo test -- sem isto,
     // um .env.local de dev com VITE_API_MODE=real (usado p/ testar contra a
     // API de verdade) faz a suite tentar rede de verdade e falhar com
     // ECONNREFUSED quando a API nao esta de pe. Testes sempre rodam contra
     // mock, independente do que o .env.local local disser.
-    env: { VITE_API_MODE: 'mock' },
+    env: { VITE_API_MODE: 'mock', VITE_DEMO_MODE: '' },
   },
 })

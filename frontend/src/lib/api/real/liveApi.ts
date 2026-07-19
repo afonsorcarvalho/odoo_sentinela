@@ -64,7 +64,9 @@ export const realLiveApi: LiveApi = {
 
     return () => {
       callbacks.delete(cb)
-      if (callbacks.size === 0) subscribers.delete(sensor_code)
+      if (subscribers.get(sensor_code) === callbacks && callbacks.size === 0) {
+        subscribers.delete(sensor_code)
+      }
       closeSharedSourceIfIdle()
     }
   },

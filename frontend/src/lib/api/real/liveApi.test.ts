@@ -122,6 +122,24 @@ describe('realLiveApi', () => {
     expect(MockEventSource.instances[1].closed).toBe(false)
   })
 
+  it('unsubscribe stale (chamado 2x com resubscribe no meio) nao apaga o inscrito novo', async () => {
+    const cbOld = vi.fn()
+    const cbNew = vi.fn()
+
+    const unsubOld = subscribe('SNR-1', cbOld)
+    unsubOld()
+
+    subscribe('SNR-1', cbNew)
+    unsubOld()
+    await Promise.resolve()
+
+    const es = MockEventSource.instances[MockEventSource.instances.length - 1]
+    es.onmessage?.({ data: JSON.stringify({ sensor_id: 'SNR-1', time: 1700000000000, valor: 15 }) })
+
+    expect(cbNew).toHaveBeenCalledTimes(1)
+    expect(cbOld).not.toHaveBeenCalled()
+  })
+
   it('sensor_code vazio: nao registra callback, nao quebra o demux dos outros', () => {
     const cb = vi.fn()
     const unsubscribe = subscribe('', cb)

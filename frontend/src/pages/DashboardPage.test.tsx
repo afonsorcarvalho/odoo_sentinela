@@ -1,5 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor, within, act } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
@@ -62,6 +62,44 @@ function renderWithAlarms(alarms: AlarmEvent[], initialEntries: string[] = ['/']
 }
 
 describe('DashboardPage', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('carousel_interval_ms do mock (configApi, 4000) flui ate o AreaCard: nao avanca em 3000ms, avanca em 4000ms', async () => {
+    // Valor do mock (frontend/src/lib/api/mock/configApi.ts) e deliberadamente
+    // 4000, diferente do fallback hardcoded 3000 usado em DashboardPage.tsx
+    // (configQuery.data?.carousel_interval_ms ?? 3000) e do default do
+    // AreaCard. Fake timers desde o inicio (mesmo padrao de AreaCard.test.tsx)
+    // + vi.advanceTimersByTimeAsync para deixar as queries do mock (promises
+    // simples, sem setTimeout) resolverem antes de avancar o relogio.
+    vi.useFakeTimers()
+    renderWithProviders(['/'])
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // EXPURGO e o 1o grupo do fixture, com 2 sensores (TEMP-EXP-01,
+    // PRESS-EXP-01) -- ativa o carrossel automatico do AreaCard.
+    const expurgoCard = screen.getByTestId('area-card-EXPURGO')
+    expect(within(expurgoCard).getByText('Temperatura')).toBeInTheDocument()
+
+    // A 1ms de completar 4000ms (o valor real do mock) o carrossel AINDA NAO
+    // avancou -- em particular, ja passou dos 3000ms do fallback hardcoded
+    // (coincidentemente igual ao antigo valor do mock): se o wiring tivesse
+    // caido de volta pro fallback, o carrossel ja teria avancado aqui.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3999)
+    })
+    expect(within(expurgoCard).getByText('Temperatura')).toBeInTheDocument()
+
+    // No ms exato de 4000ms, o carrossel avanca.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(within(expurgoCard).getByText('Pressão diferencial')).toBeInTheDocument()
+    expect(within(expurgoCard).queryByText('Temperatura')).not.toBeInTheDocument()
+  })
+
   it('sem querystring, mostra os cards de area e o painel de detalhe do 1o sensor', async () => {
     renderWithProviders(['/'])
     await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument())

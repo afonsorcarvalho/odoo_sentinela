@@ -55,6 +55,6 @@ describe('queries', () => {
   it('useConfig carrega o intervalo do carrossel do mock', async () => {
     const { result } = renderHook(() => useConfig(), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(result.current.data?.carousel_interval_ms).toBe(3000)
+    expect(result.current.data?.carousel_interval_ms).toBe(4000)
   })
 })

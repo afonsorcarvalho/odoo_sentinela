@@ -64,3 +64,35 @@ def test_live_recebe_ponto_publicado_no_registry():
             await agen.aclose()
 
     asyncio.run(cenario())
+
+
+def test_live_global_sem_token_retorna_422():
+    client = TestClient(app)
+    resposta = client.get('/live')
+    assert resposta.status_code == 422
+
+
+def test_live_global_token_invalido_retorna_401():
+    client = TestClient(app)
+    resposta = client.get('/live', params={'token': 'lixo.invalido.aqui'})
+    assert resposta.status_code == 401
+
+
+def test_live_global_recebe_evento_de_qualquer_sensor():
+    # Mesma técnica do test_live_recebe_ponto_publicado_no_registry acima: chama a
+    # coroutine da rota diretamente (não via ASGI transport), pelo mesmo motivo já
+    # documentado (StreamingResponse infinito trava o ASGITransport do httpx).
+    async def cenario():
+        resposta = await live.get_live_global(_claims={})
+        agen = resposta.body_iterator
+        try:
+            live.publicar('QUALQUER-OUTRO-SENSOR', {'sensor_id': 'QUALQUER-OUTRO-SENSOR', 'time': 1700000000000, 'valor': 15.0})
+            linha = await asyncio.wait_for(agen.__anext__(), timeout=2)
+            assert linha.startswith('data: ')
+            payload = json.loads(linha[len('data: '):].strip())
+            assert payload['sensor_id'] == 'QUALQUER-OUTRO-SENSOR'
+            assert payload['valor'] == 15.0
+        finally:
+            await agen.aclose()
+
+    asyncio.run(cenario())

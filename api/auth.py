@@ -43,17 +43,18 @@ def login(dados: LoginRequest):
 
     # `has_group` via XML-RPC execute_kw não aceita a assinatura direta
     # (falha em runtime: "missing 1 required positional argument: 'group_ext_id'").
-    # Alternativa equivalente: localizar o grupo Administration/Settings e
-    # checar se o uid logado pertence a ele.
-    grupo = odoo_cliente.executar(
-        cliente_servico, 'res.groups', 'search',
-        [('full_name', '=', 'Administration / Settings')], limit=1,
+    # Alternativa equivalente: resolver o xml_id técnico base.group_system
+    # (imune a locale, ao contrário de buscar por full_name traduzível) e
+    # checar se o uid logado pertence ao grupo correspondente.
+    dados_modelo = odoo_cliente.executar(
+        cliente_servico, 'ir.model.data', 'search_read',
+        [('module', '=', 'base'), ('name', '=', 'group_system')], fields=['res_id'], limit=1,
     )
     is_admin = False
-    if grupo:
+    if dados_modelo:
         usuarios_admin = odoo_cliente.executar(
             cliente_servico, 'res.users', 'search_read',
-            [('id', '=', cliente_usuario.uid), ('groups_id', 'in', grupo)], fields=['id'],
+            [('id', '=', cliente_usuario.uid), ('groups_id', 'in', dados_modelo[0]['res_id'])], fields=['id'],
         )
         is_admin = bool(usuarios_admin)
 

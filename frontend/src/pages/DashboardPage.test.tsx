@@ -4,12 +4,14 @@ import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 
-// ECharts mockado (sem canvas em jsdom) — DashboardPage renderiza SensorDetailPanel -> TimeSeriesChart.
+// ECharts mockado (sem canvas em jsdom). O registry de widgets importa
+// estaticamente o TimeseriesWidget (-> echarts) mesmo sem widget timeseries no
+// default layout, entao o mock continua necessario apos remover o
+// SensorDetailPanel.
 vi.mock('echarts', () => ({ init: () => ({ setOption: vi.fn(), dispose: vi.fn(), resize: vi.fn() }) }))
 
 import { DashboardPage } from './DashboardPage'
-import { AuthProvider } from '../lib/useAuth'
-import type { AlarmEvent } from '../lib/types'
+import { AuthProvider, TOKEN_STORAGE_KEY } from '../lib/useAuth'
 
 // AuthProvider necessario: Topbar -> LogoutButton usa useAuth(), que lanca
 // erro fora de um AuthProvider (o brief original nao incluia este wrapper).
@@ -26,50 +28,31 @@ function renderWithProviders(initialEntries: string[]) {
   )
 }
 
-function makeAlarms(count: number): AlarmEvent[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: 1000 + i,
-    sensor_code: `TEMP-PRE-0${i + 1}`,
-    area_code: 'PREPARO',
-    tipo_violacao: 'acima_limite',
-    status: 'aberto',
-    timestamp_deteccao: 1_700_000_000_000 - i * 60_000,
-    timestamp_resolucao_sensor: null,
-    valor_lido: 24 + i,
-    limite_configurado_snapshot: 23,
-    usuario_responsavel: null,
-    data_resolucao: null,
-    observacoes: null,
-  }))
-}
-
-// Semeia o cache de ['alarms'] antes do render, com staleTime: Infinity para
-// que o useAlarms() (refetchInterval: 5000, real hook) nao dispare um refetch
-// em background que sobrescreveria os alarmes semeados com o fixture mock
-// (que so tem 2 alarmes, insuficiente pra acionar o botao "Ver mais").
-function renderWithAlarms(alarms: AlarmEvent[], initialEntries: string[] = ['/']) {
-  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
-  client.setQueryData(['alarms'], alarms)
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={initialEntries}>
-        <AuthProvider>
-          <DashboardPage />
-        </AuthProvider>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  )
+// Injeta um token JWT (sem verificacao de assinatura no client) com is_admin.
+// exp em segundos (decodeJwtExp faz *1000). Chamar ANTES do render: o
+// AuthProvider le o token no initializer do useState em tempo de montagem.
+function setAdminToken() {
+  const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, '')
+  const exp = Math.floor(Date.now() / 1000) + 3600
+  localStorage.setItem(TOKEN_STORAGE_KEY, `${b64({ alg: 'HS256' })}.${b64({ is_admin: true, exp })}.sig`)
 }
 
 describe('DashboardPage', () => {
-  afterEach(() => vi.useRealTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    // Isola os testes de gate: sem isso o token admin vazaria para o teste
+    // de nao-admin (ou para qualquer teste seguinte) conforme a ordem.
+    localStorage.clear()
+  })
 
   it('carousel_interval_ms do mock (configApi, 4000) flui ate o AreaCard: nao avanca em 3000ms, avanca em 4000ms', async () => {
     // Valor do mock (frontend/src/lib/api/mock/configApi.ts) e deliberadamente
-    // 4000, diferente do fallback hardcoded 3000 usado em DashboardPage.tsx
-    // (configQuery.data?.carousel_interval_ms ?? 3000) e do default do
-    // AreaCard. Fake timers desde o inicio (mesmo padrao de AreaCard.test.tsx)
-    // + vi.advanceTimersByTimeAsync para deixar as queries do mock (promises
+    // 4000, diferente do fallback hardcoded 3000 usado no AreaWidget
+    // (config.data?.carousel_interval_ms ?? 3000) e do default do AreaCard.
+    // O AreaCard agora renderiza via AreaWidget dentro do DashboardGrid; o
+    // carrossel (setInterval no AreaCard) continua alimentado pelo mesmo mock.
+    // Fake timers desde o inicio (mesmo padrao de AreaCard.test.tsx) +
+    // vi.advanceTimersByTimeAsync para deixar as queries do mock (promises
     // simples, sem setTimeout) resolverem antes de avancar o relogio.
     vi.useFakeTimers()
     renderWithProviders(['/'])
@@ -100,53 +83,38 @@ describe('DashboardPage', () => {
     expect(within(expurgoCard).queryByText('Temperatura')).not.toBeInTheDocument()
   })
 
-  it('sem querystring, mostra os cards de area e o painel de detalhe do 1o sensor', async () => {
-    renderWithProviders(['/'])
-    await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument())
-    expect(screen.getAllByTestId(/area-card-/).length).toBeGreaterThan(0)
-  })
-
-  it('com ?sensor=CODE, o painel de detalhe abre nesse sensor', async () => {
-    renderWithProviders(['/?sensor=TEMP-PRE-01'])
-    // Nome da area + measurement_type.name no fixture mock (TEMP-PRE-01) e
-    // "Preparo/Esterilização" / "Temperatura" — ver frontend/src/lib/api/mock/fixtures.ts.
-    await waitFor(() => expect(screen.getByText('Preparo/Esterilização · Temperatura')).toBeInTheDocument())
-  })
-
   it('mostra o painel de alarmes e o topbar', async () => {
     renderWithProviders(['/'])
+    // 'Alarmes' vem do AlarmsWidget (default layout) e 'Sentinela' do Topbar.
     await waitFor(() => expect(screen.getByText('Alarmes')).toBeInTheDocument())
     expect(screen.getByText('Sentinela')).toBeInTheDocument()
   })
 
-  it('ao clicar num sensor de outra area no AreaCard, o painel de detalhe passa a mostrar esse sensor', async () => {
+  it('nao mostra botao Editar para nao-admin', async () => {
     renderWithProviders(['/'])
-    // Sem querystring, o painel de detalhe abre no 1o sensor do 1o grupo
-    // (Expurgo · Temperatura, ver fixtures.ts / App.test.tsx).
-    await waitFor(() => expect(screen.getByText('Expurgo · Temperatura')).toBeInTheDocument())
-
-    // Clica no 1o sensor (Temperatura / TEMP-PRE-01) do card de uma area
-    // diferente (Preparo/Esterilização) -- exercita selectSensor ->
-    // setSearchParams -> re-render do SensorDetailPanel.
-    const preparoCard = screen.getByTestId('area-card-PREPARO_ESTER')
-    const [temperaturaButton] = within(preparoCard).getAllByRole('button')
-    await userEvent.click(temperaturaButton)
-
-    await waitFor(() => expect(screen.getByText('Preparo/Esterilização · Temperatura')).toBeInTheDocument())
-    expect(screen.queryByText('Expurgo · Temperatura')).not.toBeInTheDocument()
+    // Espera o grid montar (AlarmsWidget rende 'Alarmes') antes de afirmar
+    // ausencia, pra nao passar so por ainda nao ter renderizado nada.
+    await waitFor(() => expect(screen.getByText('Alarmes')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /editar/i })).toBeNull()
   })
 
-  it('abre o modal de alarmes ao clicar em "Ver mais" e fecha ao clicar em Fechar', async () => {
-    renderWithAlarms(makeAlarms(9))
+  it('mostra botao Editar para admin', async () => {
+    setAdminToken()
+    renderWithProviders(['/'])
+    expect(await screen.findByRole('button', { name: /editar/i })).toBeInTheDocument()
+  })
 
-    const verMaisButton = await screen.findByRole('button', { name: /Ver mais/ })
-    await userEvent.click(verMaisButton)
+  it('admin: clicar em Editar monta o DashboardEditor (palette + Salvar/Cancelar) e esconde Editar', async () => {
+    // Cobre o caminho Editar -> DashboardEditor (que jsdom consegue montar; o
+    // layout visivel do react-grid-layout depende de medicao de largura via
+    // WidthProvider, que e 0 no jsdom -- essa parte fica fora deste teste).
+    setAdminToken()
+    renderWithProviders(['/'])
+    await userEvent.click(await screen.findByRole('button', { name: /editar/i }))
 
-    const dialog = screen.getByRole('dialog', { name: 'Todos os alarmes' })
-    expect(dialog).toBeInTheDocument()
-
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }))
-
-    expect(screen.queryByRole('dialog', { name: 'Todos os alarmes' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /adicionar/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /editar/i })).toBeNull()
   })
 })

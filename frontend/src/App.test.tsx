@@ -34,20 +34,27 @@ beforeEach(() => seedValidToken())
 afterEach(() => localStorage.clear())
 
 describe('App routing', () => {
+  // Marcador de "DashboardPage montou": 'Áreas monitoradas' e texto estatico da
+  // pagina (sem depender de dados), substitui o antigo 'Detalhe do sensor' — o
+  // SensorDetailPanel foi removido do fluxo principal na Task 14.
   it('"/" renderiza a DashboardPage', async () => {
     render(wrap(<App />, '/'))
-    await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Áreas monitoradas')).toBeInTheDocument())
   })
 
-  it('"/sensor/:code" redireciona para "/?sensor=:code" e abre o Detalhe do sensor certo', async () => {
+  it('"/sensor/:code" redireciona para "/?sensor=:code" e renderiza a DashboardPage', async () => {
+    // O redirect App-level ainda existe; a DashboardPage nao consome mais o
+    // ?sensor (detalhe dropado), entao afirmamos apenas que a rota resolve na
+    // DashboardPage sem 404/crash.
     render(wrap(<App />, '/sensor/TEMP-EXP-01'))
-    await waitFor(() => expect(screen.getByText('Expurgo · Temperatura')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Áreas monitoradas')).toBeInTheDocument())
   })
 
   it('"/area/:areaCode" redireciona para "/?area=:areaCode"', async () => {
     render(wrap(<App />, '/area/EXPURGO'))
-    await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument())
-    expect(screen.getByTestId('area-card-EXPURGO')).toBeInTheDocument()
+    // 'Áreas monitoradas' e estatico (aparece na hora); o card da area so
+    // aparece apos a query de sensores resolver -- por isso esperamos o testid.
+    await waitFor(() => expect(screen.getByTestId('area-card-EXPURGO')).toBeInTheDocument())
   })
 
   it('fluxo completo de auth: sem login redireciona, loga, navega, desloga, bloqueia de novo', async () => {
@@ -62,7 +69,7 @@ describe('App routing', () => {
     await userEvent.click(screen.getByRole('button', { name: /entrar/i }))
 
     // login ok, entra na DashboardPage
-    await waitFor(() => expect(screen.getByText('Detalhe do sensor')).toBeInTheDocument(), { timeout: 3000 })
+    await waitFor(() => expect(screen.getByText('Áreas monitoradas')).toBeInTheDocument(), { timeout: 3000 })
 
     // desloga
     await userEvent.click(screen.getByRole('button', { name: /sair/i }))

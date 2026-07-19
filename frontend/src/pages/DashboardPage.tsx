@@ -1,66 +1,42 @@
-import { useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useSensors, useThresholds, useHistory, useAlarms, useConfig } from '../lib/queries'
-import { useLiveStatuses } from '../lib/useLiveStatuses'
-import { useLiveTail } from '../lib/useLiveTail'
+import { useSensors, useAlarms, useConfig } from '../lib/queries'
 import { groupSensorsByArea } from '../lib/aggregateStatus'
-import { AreaCard } from '../components/AreaCard'
+import { useAuth } from '../lib/useAuth'
+import { parseLayout } from '../lib/layout/schema'
+import { defaultLayout } from '../lib/layout/defaultLayout'
+import { DashboardGrid } from '../components/DashboardGrid'
+import { DashboardEditor } from '../components/DashboardEditor'
 import { Topbar } from '../components/Topbar'
-import { AlarmPanel } from '../components/AlarmPanel'
 import { AlarmsModal } from '../components/AlarmsModal'
 import { ToastContainer } from '../components/ToastContainer'
-import { SensorDetailPanel } from '../components/SensorDetailPanel'
 import { DemoBanner } from '../components/DemoBanner'
 import { isDemoMode } from '../lib/demoMode'
-import type { Window, AlarmEvent } from '../lib/types'
+import type { AlarmEvent } from '../lib/types'
 
 const UNIT_NAME = import.meta.env.VITE_UNIT_NAME ?? 'Unidade não configurada'
 
-function isToday(ts: number): boolean {
-  const d = new Date(ts)
-  const now = new Date()
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
-}
-
 export function DashboardPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [window, setWindow] = useState<Window>('24h')
+  const { isAdmin } = useAuth()
   const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
   const [simulating, setSimulating] = useState(false)
   const [alarmsModalOpen, setAlarmsModalOpen] = useState(false)
 
   const sensorsQuery = useSensors()
   const configQuery = useConfig()
-  const carouselIntervalMs = configQuery.data?.carousel_interval_ms ?? 3000
   const sensors = sensorsQuery.data ?? []
-  const codes = sensors.map((s) => s.sensor_code)
-  const thresholdResults = useThresholds(codes)
-  const thresholdsByCode = Object.fromEntries(codes.map((c, i) => [c, thresholdResults[i]?.data]))
-  const liveByCode = useLiveStatuses(codes)
   const groups = groupSensorsByArea(sensors)
   const areaNameByCode = Object.fromEntries(sensors.map((s) => [s.area.area_code, s.area.name]))
   const alarmsQuery = useAlarms()
   const alarms = alarmsQuery.data ?? []
 
-  const areaParam = searchParams.get('area')
-  const sensorParam = searchParams.get('sensor')
-  const selectedGroup =
-    groups.find((g) => g.sensors.some((s) => s.sensor_code === sensorParam))
-    ?? groups.find((g) => g.area.area_code === areaParam)
-    ?? groups[0]
-  const selectedCode =
-    selectedGroup?.sensors.find((s) => s.sensor_code === sensorParam)?.sensor_code
-    ?? selectedGroup?.sensors[0]?.sensor_code
-    ?? null
-
-  const history = useHistory(selectedCode ?? '', window)
-  const { last, tail } = useLiveTail(selectedCode ?? '')
-
-  function selectSensor(code: string) {
-    const group = groups.find((g) => g.sensors.some((s) => s.sensor_code === code))
-    setSearchParams(group ? { area: group.area.area_code, sensor: code } : { sensor: code })
-  }
+  // Layout salvo (via /config) tem prioridade; se ausente ou invalido, cai no
+  // default derivado das areas (um card por area + painel de alarmes).
+  const layout = useMemo(
+    () => parseLayout(configQuery.data?.layout) ?? defaultLayout(groups),
+    [configQuery.data?.layout, groups],
+  )
 
   function simulateAlarm() {
     setSimulating(true)
@@ -79,7 +55,6 @@ export function DashboardPage() {
     queryClient.invalidateQueries({ queryKey: ['alarms'] })
   }
 
-  const ready = sensorsQuery.isSuccess && thresholdResults.every((r) => r.isSuccess)
   const healthy = sensorsQuery.isSuccess && !alarmsQuery.isError
 
   return (
@@ -89,55 +64,32 @@ export function DashboardPage() {
       {isDemoMode() && <DemoBanner simulating={simulating} onSimulate={simulateAlarm} onReset={resetDemo} />}
 
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-          Áreas monitoradas
-        </p>
-
-        <div className="flex flex-wrap gap-6">
-          <div className="flex-1" style={{ minWidth: 280 }}>
-            {!ready ? (
-              <p className="text-sm" style={{ color: 'var(--color-muted)' }}>Carregando…</p>
-            ) : (
-              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(232px, 1fr))' }}>
-                {groups.map((g) => (
-                  <AreaCard
-                    key={g.area.area_code}
-                    group={g}
-                    thresholdsByCode={thresholdsByCode}
-                    liveByCode={liveByCode}
-                    selectedSensorCode={selectedCode}
-                    onSelectSensor={selectSensor}
-                    hadAlarmToday={alarms.some((a) => a.area_code === g.area.area_code && isToday(a.timestamp_deteccao))}
-                    carouselIntervalMs={carouselIntervalMs}
-                  />
-                ))}
-              </div>
-            )}
-
-            {ready && selectedGroup && selectedCode && (
-              <div className="mt-6">
-                <SensorDetailPanel
-                  group={selectedGroup}
-                  selectedCode={selectedCode}
-                  onSelectSensor={selectSensor}
-                  threshold={thresholdsByCode[selectedCode] ?? null}
-                  unidade={selectedGroup.sensors.find((s) => s.sensor_code === selectedCode)?.unidade ?? ''}
-                  value={last?.value ?? null}
-                  state={last?.alarm_state}
-                  window={window}
-                  onWindowChange={setWindow}
-                  history={history.data}
-                  tail={tail}
-                />
-              </div>
-            )}
-          </div>
-
-          <AlarmPanel alarms={alarms} areaNameByCode={areaNameByCode} onVerMais={() => setAlarmsModalOpen(true)} />
+        <div className="mb-2 flex items-center">
+          <p className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+            Áreas monitoradas
+          </p>
+          {isAdmin && !editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="ml-auto rounded border px-3 py-1 text-sm"
+              style={{ borderColor: 'var(--color-line-strong)', color: 'var(--color-ink)' }}
+            >
+              Editar
+            </button>
+          )}
         </div>
+
+        {editing ? (
+          <DashboardEditor layout={layout} onExit={() => setEditing(false)} />
+        ) : (
+          <DashboardGrid layout={layout} editing={false} />
+        )}
       </div>
 
-      {alarmsModalOpen && <AlarmsModal alarms={alarms} areaNameByCode={areaNameByCode} onClose={() => setAlarmsModalOpen(false)} />}
+      {alarmsModalOpen && (
+        <AlarmsModal alarms={alarms} areaNameByCode={areaNameByCode} onClose={() => setAlarmsModalOpen(false)} />
+      )}
     </div>
   )
 }

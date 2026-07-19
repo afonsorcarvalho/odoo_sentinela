@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Responsive, WidthProvider, type Layout, type Layouts } from 'react-grid-layout'
-import type { DashboardLayout, WidgetInstance } from '../lib/layout/schema'
+import type { DashboardLayout, WidgetInstance, WidgetType } from '../lib/layout/schema'
+import { WIDGET_REGISTRY } from '../lib/widgets/registry'
 import { WidgetFrame } from './WidgetFrame'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
@@ -38,12 +39,22 @@ function EditGridOverlay({ grid, width }: {
   )
 }
 
-export function DashboardGrid({ layout, editing, onLayoutChange, onWidgetChange, onRemove }: {
+export function DashboardGrid({
+  layout,
+  editing,
+  onLayoutChange,
+  onWidgetChange,
+  onRemove,
+  droppingType,
+  onDropWidget,
+}: {
   layout: DashboardLayout
   editing: boolean
   onLayoutChange?: (l: DashboardLayout) => void
   onWidgetChange?: (w: WidgetInstance) => void
   onRemove?: (id: string) => void
+  droppingType?: WidgetType | null
+  onDropWidget?: (pos: { x: number; y: number }) => void
 }) {
   const rglLayout: Layout[] = layout.widgets.map((w) => ({
     i: w.id,
@@ -108,6 +119,19 @@ export function DashboardGrid({ layout, editing, onLayoutChange, onWidgetChange,
         isResizable={editing}
         onLayoutChange={handleChange}
         draggableCancel="button"
+        isDroppable={editing}
+        droppingItem={
+          droppingType
+            ? {
+                i: '__dropping__',
+                w: WIDGET_REGISTRY[droppingType].defaultSize.w,
+                h: WIDGET_REGISTRY[droppingType].defaultSize.h,
+              }
+            : undefined
+        }
+        onDrop={(_layout, item) => {
+          if (item) onDropWidget?.({ x: item.x, y: item.y })
+        }}
       >
         {layout.widgets.map((w) => (
           <div key={w.id}>

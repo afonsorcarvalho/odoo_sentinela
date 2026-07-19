@@ -7,10 +7,16 @@ import type { DashboardLayout, WidgetInstance, WidgetType } from '../lib/layout/
 
 export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; onExit: () => void }) {
   const [draft, setDraft] = useState<DashboardLayout>(layout)
+  const [droppingType, setDroppingType] = useState<WidgetType | null>(null)
   const save = useSaveLayout()
 
   function addWidget(type: WidgetType) {
     setDraft((d) => ({ ...d, widgets: [...d.widgets, newWidget(type, d.widgets)] }))
+  }
+  function dropWidget(pos: { x: number; y: number }) {
+    if (!droppingType) return
+    setDraft((d) => ({ ...d, widgets: [...d.widgets, newWidget(droppingType, d.widgets, pos)] }))
+    setDroppingType(null)
   }
   function removeWidget(id: string) {
     setDraft((d) => ({ ...d, widgets: d.widgets.filter((w) => w.id !== id) }))
@@ -22,7 +28,7 @@ export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; o
   return (
     <div>
       <div className="mb-3 flex items-center gap-3">
-        <WidgetPalette onAdd={addWidget} />
+        <WidgetPalette onAdd={addWidget} onDragStartType={setDroppingType} />
         <div className="ml-auto flex gap-2">
           <button
             type="button"
@@ -43,6 +49,8 @@ export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; o
         onLayoutChange={setDraft}
         onWidgetChange={updateWidget}
         onRemove={removeWidget}
+        droppingType={droppingType}
+        onDropWidget={dropWidget}
       />
     </div>
   )

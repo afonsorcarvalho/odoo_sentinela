@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useSensorMeta, useThreshold, useHistory, useSensors, useThresholds, useAlarms, useConfig } from './queries'
+import { useSensorMeta, useThreshold, useHistory, useSensors, useThresholds, useAlarms, useConfig, useSaveLayout } from './queries'
 import type { ReactNode } from 'react'
 
 function wrapper() {
@@ -56,5 +56,12 @@ describe('queries', () => {
     const { result } = renderHook(() => useConfig(), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.carousel_interval_ms).toBe(4000)
+  })
+
+  it('useSaveLayout chama saveLayout e resolve', async () => {
+    const layout = { version: 1 as const, grid: { cols: 12, rowHeight: 40, margin: [8, 8] as [number, number] }, widgets: [] }
+    const { result } = renderHook(() => useSaveLayout(), { wrapper: wrapper() })
+    result.current.mutate(layout)
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
   })
 })

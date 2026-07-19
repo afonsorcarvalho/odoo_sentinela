@@ -53,6 +53,8 @@ def test_limpar_backfill_remove_so_o_range_do_backfill_preserva_fora_dele():
         assert restantes == 1  # so' a leitura 'fora' (ultima 1h) sobrevive
     finally:
         _limpar_todos_sensores(conn)
+        # Refresh aggregates to clear any materialized rows from the continuous aggregate
+        backfill_demo.refrescar_agregados(conn, dias=30, agora=agora)
         conn.close()
 
 
@@ -82,4 +84,7 @@ def test_refrescar_agregados_materializa_bucket_horario_para_o_range_do_backfill
         assert resultado is not None and resultado[0] == 21.5
     finally:
         _limpar_todos_sensores(conn)
+        # Refresh aggregates to clear any materialized rows from the continuous aggregate
+        # (reading was 5 days old, so dias=7 safely covers that range)
+        backfill_demo.refrescar_agregados(conn, dias=7, agora=agora)
         conn.close()

@@ -95,7 +95,7 @@ export function DashboardGrid({ layout, editing, onLayoutChange, onConfigure, on
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className={`relative${editing ? ' dashboard-grid-editing' : ''}`}>
       {editing && <EditGridOverlay grid={layout.grid} width={width} />}
       <ResponsiveGridLayout
         className="layout"

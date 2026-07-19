@@ -60,3 +60,18 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+
+/* Handle de resize: SVG default é escuro e some no tema dark. Realçamos com
+   a cor de linha do tema e aumentamos o grip + área de clique. */
+.dashboard-grid-editing .react-resizable-handle::after {
+  width: 8px;
+  height: 8px;
+  right: 4px;
+  bottom: 4px;
+  border-right: 2px solid var(--color-line-strong);
+  border-bottom: 2px solid var(--color-line-strong);
+}
+
+.dashboard-grid-editing .react-resizable-handle:hover::after {
+  border-color: var(--color-primary);
+}

@@ -42,7 +42,12 @@ export function buildChartOption(
   const markArea = threshold
     ? {
         itemStyle: { color: goodSoftColor, opacity: 0.5 },
-        data: [[{ yAxis: threshold.limite_min }, { yAxis: threshold.limite_max }]],
+        // markArea 2D espera pares [inicio, fim]; tipar como tupla p/ o TS não
+        // inferir array de tamanho variável (MarkArea2DDataItemOption exige 2).
+        data: [[{ yAxis: threshold.limite_min }, { yAxis: threshold.limite_max }]] as [
+          { yAxis: number },
+          { yAxis: number },
+        ][],
       }
     : undefined
 

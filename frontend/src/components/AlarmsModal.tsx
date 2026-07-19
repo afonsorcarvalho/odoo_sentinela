@@ -90,7 +90,7 @@ export function AlarmsModal({ alarms, onClose }: { alarms: AlarmEvent[]; onClose
             Nenhum alarme encontrado.
           </p>
         ) : (
-          <ul className="space-y-2 overflow-y-auto">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto">
             {filtrados.map((a) => (
               <AlarmItem key={a.id} alarm={a} />
             ))}

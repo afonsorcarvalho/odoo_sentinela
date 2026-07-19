@@ -9,6 +9,12 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from . import registro_coletores
 
+HEADER_KEYS = {
+    'schema_version', 'tipo_arquivo', 'coletor_id', 'hub_id',
+    'coletor_pubkey_fingerprint', 'data_referencia', 'timezone_offset',
+    'firmware_version', 'dia_anterior_hash_final',
+}
+
 
 @dataclass
 class ResultadoValidacao:
@@ -19,7 +25,9 @@ class ResultadoValidacao:
     data_referencia: str = None
     hash_final: str = None
     assinatura: str = None
+    tipo_arquivo: str = None
     leituras: list = field(default_factory=list)
+    eventos: list = field(default_factory=list)
 
 
 def _parse_bloco_metadados(linhas):
@@ -32,13 +40,20 @@ def _parse_bloco_metadados(linhas):
     return metadados
 
 
+def _eh_linha_cabecalho(linha):
+    if not linha.startswith('#'):
+        return False
+    chave, _, _ = linha[2:].partition(':')
+    return chave.strip() in HEADER_KEYS
+
+
 def parse_arquivo(texto):
     linhas = texto.split('\n')
     if linhas and linhas[-1] == '':
         linhas = linhas[:-1]
     idx = 0
     linhas_cabecalho = []
-    while idx < len(linhas) and linhas[idx].startswith('#'):
+    while idx < len(linhas) and _eh_linha_cabecalho(linhas[idx]):
         linhas_cabecalho.append(linhas[idx])
         idx += 1
     linhas_corpo = []
@@ -72,6 +87,27 @@ def parse_linha_leitura(linha):
     }
 
 
+def parse_linha_alarme(linha):
+    campos = linha.split('|')
+    (seq, timestamp, sensor_id, area_id, tipo_medida, tipo_evento, tipo_violacao,
+     valor, limite_min_vigente, limite_max_vigente, hash_linha) = campos
+    linha_sem_hash = '|'.join(campos[:-1])
+    return {
+        'seq': int(seq),
+        'timestamp': timestamp,
+        'sensor_id': sensor_id,
+        'area_id': area_id,
+        'tipo_medida': tipo_medida,
+        'tipo_evento': tipo_evento,
+        'tipo_violacao': tipo_violacao,
+        'valor': float(valor),
+        'limite_min_vigente': None if limite_min_vigente == '—' else float(limite_min_vigente),
+        'limite_max_vigente': None if limite_max_vigente == '—' else float(limite_max_vigente),
+        'hash': hash_linha,
+        'linha_sem_hash': linha_sem_hash,
+    }
+
+
 def _hash_seed(cabecalho_canonico):
     return hashlib.sha256(cabecalho_canonico.encode()).hexdigest()
 
@@ -85,6 +121,7 @@ def validar_arquivo(caminho, registro_path):
     metadados_cab, cabecalho_canonico, linhas_corpo, metadados_rod = parse_arquivo(texto)
     coletor_id = metadados_cab.get('coletor_id')
     data_referencia = metadados_cab.get('data_referencia')
+    tipo_arquivo = metadados_cab.get('tipo_arquivo')
     hash_final_declarado = metadados_rod.get('hash_final')
     assinatura_declarada = metadados_rod.get('assinatura')
     total_linhas = len(linhas_corpo)
@@ -98,17 +135,20 @@ def validar_arquivo(caminho, registro_path):
             data_referencia=data_referencia,
             hash_final=hash_final_declarado,
             assinatura=assinatura_declarada,
+            tipo_arquivo=tipo_arquivo,
         )
 
+    parse_linha = parse_linha_alarme if tipo_arquivo == 'alarmes' else parse_linha_leitura
+
     hash_atual = _hash_seed(cabecalho_canonico)
-    leituras = []
+    linhas_parseadas = []
     for linha in linhas_corpo:
-        parsed = parse_linha_leitura(linha)
+        parsed = parse_linha(linha)
         hash_esperado = _hash_linha(hash_atual, parsed['linha_sem_hash'])
         if hash_esperado != parsed['hash']:
             return _invalido(f"cadeia de hash quebrada na linha seq={parsed['seq']}")
         hash_atual = hash_esperado
-        leituras.append(parsed)
+        linhas_parseadas.append(parsed)
 
     if hash_atual != hash_final_declarado:
         return _invalido('hash_final do rodapé não bate com a cadeia recalculada')
@@ -124,7 +164,7 @@ def validar_arquivo(caminho, registro_path):
     except InvalidSignature:
         return _invalido('assinatura inválida')
 
-    return ResultadoValidacao(
+    resultado = ResultadoValidacao(
         status_validacao='valido',
         motivo_rejeicao=None,
         total_linhas=total_linhas,
@@ -132,5 +172,10 @@ def validar_arquivo(caminho, registro_path):
         data_referencia=data_referencia,
         hash_final=hash_final_declarado,
         assinatura=assinatura_declarada,
-        leituras=leituras,
+        tipo_arquivo=tipo_arquivo,
     )
+    if tipo_arquivo == 'alarmes':
+        resultado.eventos = linhas_parseadas
+    else:
+        resultado.leituras = linhas_parseadas
+    return resultado

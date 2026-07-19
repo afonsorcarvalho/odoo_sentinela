@@ -4,7 +4,13 @@ import type { AlarmEvent } from '../lib/types'
 
 const AUTO_DISMISS_MS = 6000
 
-export function ToastContainer({ alarms, loaded }: { alarms: AlarmEvent[]; loaded: boolean }) {
+export function ToastContainer({
+  alarms, areaNameByCode, loaded,
+}: {
+  alarms: AlarmEvent[]
+  areaNameByCode: Record<string, string>
+  loaded: boolean
+}) {
   const [visible, setVisible] = useState<AlarmEvent[]>([])
   const seenIds = useRef<Set<number> | null>(null)
   const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
@@ -57,7 +63,7 @@ export function ToastContainer({ alarms, loaded }: { alarms: AlarmEvent[]; loade
   return (
     <div className="fixed right-6 top-[70px] z-20 flex flex-col gap-2.5" aria-live="polite">
       {visible.map((a) => (
-        <Toast key={a.id} alarm={a} onClose={() => dismiss(a.id)} />
+        <Toast key={a.id} alarm={a} areaName={areaNameByCode[a.area_code] ?? a.area_code} onClose={() => dismiss(a.id)} />
       ))}
     </div>
   )

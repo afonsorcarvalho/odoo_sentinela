@@ -5,9 +5,11 @@ export const VISIBLE_LIMIT = 8
 
 export function AlarmPanel({
   alarms,
+  areaNameByCode,
   onVerMais,
 }: {
   alarms: AlarmEvent[]
+  areaNameByCode: Record<string, string>
   onVerMais?: () => void
 }) {
   const ativos = alarms.filter((a) => a.status !== 'resolvido').length
@@ -46,7 +48,7 @@ export function AlarmPanel({
         <>
           <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
             {visiveis.map((a) => (
-              <AlarmItem key={a.id} alarm={a} />
+              <AlarmItem key={a.id} alarm={a} areaName={areaNameByCode[a.area_code] ?? a.area_code} />
             ))}
           </ul>
           {restantes > 0 && onVerMais && (

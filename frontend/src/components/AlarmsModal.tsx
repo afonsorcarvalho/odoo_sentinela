@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { AlarmItem } from './AlarmItem'
 import type { AlarmEvent } from '../lib/types'
 
-function matchesQuery(alarm: AlarmEvent, query: string): boolean {
+function matchesQuery(alarm: AlarmEvent, query: string, areaName: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
-  return alarm.sensor_code.toLowerCase().includes(q) || alarm.area.name.toLowerCase().includes(q)
+  return alarm.sensor_code.toLowerCase().includes(q) || areaName.toLowerCase().includes(q)
 }
 
-function localDateString(iso: string): string {
-  const d = new Date(iso)
+function localDateString(ts: number): string {
+  const d = new Date(ts)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
@@ -19,7 +19,13 @@ function matchesDate(alarm: AlarmEvent, date: string): boolean {
   return localDateString(alarm.timestamp_deteccao) === date
 }
 
-export function AlarmsModal({ alarms, onClose }: { alarms: AlarmEvent[]; onClose: () => void }) {
+export function AlarmsModal({
+  alarms, areaNameByCode, onClose,
+}: {
+  alarms: AlarmEvent[]
+  areaNameByCode: Record<string, string>
+  onClose: () => void
+}) {
   const [query, setQuery] = useState('')
   const [date, setDate] = useState('')
 
@@ -31,7 +37,9 @@ export function AlarmsModal({ alarms, onClose }: { alarms: AlarmEvent[]; onClose
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
-  const filtrados = alarms.filter((a) => matchesQuery(a, query) && matchesDate(a, date))
+  const filtrados = alarms.filter((a) =>
+    matchesQuery(a, query, areaNameByCode[a.area_code] ?? a.area_code) && matchesDate(a, date),
+  )
 
   return (
     <div
@@ -92,7 +100,7 @@ export function AlarmsModal({ alarms, onClose }: { alarms: AlarmEvent[]; onClose
         ) : (
           <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto">
             {filtrados.map((a) => (
-              <AlarmItem key={a.id} alarm={a} />
+              <AlarmItem key={a.id} alarm={a} areaName={areaNameByCode[a.area_code] ?? a.area_code} />
             ))}
           </ul>
         )}

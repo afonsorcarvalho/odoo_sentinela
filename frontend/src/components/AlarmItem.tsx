@@ -11,13 +11,19 @@ const BORDER_COLOR: Record<AlarmEvent['status'], string> = {
   resolvido: 'var(--color-good)',
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso)
+function formatTime(ts: number): string {
+  const d = new Date(ts)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-export function AlarmItem({ alarm }: { alarm: AlarmEvent }) {
+function formatDataResolucao(ts: number): string {
+  const d = new Date(ts)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+export function AlarmItem({ alarm, areaName }: { alarm: AlarmEvent; areaName: string }) {
   return (
     <li
       className="rounded-md p-3"
@@ -28,11 +34,26 @@ export function AlarmItem({ alarm }: { alarm: AlarmEvent }) {
         <span className="font-mono" style={{ color: 'var(--color-muted)' }}>{formatTime(alarm.timestamp_deteccao)}</span>
       </div>
       <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--color-ink)' }}>
-        {alarm.area.name} · {alarm.sensor_code}
+        {areaName} · {alarm.sensor_code}
       </p>
       <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--color-muted)' }}>
-        Valor lido {alarm.valor_lido ?? '—'} (limite {alarm.limite_configurado_snapshot ?? '—'})
+        Valor lido {alarm.valor_lido} (limite {alarm.limite_configurado_snapshot})
       </p>
+      {alarm.timestamp_resolucao_sensor && (
+        <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>
+          Sensor normalizado às {formatTime(alarm.timestamp_resolucao_sensor)}
+        </p>
+      )}
+      {alarm.status === 'resolvido' && alarm.usuario_responsavel && alarm.data_resolucao && (
+        <p className="mt-0.5 text-xs" style={{ color: 'var(--color-muted)' }}>
+          Resolvido por {alarm.usuario_responsavel} em {formatDataResolucao(alarm.data_resolucao)}
+        </p>
+      )}
+      {alarm.observacoes && (
+        <p className="mt-0.5 text-xs italic" style={{ color: 'var(--color-muted)' }}>
+          "{alarm.observacoes}"
+        </p>
+      )}
     </li>
   )
 }

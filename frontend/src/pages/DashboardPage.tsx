@@ -17,8 +17,10 @@ import type { Window, AlarmEvent } from '../lib/types'
 
 const UNIT_NAME = import.meta.env.VITE_UNIT_NAME ?? 'Unidade não configurada'
 
-function isToday(iso: string): boolean {
-  return iso.slice(0, 10) === new Date().toISOString().slice(0, 10)
+function isToday(ts: number): boolean {
+  const d = new Date(ts)
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
 }
 
 export function DashboardPage() {
@@ -35,6 +37,7 @@ export function DashboardPage() {
   const thresholdsByCode = Object.fromEntries(codes.map((c, i) => [c, thresholdResults[i]?.data]))
   const liveByCode = useLiveStatuses(codes)
   const groups = groupSensorsByArea(sensors)
+  const areaNameByCode = Object.fromEntries(sensors.map((s) => [s.area.area_code, s.area.name]))
   const alarmsQuery = useAlarms()
   const alarms = alarmsQuery.data ?? []
 
@@ -60,10 +63,11 @@ export function DashboardPage() {
   function simulateAlarm() {
     setSimulating(true)
     const fake: AlarmEvent = {
-      id: Date.now(), sensor_code: 'PRESS-EXP-01', area: { area_code: 'EXPURGO', name: 'Expurgo' },
+      id: Date.now(), sensor_code: 'PRESS-EXP-01', area_code: 'EXPURGO',
       tipo_violacao: 'abaixo_limite', status: 'aberto',
-      timestamp_deteccao: new Date().toISOString(),
-      valor_lido: -1.7, limite_configurado_snapshot: -2.5, data_resolucao: null,
+      timestamp_deteccao: Date.now(), timestamp_resolucao_sensor: null,
+      valor_lido: -1.7, limite_configurado_snapshot: -2.5,
+      usuario_responsavel: null, data_resolucao: null, observacoes: null,
     }
     queryClient.setQueryData<AlarmEvent[]>(['alarms'], (old) => [fake, ...(old ?? [])])
   }
@@ -79,7 +83,7 @@ export function DashboardPage() {
   return (
     <div>
       <Topbar healthy={healthy} unitName={UNIT_NAME} />
-      <ToastContainer alarms={alarms} loaded={!alarmsQuery.isLoading} />
+      <ToastContainer alarms={alarms} areaNameByCode={areaNameByCode} loaded={!alarmsQuery.isLoading} />
       {isDemoMode() && <DemoBanner simulating={simulating} onSimulate={simulateAlarm} onReset={resetDemo} />}
 
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
@@ -101,7 +105,7 @@ export function DashboardPage() {
                     liveByCode={liveByCode}
                     selectedSensorCode={selectedCode}
                     onSelectSensor={selectSensor}
-                    hadAlarmToday={alarms.some((a) => a.area.area_code === g.area.area_code && isToday(a.timestamp_deteccao))}
+                    hadAlarmToday={alarms.some((a) => a.area_code === g.area.area_code && isToday(a.timestamp_deteccao))}
                   />
                 ))}
               </div>
@@ -126,11 +130,11 @@ export function DashboardPage() {
             )}
           </div>
 
-          <AlarmPanel alarms={alarms} onVerMais={() => setAlarmsModalOpen(true)} />
+          <AlarmPanel alarms={alarms} areaNameByCode={areaNameByCode} onVerMais={() => setAlarmsModalOpen(true)} />
         </div>
       </div>
 
-      {alarmsModalOpen && <AlarmsModal alarms={alarms} onClose={() => setAlarmsModalOpen(false)} />}
+      {alarmsModalOpen && <AlarmsModal alarms={alarms} areaNameByCode={areaNameByCode} onClose={() => setAlarmsModalOpen(false)} />}
     </div>
   )
 }

@@ -1,9 +1,9 @@
 import type { AlarmEvent } from '../lib/types'
 
-export function Toast({ alarm, onClose }: { alarm: AlarmEvent; onClose: () => void }) {
+export function Toast({ alarm, areaName, onClose }: { alarm: AlarmEvent; areaName: string; onClose: () => void }) {
   const isResolucao = alarm.status === 'resolvido'
   const color = isResolucao ? 'var(--color-good)' : 'var(--color-crit)'
-  const titulo = isResolucao ? `Normalização — ${alarm.area.name}` : `Não conformidade — ${alarm.area.name}`
+  const titulo = isResolucao ? `Normalização — ${areaName}` : `Não conformidade — ${areaName}`
 
   return (
     <div

@@ -30,13 +30,16 @@ function makeAlarms(count: number): AlarmEvent[] {
   return Array.from({ length: count }, (_, i) => ({
     id: 1000 + i,
     sensor_code: `TEMP-PRE-0${i + 1}`,
-    area: { area_code: 'PREPARO', name: 'Preparo' },
+    area_code: 'PREPARO',
     tipo_violacao: 'acima_limite',
     status: 'aberto',
-    timestamp_deteccao: new Date(1_700_000_000_000 - i * 60_000).toISOString(),
+    timestamp_deteccao: 1_700_000_000_000 - i * 60_000,
+    timestamp_resolucao_sensor: null,
     valor_lido: 24 + i,
     limite_configurado_snapshot: 23,
+    usuario_responsavel: null,
     data_resolucao: null,
+    observacoes: null,
   }))
 }
 

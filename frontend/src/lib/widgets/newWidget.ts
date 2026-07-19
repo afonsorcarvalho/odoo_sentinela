@@ -3,10 +3,9 @@ import { WIDGET_REGISTRY } from './registry'
 
 export function newWidget(type: WidgetType, existing: WidgetInstance[]): WidgetInstance {
   const desc = WIDGET_REGISTRY[type]
-  const n = existing.filter((w) => w.type === type).length + 1
   const maxY = existing.reduce((m, w) => Math.max(m, w.layout.y + w.layout.h), 0)
   return {
-    id: `${type}-${n}-${maxY}`,
+    id: `${type}-${crypto.randomUUID().slice(0, 8)}`,
     type,
     layout: {
       x: 0,

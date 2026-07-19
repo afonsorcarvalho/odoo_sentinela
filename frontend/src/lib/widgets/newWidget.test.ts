@@ -16,4 +16,10 @@ describe('newWidget', () => {
     const w2 = newWidget('kpi', [w1])
     expect(w1.id).not.toBe(w2.id)
   })
+  it('alarms recebe options scope site', () => {
+    expect(newWidget('alarms', []).options).toEqual({ scope: 'site' })
+  })
+  it('não-alarms recebe options vazio', () => {
+    expect(newWidget('kpi', []).options).toEqual({})
+  })
 })

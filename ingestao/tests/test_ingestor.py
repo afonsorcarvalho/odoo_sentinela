@@ -195,6 +195,57 @@ def test_ingerir_arquivo_alarme_sem_eventos_grava_ledger(tmp_path):
         _limpar_ledger(cliente, info_coletor['id'], data.isoformat(), tipo_arquivo='alarmes')
 
 
+def test_ingerir_arquivo_alarme_sensor_desconhecido_grava_ledger_invalido(tmp_path):
+    cliente = _cliente_odoo()
+    provisionar_odoo_sim.provisionar(cliente)
+    info_coletor = odoo_cliente.resolver_coletor(cliente, provisionar_odoo_sim.COLETOR_CODE)
+    sensor_code_original = gerador_simulado.SENSORES[1]['sensor_id']
+    assert sensor_code_original == 'SNR-SIM-PRES-01'
+    info_sensor = odoo_cliente.resolver_sensor(cliente, sensor_code_original)
+    data = date(2026, 7, 26)
+
+    chave_path = tmp_path / 'chave.pem'
+    output_dir = gerador_simulado.gerar_dia(
+        data, tmp_path / 'output', injetar_alarme=True, chave_path=chave_path,
+    )
+    registro_path = tmp_path / 'registro.json'
+    registro_coletores.registrar_a_partir_de_chave_privada(registro_path, chave_path, gerador_simulado.COLETOR_ID)
+    caminho_arquivo = output_dir / f"{gerador_simulado.COLETOR_ID}_alarmes_{data.isoformat()}.txt"
+
+    sensor_code_temporario = 'SNR-SIM-PRES-01-RENOMEADO-TESTE'
+    _limpar_ledger(cliente, info_coletor['id'], data.isoformat(), tipo_arquivo='alarmes')
+    odoo_cliente.executar(
+        cliente, 'sensor_monitor.sensor', 'write', [info_sensor['id']], {'sensor_code': sensor_code_temporario},
+    )
+    try:
+        resultado = ingestor.ingerir_arquivo(caminho_arquivo, registro_path, DSN, cliente)
+        assert resultado.status_validacao == 'invalido'
+        assert sensor_code_original in resultado.motivo_rejeicao
+        assert resultado.total_gravado == 0
+
+        ledgers = odoo_cliente.executar(
+            cliente, 'sensor_monitor.file.ledger', 'search_read',
+            [
+                ('coletor_id', '=', info_coletor['id']),
+                ('data_referencia', '=', data.isoformat()),
+                ('tipo_arquivo', '=', 'alarmes'),
+            ],
+            fields=['status_validacao', 'motivo_rejeicao', 'total_linhas'],
+        )
+        assert len(ledgers) == 1
+        assert ledgers[0]['status_validacao'] == 'invalido'
+        assert sensor_code_original in ledgers[0]['motivo_rejeicao']
+        assert ledgers[0]['total_linhas'] == 2
+    finally:
+        odoo_cliente.executar(
+            cliente, 'sensor_monitor.sensor', 'write', [info_sensor['id']], {'sensor_code': sensor_code_original},
+        )
+        restaurado = odoo_cliente.resolver_sensor(cliente, sensor_code_original)
+        assert restaurado['id'] == info_sensor['id']
+        _limpar_ledger(cliente, info_coletor['id'], data.isoformat(), tipo_arquivo='alarmes')
+        _limpar_alarm_events(cliente, info_sensor['id'])
+
+
 def test_ingerir_arquivo_alarme_com_par_cria_e_resolve_alarm_event(tmp_path):
     cliente = _cliente_odoo()
     provisionar_odoo_sim.provisionar(cliente)

@@ -52,24 +52,31 @@ def ingerir_arquivo(caminho, registro_path, dsn, cliente_odoo):
             total_gravado=0,
         )
 
+    status_validacao = resultado_validacao.status_validacao
+    motivo_rejeicao = resultado_validacao.motivo_rejeicao
     total_gravado = 0
     eventos_orfaos = 0
-    if resultado_validacao.status_validacao == 'valido':
+    if status_validacao == 'valido':
         if resultado_validacao.tipo_arquivo == 'alarmes':
-            eventos_orfaos = _processar_alarmes(cliente_odoo, info_coletor, resultado_validacao)
-            total_gravado = len(resultado_validacao.eventos)
+            try:
+                eventos_orfaos = _processar_alarmes(cliente_odoo, info_coletor, resultado_validacao)
+                total_gravado = len(resultado_validacao.eventos)
+            except ValueError as exc:
+                status_validacao = 'invalido'
+                motivo_rejeicao = str(exc)
+                total_gravado = 0
         else:
             total_gravado = _processar_leituras(dsn, info_coletor, resultado_validacao)
 
     odoo_cliente.escrever_ledger(
         cliente_odoo, info_coletor['id'], resultado_validacao.tipo_arquivo, resultado_validacao.data_referencia,
-        resultado_validacao.status_validacao, resultado_validacao.motivo_rejeicao,
+        status_validacao, motivo_rejeicao,
         resultado_validacao.total_linhas, resultado_validacao.hash_final, resultado_validacao.assinatura,
     )
 
     return ResultadoIngestao(
-        status_validacao=resultado_validacao.status_validacao,
-        motivo_rejeicao=resultado_validacao.motivo_rejeicao,
+        status_validacao=status_validacao,
+        motivo_rejeicao=motivo_rejeicao,
         total_linhas=resultado_validacao.total_linhas,
         total_gravado=total_gravado,
         eventos_orfaos=eventos_orfaos,

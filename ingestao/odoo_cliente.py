@@ -1,5 +1,5 @@
 import xmlrpc.client
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class ClienteOdoo:
@@ -71,3 +71,58 @@ def escrever_ledger(cliente, coletor_odoo_id, tipo_arquivo, data_referencia, sta
         executar(cliente, 'sensor_monitor.file.ledger', 'write', existentes, valores)
         return existentes[0]
     return executar(cliente, 'sensor_monitor.file.ledger', 'create', valores)
+
+
+def _timestamp_arquivo_para_utc(timestamp_iso):
+    dt = datetime.fromisoformat(timestamp_iso)
+    return dt.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+
+def resolver_sensor(cliente, sensor_code):
+    sensores = executar(
+        cliente, 'sensor_monitor.sensor', 'search_read',
+        [('sensor_code', '=', sensor_code)], fields=['id', 'area_id'],
+    )
+    if not sensores:
+        raise ValueError(f"sensor '{sensor_code}' não encontrado no Odoo")
+    sensor = sensores[0]
+    return {'id': sensor['id'], 'area_id': sensor['area_id'][0]}
+
+
+def processar_entrada_alarme(cliente, evento, sensor_odoo_id, area_odoo_id, coletor_odoo_id, hash_arquivo):
+    if evento['tipo_violacao'] == 'acima_limite':
+        limite_snapshot = evento['limite_max_vigente']
+    elif evento['tipo_violacao'] == 'abaixo_limite':
+        limite_snapshot = evento['limite_min_vigente']
+    else:
+        limite_snapshot = None
+    valores = {
+        'sensor_id': sensor_odoo_id,
+        'area_id': area_odoo_id,
+        'coletor_id': coletor_odoo_id,
+        'timestamp_deteccao': _timestamp_arquivo_para_utc(evento['timestamp']),
+        'valor_lido': evento['valor'],
+        'tipo_violacao': evento['tipo_violacao'],
+        'limite_configurado_snapshot': limite_snapshot if limite_snapshot is not None else 0.0,
+        'origem_arquivo_hash': hash_arquivo or False,
+        'status': 'aberto',
+    }
+    return executar(cliente, 'sensor_monitor.alarm.event', 'create', valores)
+
+
+def processar_saida_alarme(cliente, evento, sensor_odoo_id):
+    abertos = executar(
+        cliente, 'sensor_monitor.alarm.event', 'search',
+        [
+            ('sensor_id', '=', sensor_odoo_id),
+            ('timestamp_resolucao_sensor', '=', False),
+        ],
+        order='timestamp_deteccao desc', limit=1,
+    )
+    if not abertos:
+        return None
+    executar(
+        cliente, 'sensor_monitor.alarm.event', 'write', abertos,
+        {'timestamp_resolucao_sensor': _timestamp_arquivo_para_utc(evento['timestamp'])},
+    )
+    return abertos[0]

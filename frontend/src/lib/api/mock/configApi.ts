@@ -1,4 +1,8 @@
 import type { ConfigApi } from '../contracts'
+import type { DashboardLayout } from '../../layout/schema'
+
+// Estado em memória: prova o round-trip save→get no modo mock.
+let _layout: DashboardLayout | null = null
 
 export const mockConfigApi: ConfigApi = {
   async getConfig() {
@@ -6,6 +10,10 @@ export const mockConfigApi: ConfigApi = {
     // DashboardPage.tsx e do default do AreaCard: prova que o valor flui
     // do mock/API ate o componente renderizado, e nao e uma coincidencia
     // mascarada pelo `?? 3000`.
-    return { carousel_interval_ms: 4000 }
+    return { carousel_interval_ms: 4000, layout: _layout }
+  },
+  async saveLayout(layout: DashboardLayout) {
+    _layout = layout
+    return { layout }
   },
 }

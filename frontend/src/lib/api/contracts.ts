@@ -1,4 +1,5 @@
 import type { SensorMeta, Threshold, HistoryResponse, LivePoint, Window, AlarmEvent, DashboardConfig } from '../types'
+import type { DashboardLayout } from '../layout/schema'
 
 export type MetaApi = {
   getSensor(code: string): Promise<SensorMeta>
@@ -20,4 +21,5 @@ export type AlarmApi = {
 }
 export type ConfigApi = {
   getConfig(): Promise<DashboardConfig>
+  saveLayout(layout: DashboardLayout): Promise<{ layout: DashboardLayout }>
 }

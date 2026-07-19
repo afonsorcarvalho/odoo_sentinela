@@ -8,7 +8,6 @@ import { defaultLayout } from '../lib/layout/defaultLayout'
 import { DashboardGrid } from '../components/DashboardGrid'
 import { DashboardEditor } from '../components/DashboardEditor'
 import { Topbar } from '../components/Topbar'
-import { AlarmsModal } from '../components/AlarmsModal'
 import { ToastContainer } from '../components/ToastContainer'
 import { DemoBanner } from '../components/DemoBanner'
 import { isDemoMode } from '../lib/demoMode'
@@ -21,12 +20,11 @@ export function DashboardPage() {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [simulating, setSimulating] = useState(false)
-  const [alarmsModalOpen, setAlarmsModalOpen] = useState(false)
 
   const sensorsQuery = useSensors()
   const configQuery = useConfig()
   const sensors = sensorsQuery.data ?? []
-  const groups = groupSensorsByArea(sensors)
+  const groups = useMemo(() => groupSensorsByArea(sensors), [sensors])
   const areaNameByCode = Object.fromEntries(sensors.map((s) => [s.area.area_code, s.area.name]))
   const alarmsQuery = useAlarms()
   const alarms = alarmsQuery.data ?? []
@@ -86,10 +84,6 @@ export function DashboardPage() {
           <DashboardGrid layout={layout} editing={false} />
         )}
       </div>
-
-      {alarmsModalOpen && (
-        <AlarmsModal alarms={alarms} areaNameByCode={areaNameByCode} onClose={() => setAlarmsModalOpen(false)} />
-      )}
     </div>
   )
 }

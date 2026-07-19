@@ -9,7 +9,7 @@ export function WidgetFrame({ widget, editing, onConfigure, onRemove }: {
 }) {
   const descriptor = WIDGET_REGISTRY[widget.type]
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div data-testid="widget-frame" className="relative h-full w-full overflow-hidden">
       {editing && (
         <div className="absolute right-1 top-1 z-10 flex gap-1">
           <button type="button" onClick={onConfigure} aria-label="Configurar widget"

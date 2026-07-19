@@ -8,7 +8,7 @@ describe('computeStatus', () => {
   it('ok no centro da faixa', () => {
     const r = computeStatus(20, t)
     expect(r.state).toBe('ok')
-    expect(r.label).toBe('Dentro da faixa')
+    expect(r.label).toBe('OK')
     expect(r.position).toBeCloseTo(0.5, 5)
   })
   it('warn perto do limite superior', () => {
@@ -20,7 +20,7 @@ describe('computeStatus', () => {
   it('crit acima do maximo', () => {
     const r = computeStatus(23, t)
     expect(r.state).toBe('crit')
-    expect(r.label).toBe('Fora da faixa')
+    expect(r.label).toBe('Fora')
     expect(r.position).toBe(1) // clamp
   })
   it('crit abaixo do minimo', () => {

@@ -5,7 +5,7 @@ import { StatusChip } from './StatusChip'
 describe('StatusChip', () => {
   it('mostra o texto do estado (nao so cor)', () => {
     render(<StatusChip state="crit" />)
-    expect(screen.getByText('Fora da faixa')).toBeInTheDocument()
+    expect(screen.getByText('Fora')).toBeInTheDocument()
   })
 
   it('inclui um icone (svg) ao lado do texto', () => {

@@ -7,9 +7,9 @@ export type StatusResult = {
 }
 
 export const LABELS = {
-  ok: 'Dentro da faixa',
+  ok: 'OK',
   warn: 'Perto do limite',
-  crit: 'Fora da faixa',
+  crit: 'Fora',
   unknown: 'Sem limite',
 } as const
 

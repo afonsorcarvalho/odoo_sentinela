@@ -26,5 +26,5 @@ export function TimeSeriesChart({
     chart.current?.setOption(buildChartOption(history, threshold, critColor, goodSoftColor, tail), { notMerge: true })
   }, [history, threshold, critColor, goodSoftColor, tail, chart])
 
-  return <div ref={el} style={{ width: '100%', height: 320 }} />
+  return <div ref={el} style={{ width: '100%', height: '100%', minHeight: 160 }} />
 }

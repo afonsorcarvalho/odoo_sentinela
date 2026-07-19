@@ -9,7 +9,19 @@ export function useECharts() {
     chart.current = echarts.init(el.current)
     const onResize = () => chart.current?.resize()
     window.addEventListener('resize', onResize)
-    return () => { window.removeEventListener('resize', onResize); chart.current?.dispose(); chart.current = null }
+    // Resize da janela nao cobre o caso do card mudar de tamanho sozinho
+    // (drag/resize do react-grid-layout, ou mudanca de layout do dashboard) —
+    // sem isso o canvas do ECharts fica com o tamanho antigo (cortado/com
+    // espaco em branco) ate a proxima resize da window. ResizeObserver
+    // acompanha o elemento em si.
+    const ro = new ResizeObserver(onResize)
+    ro.observe(el.current)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      ro.disconnect()
+      chart.current?.dispose()
+      chart.current = null
+    }
   }, [])
   return { el, chart }
 }

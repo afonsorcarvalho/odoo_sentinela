@@ -28,7 +28,9 @@ export function KpiWidget({ sensorCode, label }: { sensorCode: string; label?: s
         {titulo}
       </p>
       <div className="flex items-baseline gap-1">
-        <span className="text-3xl font-bold tabular-nums" style={{ color: cor }}>
+        {/* Fonte fluida via container query: escala com a largura do card
+            (WidgetFrame e @container), nao da viewport. */}
+        <span className="font-bold tabular-nums text-[clamp(1.25rem,8cqw,2.25rem)]" style={{ color: cor }}>
           {last?.value ?? '—'}
         </span>
         <span className="text-sm" style={{ color: 'var(--color-muted)' }}>

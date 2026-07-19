@@ -13,3 +13,6 @@ __pycache__/
 ingestao/coletores_conhecidos.json
 .impeccable/
 .vscode/
+
+# Referências externas (não versionar)
+exemplos/

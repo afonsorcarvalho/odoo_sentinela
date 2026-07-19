@@ -22,4 +22,12 @@ describe('WidgetFrame edição', () => {
     // WidgetConfigPopover mostra o label do tipo no header
     expect(screen.getByText('KPI (valor único)')).toBeInTheDocument()
   })
+
+  it('fecha o popover ao pressionar Escape', async () => {
+    wrap(<WidgetFrame widget={w} editing onChange={vi.fn()} onRemove={vi.fn()} />)
+    await userEvent.click(screen.getByLabelText('Configurar widget'))
+    expect(screen.getByText('KPI (valor único)')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByText('KPI (valor único)')).toBeNull()
+  })
 })

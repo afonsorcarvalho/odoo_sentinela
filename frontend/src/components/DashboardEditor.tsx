@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { DashboardGrid } from './DashboardGrid'
 import { WidgetPalette } from './WidgetPalette'
-import { WidgetConfigPopover } from './WidgetConfigPopover'
 import { newWidget } from '../lib/widgets/newWidget'
 import { useSaveLayout } from '../lib/queries'
 import type { DashboardLayout, WidgetInstance, WidgetType } from '../lib/layout/schema'
 
 export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; onExit: () => void }) {
   const [draft, setDraft] = useState<DashboardLayout>(layout)
-  const [configuring, setConfiguring] = useState<string | null>(null)
   const save = useSaveLayout()
 
   function addWidget(type: WidgetType) {
@@ -20,8 +18,6 @@ export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; o
   function updateWidget(w: WidgetInstance) {
     setDraft((d) => ({ ...d, widgets: d.widgets.map((x) => (x.id === w.id ? w : x)) }))
   }
-
-  const configuringWidget = draft.widgets.find((w) => w.id === configuring) ?? null
 
   return (
     <div>
@@ -41,21 +37,11 @@ export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; o
         </div>
       </div>
 
-      {configuringWidget && (
-        <div className="mb-3">
-          <WidgetConfigPopover
-            widget={configuringWidget}
-            onChange={updateWidget}
-            onClose={() => setConfiguring(null)}
-          />
-        </div>
-      )}
-
       <DashboardGrid
         layout={draft}
         editing
         onLayoutChange={setDraft}
-        onConfigure={setConfiguring}
+        onWidgetChange={updateWidget}
         onRemove={removeWidget}
       />
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Responsive, WidthProvider, type Layout, type Layouts } from 'react-grid-layout'
-import type { DashboardLayout } from '../lib/layout/schema'
+import type { DashboardLayout, WidgetInstance } from '../lib/layout/schema'
 import { WidgetFrame } from './WidgetFrame'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
@@ -38,11 +38,11 @@ function EditGridOverlay({ grid, width }: {
   )
 }
 
-export function DashboardGrid({ layout, editing, onLayoutChange, onConfigure, onRemove }: {
+export function DashboardGrid({ layout, editing, onLayoutChange, onWidgetChange, onRemove }: {
   layout: DashboardLayout
   editing: boolean
   onLayoutChange?: (l: DashboardLayout) => void
-  onConfigure?: (id: string) => void
+  onWidgetChange?: (w: WidgetInstance) => void
   onRemove?: (id: string) => void
 }) {
   const rglLayout: Layout[] = layout.widgets.map((w) => ({
@@ -114,7 +114,7 @@ export function DashboardGrid({ layout, editing, onLayoutChange, onConfigure, on
             <WidgetFrame
               widget={w}
               editing={editing}
-              onConfigure={onConfigure ? () => onConfigure(w.id) : undefined}
+              onChange={onWidgetChange}
               onRemove={onRemove ? () => onRemove(w.id) : undefined}
             />
           </div>

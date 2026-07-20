@@ -42,4 +42,11 @@ export const mockLiveApi: LiveApi = {
     }, TICK_MS)
     return () => clearInterval(id)
   },
+
+  // Mock nao tem EventSource/rede: reporta 'live' uma vez na inscricao e
+  // nunca transiciona -- preserva o seam mock<->real (UI sempre agnostica).
+  subscribeConnection(cb) {
+    cb('live')
+    return () => {}
+  },
 }

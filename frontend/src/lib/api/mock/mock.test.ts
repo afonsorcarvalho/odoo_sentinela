@@ -104,4 +104,11 @@ describe('mockLiveApi', () => {
     unsub()
     expect([...states]).toEqual(['ok'])
   })
+
+  it('subscribeConnection emite "live" na inscricao e nunca muda (mock nao tem rede)', () => {
+    const states: string[] = []
+    const unsub = mockLiveApi.subscribeConnection((s) => states.push(s))
+    expect(states).toEqual(['live'])
+    unsub()
+  })
 })

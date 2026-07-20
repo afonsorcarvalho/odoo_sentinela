@@ -8,6 +8,11 @@ class MockEventSource {
   static instances: MockEventSource[] = []
   url: string
   onmessage: ((ev: { data: string }) => void) | null = null
+  onopen: (() => void) | null = null
+  onerror: (() => void) | null = null
+  // 1 = OPEN por padrao: os testes de demux/subscribe existentes nao exercitam
+  // onopen e tratam a conexao como ja estabelecida.
+  readyState = 1
   closed = false
   constructor(url: string) {
     this.url = url
@@ -34,6 +39,17 @@ function subscribe(code: string, cb: (p: LivePoint) => void) {
   return unsub
 }
 
+// Mesma logica do array `unsubs` acima, para a subscription paralela de
+// estado de conexao -- sem isto, listeners de um `it()' vazam pro proximo
+// (Vitest isola modulo por arquivo, nao por teste) e recebem transicoes de
+// testes que nao os criaram.
+let connectionUnsubs: Array<() => void> = []
+function subscribeConnection(cb: (s: string) => void) {
+  const unsub = realLiveApi.subscribeConnection(cb)
+  connectionUnsubs.push(unsub)
+  return unsub
+}
+
 beforeEach(() => {
   MockEventSource.instances = []
   vi.stubGlobal('EventSource', MockEventSource)
@@ -43,8 +59,11 @@ beforeEach(() => {
 afterEach(() => {
   unsubs.forEach((fn) => fn())
   unsubs = []
+  connectionUnsubs.forEach((fn) => fn())
+  connectionUnsubs = []
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+  vi.useRealTimers()
   localStorage.clear()
 })
 
@@ -147,5 +166,100 @@ describe('realLiveApi', () => {
     expect(() => unsubscribe()).not.toThrow()
     // Nao conta como inscrito "de verdade" pro reference-count: sozinho, unsubscribe fecha o ES
     // (mesmo ES ainda foi aberto pelo subscribe('') em si -- ver nota de implementacao no Step 3).
+  })
+})
+
+describe('realLiveApi estado de conexao (subscribeConnection)', () => {
+  it('onerror transitorio (readyState=CONNECTING) antes de 3s: sem transicao, segue live', () => {
+    vi.useFakeTimers()
+    subscribe('SNR-1', () => {})
+    const es = MockEventSource.instances[0]
+    const states: string[] = []
+    subscribeConnection((s) => states.push(s))
+
+    es.readyState = 0 // CONNECTING
+    es.onerror?.()
+    vi.advanceTimersByTime(2999)
+
+    expect(states).toEqual(['live'])
+  })
+
+  it('onerror transitorio que persiste alem de 3s: transita para reconnecting', () => {
+    vi.useFakeTimers()
+    subscribe('SNR-1', () => {})
+    const es = MockEventSource.instances[0]
+    const states: string[] = []
+    subscribeConnection((s) => states.push(s))
+
+    es.readyState = 0 // CONNECTING
+    es.onerror?.()
+    vi.advanceTimersByTime(3000)
+
+    expect(states).toEqual(['live', 'reconnecting'])
+  })
+
+  it('onopen durante o grace cancela o timer, permanece live (nao pisca)', () => {
+    vi.useFakeTimers()
+    subscribe('SNR-1', () => {})
+    const es = MockEventSource.instances[0]
+    const states: string[] = []
+    subscribeConnection((s) => states.push(s))
+
+    es.readyState = 0
+    es.onerror?.()
+    vi.advanceTimersByTime(1000)
+    es.readyState = 1
+    es.onopen?.()
+    vi.advanceTimersByTime(5000)
+
+    expect(states).toEqual(['live'])
+  })
+
+  it('onopen a partir de reconnecting: snap imediato para live, sem esperar grace', () => {
+    vi.useFakeTimers()
+    subscribe('SNR-1', () => {})
+    const es = MockEventSource.instances[0]
+    const states: string[] = []
+    subscribeConnection((s) => states.push(s))
+
+    es.readyState = 0
+    es.onerror?.()
+    vi.advanceTimersByTime(3000) // agora 'reconnecting'
+    es.readyState = 1
+    es.onopen?.()
+
+    expect(states).toEqual(['live', 'reconnecting', 'live'])
+  })
+
+  it('onerror com readyState=CLOSED (2): vai direto para offline, ignorando o grace', () => {
+    vi.useFakeTimers()
+    subscribe('SNR-1', () => {})
+    const es = MockEventSource.instances[0]
+    const states: string[] = []
+    subscribeConnection((s) => states.push(s))
+
+    es.readyState = 2 // CLOSED
+    es.onerror?.()
+
+    expect(states).toEqual(['live', 'offline'])
+  })
+
+  it('subscribeConnection emite o estado atual na inscricao e cada transicao; unsubscribe para de receber', () => {
+    vi.useFakeTimers()
+    subscribe('SNR-1', () => {})
+    const es = MockEventSource.instances[0]
+    const states: string[] = []
+    const unsub = subscribeConnection((s) => states.push(s))
+
+    expect(states).toEqual(['live'])
+
+    es.readyState = 2
+    es.onerror?.()
+    expect(states).toEqual(['live', 'offline'])
+
+    unsub()
+    es.readyState = 1
+    es.onopen?.()
+    expect(states).toEqual(['live', 'offline'])
   })
 })

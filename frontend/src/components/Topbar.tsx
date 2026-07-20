@@ -1,6 +1,18 @@
 import { ThemeToggle } from './ThemeToggle'
 import { LogoutButton } from './LogoutButton'
 import { LiveClock } from './LiveClock'
+import type { LiveConnectionState } from '../lib/types'
+
+// Mapeia estado de conexao -> apresentacao do badge. Topbar e apresentacional
+// (ver design doc A3): so traduz o LiveConnectionState recebido por prop, sem
+// logica de EventSource/timer aqui. `dotClassName` distingue os 3 estados no
+// ponto: live pulsa cheio; reconnecting pulsa mas opaco ("pulso lento/opaco"
+// no design doc); offline e estatico (sem animate-pulse), terminal.
+const LIVE_STATE_BADGE: Record<LiveConnectionState, { label: string; color: string; dotClassName: string }> = {
+  live: { label: 'AO VIVO', color: 'var(--color-good)', dotClassName: 'motion-safe:animate-pulse' },
+  reconnecting: { label: 'Reconectando…', color: 'var(--color-warn)', dotClassName: 'motion-safe:animate-pulse opacity-70' },
+  offline: { label: 'Sem conexão', color: 'var(--color-crit)', dotClassName: '' },
+}
 
 function ShieldIcon() {
   return (
@@ -11,7 +23,16 @@ function ShieldIcon() {
   )
 }
 
-export function Topbar({ healthy, unitName }: { healthy: boolean; unitName: string }) {
+export function Topbar({
+  healthy,
+  unitName,
+  liveState,
+}: {
+  healthy: boolean
+  unitName: string
+  liveState: LiveConnectionState
+}) {
+  const badge = LIVE_STATE_BADGE[liveState]
   return (
     <header
       className="sticky top-0 z-10 flex flex-wrap items-center gap-4 gap-y-2 px-6 py-3"
@@ -51,13 +72,18 @@ export function Topbar({ healthy, unitName }: { healthy: boolean; unitName: stri
 
         <LiveClock />
 
-        <span className="flex items-center gap-1.5 text-xs font-bold tracking-wide" style={{ color: 'var(--color-good)' }}>
+        <span
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-1.5 text-xs font-bold tracking-wide"
+          style={{ color: badge.color }}
+        >
           <span
             aria-hidden="true"
-            className="size-[9px] rounded-full motion-safe:animate-pulse"
-            style={{ background: 'var(--color-good)' }}
+            className={`size-[9px] rounded-full ${badge.dotClassName}`}
+            style={{ background: badge.color }}
           />
-          AO VIVO
+          {badge.label}
         </span>
 
         <ThemeToggle />

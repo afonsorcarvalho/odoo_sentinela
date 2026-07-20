@@ -43,6 +43,11 @@ export type LivePoint = {
   alarm_state: AlarmState
 }
 
+// Estado da conexao de dados ao vivo (EventSource), derivado exclusivamente
+// de onopen/onerror + readyState -- nunca de chegada/ausencia de dado (ver
+// design doc A3, "Fora de escopo": silencio de dados e normal neste backend).
+export type LiveConnectionState = 'live' | 'reconnecting' | 'offline'
+
 export type AlarmEventStatus = 'aberto' | 'reconhecido' | 'resolvido'
 export type AlarmTipoViolacao = 'acima_limite' | 'abaixo_limite' | 'sensor_offline' | 'erro_leitura'
 

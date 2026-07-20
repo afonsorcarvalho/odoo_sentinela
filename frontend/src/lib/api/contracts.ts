@@ -1,4 +1,4 @@
-import type { SensorMeta, Threshold, HistoryResponse, LivePoint, Window, AlarmEvent, DashboardConfig } from '../types'
+import type { SensorMeta, Threshold, HistoryResponse, LivePoint, Window, AlarmEvent, DashboardConfig, LiveConnectionState } from '../types'
 import type { DashboardLayout } from '../layout/schema'
 
 export type MetaApi = {
@@ -11,6 +11,10 @@ export type HistoryApi = {
 }
 export type LiveApi = {
   subscribe(code: string, cb: (p: LivePoint) => void): () => void
+  // Estado da conexao (transporte), agnostico de sensor. Emite o estado atual
+  // na inscricao e a cada transicao subsequente; mock reporta 'live' sempre
+  // (nao ha rede a monitorar) -- ver design doc A3.
+  subscribeConnection(cb: (s: LiveConnectionState) => void): () => void
 }
 
 export type AuthApi = {

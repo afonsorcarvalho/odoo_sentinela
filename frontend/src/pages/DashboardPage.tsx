@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSensors, useAlarms, useConfig } from '../lib/queries'
 import { groupSensorsByArea } from '../lib/aggregateStatus'
 import { useAuth } from '../lib/useAuth'
+import { useLiveConnection } from '../lib/useLiveConnection'
 import { parseLayout } from '../lib/layout/schema'
 import { defaultLayout } from '../lib/layout/defaultLayout'
 import { DashboardGrid } from '../components/DashboardGrid'
@@ -18,6 +19,7 @@ const UNIT_NAME = import.meta.env.VITE_UNIT_NAME ?? 'Unidade não configurada'
 export function DashboardPage() {
   const { isAdmin } = useAuth()
   const queryClient = useQueryClient()
+  const liveState = useLiveConnection()
   const [editing, setEditing] = useState(false)
   const [simulating, setSimulating] = useState(false)
 
@@ -57,7 +59,7 @@ export function DashboardPage() {
 
   return (
     <div>
-      <Topbar healthy={healthy} unitName={UNIT_NAME} />
+      <Topbar healthy={healthy} unitName={UNIT_NAME} liveState={liveState} />
       <ToastContainer alarms={alarms} areaNameByCode={areaNameByCode} loaded={!alarmsQuery.isLoading} />
       {isDemoMode() && <DemoBanner simulating={simulating} onSimulate={simulateAlarm} onReset={resetDemo} />}
 

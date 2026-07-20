@@ -89,6 +89,17 @@ estado esconderia essa distinção.
   reporta a cada 10 min dispararia falso-positivo de `stale`/`offline`. Quando os
   thresholds forem configuráveis, o ideal é derivá-los do intervalo de amostragem
   esperado por sensor. Registrar como limitação conhecida.
+- **✅ Cadência confirmada regular (verificado 2026-07-20).** O trigger
+  `sensor_reading_notify` (`timescale/init.sql`) dispara `AFTER INSERT FOR EACH ROW` —
+  **incondicional**, em toda leitura (NÃO change-gated). O gerador insere **1 leitura por
+  minuto por sensor** (`coletor_simulado/gerador.py:42-44`). Logo o canal live emite
+  ~1/min por sensor, muito abaixo de `staleMs=5min` → o modelo por idade é válido e os
+  defaults 5/15 min não geram falso-positivo. (Isto corrige a afirmação da spec da A3
+  "pg_notify só emite em mudança", que estava incorreta para o `sensor_reading_new`.)
+  Mock: `TICK_MS=1000` (`lib/api/mock/liveApi.ts`) → após o fix de `ts` real-clock, todo
+  sensor fica sempre `fresh` no mock. `useLiveStatuses` começa vazio → sensor é `never` no
+  load até o 1º evento (~1s mock / ~1min real), escalando a `offline` só após a janela de
+  graça (10min) — sem falso-positivo na carga.
 
 ### O relógio `now` (`useNow`)
 
@@ -239,12 +250,12 @@ Agregação (`areaAggregateState`, o **guarda de regressão da razão de ser da 
    classe de armadilha já registrada no MEMORY ("mock escondeu render vazio" no ECharts):
    verificar sempre o mock contra a lógica nova.
 
-2. **Unidade do `ts` — confirmar contrato (SUPOSIÇÃO A VERIFICAR).** O mock usa
-   **milissegundos** (13 dígitos). O `real/liveApi.ts` (linha 32) apenas repassa o campo
-   `time` cru do backend para `ts`, **sem normalizar**. Se o backend enviar epoch em
-   **segundos**, `Date.now() - ts` erra por **1000×** e toda a classificação de frescor
-   fica errada. Confirmar que o backend envia ms (ou normalizar na borda em
-   `real/liveApi.ts`).
+2. **Unidade do `ts` — ✅ RESOLVIDO (verificado 2026-07-20).** O backend envia
+   **milissegundos**: `timescale/init.sql:66` monta o payload do NOTIFY com
+   `'time', extract(epoch from NEW.time) * 1000`. Bate com o mock (13 dígitos) e com
+   `Date.now()`. Logo `Date.now() - ts` está correto e **NÃO** é preciso normalizar em
+   `real/liveApi.ts`. (Guard defensivo `ts < 1e12 ? ts*1000 : ts` é opcional; dado o
+   contrato confirmado, não é necessário nesta fase.)
 
 3. **`last_seen_ts` autoritativo do backend (fecha o gap de verdade).** Para detectar
    sensor **morto antes do page-load** — o caso mais perigoso — o frontend precisa de um

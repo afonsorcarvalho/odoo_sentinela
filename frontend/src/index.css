@@ -86,6 +86,19 @@ body {
   background: var(--color-muted);
 }
 
+/* Selects nativos: sem bg/cor explicitos herdam --color-ink (quase branco no
+   tema escuro) sobre o dropdown branco do browser = texto ilegivel. Fixa com
+   tokens de tema no select E nas options (o dropdown nativo usa a cor da
+   option). Global: vale p/ WidgetConfigPopover e qualquer select futuro. */
+select {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+select option {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
 /* Handle de resize: SVG default é escuro e some no tema dark. Realçamos com
    a cor de linha do tema e aumentamos o grip + área de clique. */
 .dashboard-grid-editing .react-resizable-handle::after {

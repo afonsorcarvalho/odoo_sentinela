@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { AlarmItem } from './AlarmItem'
 import type { AlarmEvent } from '../lib/types'
 
@@ -7,10 +8,21 @@ export function AlarmPanel({
   alarms,
   areaNameByCode,
   onVerMais,
+  filtro,
+  mensagemVazio = 'Nenhum alarme ativo.',
 }: {
   alarms: AlarmEvent[]
   areaNameByCode: Record<string, string>
   onVerMais?: () => void
+  // Conteudo opcional (chips de filtro de area) renderizado logo abaixo do
+  // header e acima da lista. Sem esta prop, o layout permanece identico ao
+  // uso atual (ex.: DashboardPage), que nao passa filtro.
+  filtro?: ReactNode
+  // Mensagem do estado vazio. Default cobre "sem alarmes" (comportamento
+  // atual). AlarmsWidget passa uma mensagem diferente para distinguir
+  // "nenhuma area selecionada" (filtro zerado pelo operador) de "sem
+  // alarme" (nada a reportar) -- sao estados semanticamente distintos.
+  mensagemVazio?: string
 }) {
   const ativos = alarms.filter((a) => a.status !== 'resolvido').length
   const visiveis = alarms.slice(0, VISIBLE_LIMIT)
@@ -40,9 +52,11 @@ export function AlarmPanel({
         </span>
       </div>
 
+      {filtro}
+
       {alarms.length === 0 ? (
         <p className="py-6 text-center text-sm" style={{ color: 'var(--color-muted)' }}>
-          Nenhum alarme ativo.
+          {mensagemVazio}
         </p>
       ) : (
         <>

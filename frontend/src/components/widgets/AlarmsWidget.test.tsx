@@ -1,19 +1,45 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { AlarmsWidget } from './AlarmsWidget'
-import type { AlarmEvent } from '../../lib/types'
+import type { AlarmEvent, SensorMeta } from '../../lib/types'
 
-// Semeia o cache de ['alarms'] com staleTime: Infinity para que o useAlarms()
-// (refetchInterval: 5000, hook real) nao dispare um refetch em background que
-// sobrescreveria os alarmes semeados com o fixture do mock.
+function sensor(areaCode: string, areaName: string): SensorMeta {
+  return {
+    sensor_code: `SNR-${areaCode}`,
+    name: `Sensor ${areaCode}`,
+    unidade: 'C',
+    protocolo_origem: '4-20ma',
+    measurement_type: { code: 'temp', name: 'Temperatura' },
+    area: { area_code: areaCode, name: areaName, category: 'sala' },
+  }
+}
+
+// Superset dos area_codes usados neste arquivo (a, b, c, PREPARO) — cobre
+// tanto os testes novos de filtro quanto os testes pre-existentes de scope,
+// que usam 'PREPARO' como area_code default em makeAlarms(). O universo de
+// chips (todasAreas) vem de useSensors, entao qualquer area_code usado num
+// alarme de teste precisa aparecer aqui, senao o alarme fica invisivel por
+// nao pertencer a nenhum chip (default nunca o ativa).
+const SITE_SENSORS: SensorMeta[] = [
+  sensor('a', 'Área A'),
+  sensor('b', 'Área B'),
+  sensor('c', 'Área C'),
+  sensor('PREPARO', 'Preparo'),
+]
+
+// Semeia o cache de ['alarms'] e ['sensors'] com staleTime: Infinity para que
+// os hooks reais (useAlarms com refetchInterval: 5000, useSensors) nao
+// disparem um refetch em background que sobrescreveria os fixtures semeados.
 function renderWithAlarms(
   alarms: AlarmEvent[],
   props: { scope: 'site' | 'area'; areaCodes: string[] } = { scope: 'site', areaCodes: [] },
+  sensors: SensorMeta[] = SITE_SENSORS,
 ) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
   qc.setQueryData(['alarms'], alarms)
+  qc.setQueryData(['sensors'], sensors)
   return render(
     <QueryClientProvider client={qc}>
       <AlarmsWidget scope={props.scope} areaCodes={props.areaCodes} />
@@ -98,5 +124,89 @@ describe('AlarmsWidget', () => {
 
     expect(await screen.findByText(/SENSOR-A/)).toBeInTheDocument()
     expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+  })
+
+  it('default scope="area" com areaCodes=[a,b]: chips a,b ativos, demais (c) presente e inativo', async () => {
+    const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a', 'b'] })
+
+    const chipA = await screen.findByRole('button', { name: 'Área A' })
+    const chipB = screen.getByRole('button', { name: 'Área B' })
+    const chipC = screen.getByRole('button', { name: 'Área C' })
+    expect(chipA).toHaveAttribute('aria-pressed', 'true')
+    expect(chipB).toHaveAttribute('aria-pressed', 'true')
+    expect(chipC).toHaveAttribute('aria-pressed', 'false')
+
+    expect(screen.getByText(/SENSOR-A/)).toBeInTheDocument()
+    expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+    expect(screen.queryByText(/SENSOR-C/)).not.toBeInTheDocument()
+  })
+
+  it('default scope="site": todos os chips ativos, todos os alarmes exibidos', async () => {
+    const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+    renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+    for (const name of ['Área A', 'Área B', 'Área C']) {
+      expect(await screen.findByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(screen.getByText(/SENSOR-A/)).toBeInTheDocument()
+    expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+    expect(screen.getByText(/SENSOR-C/)).toBeInTheDocument()
+  })
+
+  it('clicar chip inativo (c) passa a mostrar alarmes de c', async () => {
+    const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-C', 'c')]
+    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a'] })
+
+    expect(screen.queryByText(/SENSOR-C/)).not.toBeInTheDocument()
+    const chipC = await screen.findByRole('button', { name: 'Área C' })
+    await userEvent.click(chipC)
+
+    expect(chipC).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText(/SENSOR-C/)).toBeInTheDocument()
+  })
+
+  it('clicar chip ativo remove os alarmes daquela área', async () => {
+    const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b')]
+    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a', 'b'] })
+
+    const chipA = await screen.findByRole('button', { name: 'Área A' })
+    await userEvent.click(chipA)
+
+    expect(chipA).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByText(/SENSOR-A/)).not.toBeInTheDocument()
+    expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+  })
+
+  it('desativar todas as áreas mostra "Nenhuma área selecionada" (não "Nenhum alarme ativo.")', async () => {
+    const alarms = [alarme('SENSOR-A', 'a')]
+    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a'] }, [sensor('a', 'Área A')])
+
+    const chipA = await screen.findByRole('button', { name: 'Área A' })
+    await userEvent.click(chipA)
+
+    expect(await screen.findByText('Nenhuma área selecionada')).toBeInTheDocument()
+    expect(screen.queryByText('Nenhum alarme ativo.')).not.toBeInTheDocument()
+  })
+
+  it('config legada resolvida para areaCodes=["a"]: chip a ativo por default', async () => {
+    const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b')]
+    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a'] })
+
+    expect(await screen.findByRole('button', { name: 'Área A' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Área B' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText(/SENSOR-A/)).toBeInTheDocument()
+    expect(screen.queryByText(/SENSOR-B/)).not.toBeInTheDocument()
+  })
+
+  it('modal "Ver mais" recebe os alarmes já filtrados pelo chip', async () => {
+    const alarms = [...makeAlarms(9, 'a'), alarme('SENSOR-C-EXTRA', 'c')]
+    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a'] })
+
+    const verMaisButton = await screen.findByRole('button', { name: /Ver mais/ })
+    await userEvent.click(verMaisButton)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Todos os alarmes' })
+    expect(within(dialog).queryByText(/SENSOR-C-EXTRA/)).not.toBeInTheDocument()
   })
 })

@@ -60,3 +60,34 @@ describe('AlarmPanel — limite visivel e "Ver mais"', () => {
     expect(onVerMais).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('AlarmPanel — prop "filtro" (chips de área)', () => {
+  it('com filtro, renderiza o conteúdo sob o header e acima da lista', () => {
+    render(
+      <AlarmPanel
+        alarms={[ABERTO]}
+        areaNameByCode={AREA_NAMES}
+        filtro={<div data-testid="filtro-chips">chips</div>}
+      />,
+    )
+    expect(screen.getByTestId('filtro-chips')).toBeInTheDocument()
+  })
+
+  it('sem filtro, o layout permanece inalterado (nada extra renderizado)', () => {
+    render(<AlarmPanel alarms={[ABERTO]} areaNameByCode={AREA_NAMES} />)
+    expect(screen.queryByTestId('filtro-chips')).not.toBeInTheDocument()
+  })
+})
+
+describe('AlarmPanel — prop "mensagemVazio"', () => {
+  it('sem mensagemVazio, lista vazia mostra "Nenhum alarme ativo."', () => {
+    render(<AlarmPanel alarms={[]} areaNameByCode={{}} />)
+    expect(screen.getByText('Nenhum alarme ativo.')).toBeInTheDocument()
+  })
+
+  it('com mensagemVazio, lista vazia mostra a mensagem customizada (distinta da default)', () => {
+    render(<AlarmPanel alarms={[]} areaNameByCode={{}} mensagemVazio="Nenhuma área selecionada" />)
+    expect(screen.getByText('Nenhuma área selecionada')).toBeInTheDocument()
+    expect(screen.queryByText('Nenhum alarme ativo.')).not.toBeInTheDocument()
+  })
+})

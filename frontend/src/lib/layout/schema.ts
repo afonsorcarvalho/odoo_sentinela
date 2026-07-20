@@ -12,16 +12,54 @@ const widgetLayoutSchema = z.object({
   minH: z.number().optional(),
 })
 
-const widgetInstanceSchema = z.object({
-  id: z.string(),
-  type: z.enum(WIDGET_TYPES),
-  layout: widgetLayoutSchema,
-  binding: z.object({
-    areaCode: z.string().optional(),
-    sensorCode: z.string().optional(),
-  }),
-  options: z.record(z.string(), z.unknown()).optional().default({}),
+// options por tipo — `.catch(default)` por campo cobre tanto AUSENTE (backward-compat)
+// quanto INVÁLIDO (blob editado à mão) sem lançar — degrada campo a campo.
+const timeseriesOptions = z.object({
+  defaultWindow: z.enum(['1h', '24h', '7d', '30d']).catch('24h'),
 })
+const kpiOptions = z
+  .object({
+    label: z.string().optional().catch(undefined),
+    limiteMin: z.number().optional().catch(undefined), // override display-only (§KPI)
+    limiteMax: z.number().optional().catch(undefined), // NUNCA suaviza alarm_state
+  })
+  .refine(
+    (o) => o.limiteMin == null || o.limiteMax == null || o.limiteMin <= o.limiteMax,
+    { message: 'limiteMin deve ser ≤ limiteMax' },
+  )
+const alarmsOptions = z.object({
+  scope: z.enum(['site', 'area']).catch('site'),
+  // areaCode do escopo mora no binding.areaCode (já existe), não aqui
+})
+const areaOptions = z.object({}) // sem config em B2; strip descarta chaves desconhecidas
+
+export const OPTIONS_SCHEMA = {
+  timeseries: timeseriesOptions,
+  kpi: kpiOptions,
+  alarms: alarmsOptions,
+  area: areaOptions,
+} satisfies Record<WidgetType, z.ZodTypeAny>
+
+// Parse de options que NUNCA lança: option-set inválido (incl. refine do kpi falhando,
+// ex. limiteMin>limiteMax num blob editado à mão) cai nos defaults daquele tipo.
+function parseOptions(type: WidgetType, raw: unknown): Record<string, unknown> {
+  const schema = OPTIONS_SCHEMA[type]
+  const r = schema.safeParse(raw ?? {})
+  return (r.success ? r.data : schema.parse({})) as Record<string, unknown> // schema.parse({}) é seguro: só defaults, refine passa
+}
+
+const widgetInstanceSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(WIDGET_TYPES),
+    layout: widgetLayoutSchema,
+    binding: z.object({
+      areaCode: z.string().optional(),
+      sensorCode: z.string().optional(),
+    }),
+    options: z.record(z.string(), z.unknown()).optional().default({}),
+  })
+  .transform((w) => ({ ...w, options: parseOptions(w.type, w.options) as Record<string, unknown> }))
 
 const dashboardLayoutSchema = z.object({
   version: z.literal(1),

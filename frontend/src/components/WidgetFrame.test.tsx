@@ -5,7 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WidgetFrame } from './WidgetFrame'
 import type { WidgetInstance } from '../lib/layout/schema'
 
-vi.mock('../lib/queries', () => ({ useSensors: () => ({ data: [] }) }))
+vi.mock('../lib/queries', () => ({
+  useSensors: () => ({ data: [] }),
+  useThreshold: () => ({ data: undefined }),
+}))
 
 const w: WidgetInstance = { id: 'k1', type: 'kpi', layout: { x: 0, y: 0, w: 2, h: 2 }, binding: {}, options: {} }
 

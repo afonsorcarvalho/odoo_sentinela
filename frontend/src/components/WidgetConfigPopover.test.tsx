@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WidgetConfigPopover } from './WidgetConfigPopover'
+import { useThreshold } from '../lib/queries'
 import type { WidgetInstance } from '../lib/layout/schema'
 
 vi.mock('../lib/queries', () => ({
@@ -11,6 +12,9 @@ vi.mock('../lib/queries', () => ({
       { sensor_code: 'S2', name: 'Sensor Dois', area: { area_code: 'A2', name: 'Área Dois' } },
     ],
   }),
+  // default: sem threshold herdado (sensor sem cadastro, ou ainda carregando) —
+  // testes existentes continuam vendo o texto genérico de fallback.
+  useThreshold: vi.fn(() => ({ data: undefined })),
 }))
 
 const tsWidget: WidgetInstance = {
@@ -57,10 +61,39 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
       expect(onChange).toHaveBeenLastCalledWith({ ...kpiWidget, options: { ...kpiWidget.options, limiteMax: 9 } })
     })
 
-    it('placeholder dos limites indica que vazio usa o cadastro do sensor', () => {
+    it('placeholder dos limites indica que vazio usa o cadastro do sensor (sem threshold herdado)', () => {
       render(<WidgetConfigPopover widget={kpiWidget} onChange={vi.fn()} onClose={vi.fn()} />)
       expect(screen.getByLabelText('Limite mín.')).toHaveAttribute('placeholder', 'cadastro do sensor')
       expect(screen.getByLabelText('Limite máx.')).toHaveAttribute('placeholder', 'cadastro do sensor')
+    })
+
+    it('placeholder dos limites reflete o threshold herdado do sensor quando vazio', () => {
+      vi.mocked(useThreshold).mockReturnValueOnce({
+        data: { sensor_id: 'S1', limite_min: 10, limite_max: 90, is_valor_padrao_regulatorio: false },
+      } as ReturnType<typeof useThreshold>)
+
+      render(<WidgetConfigPopover widget={kpiWidget} onChange={vi.fn()} onClose={vi.fn()} />)
+
+      expect(screen.getByLabelText('Limite mín.')).toHaveAttribute('placeholder', '10')
+      expect(screen.getByLabelText('Limite máx.')).toHaveAttribute('placeholder', '90')
+    })
+
+    it('editar um campo faz MERGE com options existentes, não overwrite (regressão)', async () => {
+      // options multi-chave: se setOption virasse overwrite ({...patch} em vez de
+      // {...widget.options, ...patch}), label e limiteMax desapareceriam do payload.
+      const kpiComOptionsMultiChave: WidgetInstance = {
+        ...kpiWidget,
+        options: { label: 'A', limiteMax: 50 },
+      }
+      const onChange = vi.fn()
+      render(<WidgetConfigPopover widget={kpiComOptionsMultiChave} onChange={onChange} onClose={vi.fn()} />)
+
+      await userEvent.type(screen.getByLabelText('Limite mín.'), '1')
+
+      expect(onChange).toHaveBeenLastCalledWith({
+        ...kpiComOptionsMultiChave,
+        options: { label: 'A', limiteMax: 50, limiteMin: 1 },
+      })
     })
   })
 

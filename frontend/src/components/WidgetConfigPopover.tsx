@@ -1,4 +1,4 @@
-import { useSensors } from '../lib/queries'
+import { useSensors, useThreshold } from '../lib/queries'
 import { WIDGET_REGISTRY } from '../lib/widgets/registry'
 import { WindowSelector } from './WindowSelector'
 import type { WidgetInstance } from '../lib/layout/schema'
@@ -17,6 +17,15 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
   const needs = WIDGET_REGISTRY[widget.type].needs
   const areas = Array.from(new Map(sensors.map((s) => [s.area.area_code, s.area])).values())
   const scope = (widget.options?.scope as 'site' | 'area' | undefined) ?? 'site'
+  // Regra dos hooks: sempre chamado, mesmo sem sensor vinculado ainda (código
+  // vazio) ou em widgets que não são kpi — useThreshold decide sozinho a
+  // query key mas não precisa de `enabled`: com sensorCode indefinido a
+  // requisição falha isoladamente (fica em erro no cache do TanStack Query,
+  // não derruba o render) e `threshold.data` permanece `undefined`, caindo
+  // no fallback textual abaixo.
+  const threshold = useThreshold(widget.binding.sensorCode ?? '')
+  const limiteMinPlaceholder = threshold.data ? String(threshold.data.limite_min) : 'cadastro do sensor'
+  const limiteMaxPlaceholder = threshold.data ? String(threshold.data.limite_max) : 'cadastro do sensor'
 
   // Toda edição flui por onChange (nunca escrita direta no servidor); grava
   // em options fazendo merge com o que já existe, para não perder outras
@@ -91,7 +100,7 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
               <label className="block text-xs">Limite mín.
                 <input
                   type="number"
-                  placeholder="cadastro do sensor"
+                  placeholder={limiteMinPlaceholder}
                   className={selectClass}
                   style={inputStyle}
                   value={(widget.options?.limiteMin as number | undefined) ?? ''}
@@ -101,7 +110,7 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
               <label className="block text-xs">Limite máx.
                 <input
                   type="number"
-                  placeholder="cadastro do sensor"
+                  placeholder={limiteMaxPlaceholder}
                   className={selectClass}
                   style={inputStyle}
                   value={(widget.options?.limiteMax as number | undefined) ?? ''}

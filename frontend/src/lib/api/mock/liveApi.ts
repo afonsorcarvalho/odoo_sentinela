@@ -30,14 +30,15 @@ export const mockLiveApi: LiveApi = {
       ? (threshold.limite_max - threshold.limite_min) * (AMP_FRACTION[sensor_code] ?? DEFAULT_AMP_FRACTION)
       : NO_THRESHOLD_AMP
     let i = 0
-    let ts = 1_700_000_000_000
     const id = setInterval(() => {
-      ts += TICK_MS
       const value = +(mid + amp * Math.sin(i / 6)).toFixed(2)
       i++
       const state = computeStatus(value, threshold).state
       const alarm_state = state === 'unknown' ? 'ok' : state
-      const point: LivePoint = { sensor_code, ts, value, alarm_state }
+      // ts de relogio real (nao sintetico): consumido por freshness() contra
+      // um `now` tambem real (useNow). Um ts fixo em 2023 faria todo sensor
+      // parecer offline anos depois -- ver design doc A2, Dependencias #1.
+      const point: LivePoint = { sensor_code, ts: Date.now(), value, alarm_state }
       cb(point)
     }, TICK_MS)
     return () => clearInterval(id)

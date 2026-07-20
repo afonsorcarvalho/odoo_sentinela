@@ -61,7 +61,7 @@ export function DashboardPage() {
       <ToastContainer alarms={alarms} areaNameByCode={areaNameByCode} loaded={!alarmsQuery.isLoading} />
       {isDemoMode() && <DemoBanner simulating={simulating} onSimulate={simulateAlarm} onReset={resetDemo} />}
 
-      <div className="mx-auto max-w-6xl p-4 sm:p-6">
+      <div className="p-4 sm:p-6">
         <div className="mb-2 flex items-center">
           <p className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
             Áreas monitoradas

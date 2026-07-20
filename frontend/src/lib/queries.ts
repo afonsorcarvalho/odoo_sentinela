@@ -7,7 +7,7 @@ export function useSensorMeta(code: string) {
   return useQuery({ queryKey: ['sensor', code], queryFn: () => metaApi.getSensor(code) })
 }
 export function useThreshold(code: string) {
-  return useQuery({ queryKey: ['threshold', code], queryFn: () => metaApi.getThreshold(code) })
+  return useQuery({ queryKey: ['threshold', code], queryFn: () => metaApi.getThreshold(code), enabled: code !== '' })
 }
 export function useHistory(code: string, window: Window) {
   return useQuery({ queryKey: ['history', code, window], queryFn: () => historyApi.getHistory(code, window), enabled: code !== '' })

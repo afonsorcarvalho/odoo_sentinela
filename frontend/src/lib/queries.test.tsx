@@ -27,6 +27,12 @@ describe('queries', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.limite_max).toBe(22)
   })
+  it('useThreshold com código vazio fica desabilitada (não dispara request malformado)', async () => {
+    const { result } = renderHook(() => useThreshold(''), { wrapper: wrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(result.current.isPending).toBe(true)
+    expect(result.current.data).toBeUndefined()
+  })
 
   it('useSensors lista os 5 sensores', async () => {
     const { result } = renderHook(() => useSensors(), { wrapper: wrapper() })

@@ -78,6 +78,18 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
       expect(screen.getByLabelText('Limite máx.')).toHaveAttribute('placeholder', '90')
     })
 
+    it('mostra erro inline quando limiteMin > limiteMax', () => {
+      const widgetInvalido: WidgetInstance = { ...kpiWidget, options: { limiteMin: 10, limiteMax: 5 } }
+      render(<WidgetConfigPopover widget={widgetInvalido} onChange={vi.fn()} onClose={vi.fn()} />)
+      expect(screen.getByRole('alert')).toHaveTextContent('Limite mín. deve ser ≤ limite máx.')
+    })
+
+    it('não mostra erro inline quando os limites são válidos ou só um está preenchido', () => {
+      const widgetValido: WidgetInstance = { ...kpiWidget, options: { limiteMin: 1, limiteMax: 9 } }
+      render(<WidgetConfigPopover widget={widgetValido} onChange={vi.fn()} onClose={vi.fn()} />)
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
     it('editar um campo faz MERGE com options existentes, não overwrite (regressão)', async () => {
       // options multi-chave: se setOption virasse overwrite ({...patch} em vez de
       // {...widget.options, ...patch}), label e limiteMax desapareceriam do payload.

@@ -1,6 +1,7 @@
 import { useSensors, useThreshold } from '../lib/queries'
 import { WIDGET_REGISTRY } from '../lib/widgets/registry'
 import { WindowSelector } from './WindowSelector'
+import { statusTextColor } from './statusVisuals'
 import type { WidgetInstance } from '../lib/layout/schema'
 import type { Window } from '../lib/types'
 
@@ -18,14 +19,25 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
   const areas = Array.from(new Map(sensors.map((s) => [s.area.area_code, s.area])).values())
   const scope = (widget.options?.scope as 'site' | 'area' | undefined) ?? 'site'
   // Regra dos hooks: sempre chamado, mesmo sem sensor vinculado ainda (código
-  // vazio) ou em widgets que não são kpi — useThreshold decide sozinho a
-  // query key mas não precisa de `enabled`: com sensorCode indefinido a
-  // requisição falha isoladamente (fica em erro no cache do TanStack Query,
-  // não derruba o render) e `threshold.data` permanece `undefined`, caindo
-  // no fallback textual abaixo.
+  // vazio) ou em widgets que não são kpi. O guard `enabled: code !== ''` vive
+  // dentro de useThreshold (lib/queries.ts, espelhando useHistory) — aqui
+  // basta chamar; com sensorCode vazio a query fica `idle` (sem request) e
+  // `threshold.data` permanece `undefined`, caindo no fallback textual abaixo.
   const threshold = useThreshold(widget.binding.sensorCode ?? '')
   const limiteMinPlaceholder = threshold.data ? String(threshold.data.limite_min) : 'cadastro do sensor'
   const limiteMaxPlaceholder = threshold.data ? String(threshold.data.limite_max) : 'cadastro do sensor'
+
+  // Feedback inline p/ o admin (não bloqueia Salvar — popover não tem Salvar
+  // próprio). Espelha o refine de kpiOptions em schema.ts: só reprova quando
+  // AMBOS estão preenchidos e min > max; um único campo preenchido é válido.
+  const limiteMin = widget.options?.limiteMin as number | undefined
+  const limiteMax = widget.options?.limiteMax as number | undefined
+  const limitesInvalidos = limiteMin != null && limiteMax != null && limiteMin > limiteMax
+  // id sufixado por widget.id: vários popovers podem estar abertos ao mesmo
+  // tempo (cada WidgetFrame tem seu próprio estado `open`, sem exclusividade
+  // entre widgets) — sem o sufixo, dois KPIs inválidos abertos juntos
+  // colidiriam no id e quebrariam o aria-describedby (HTML inválido).
+  const limitesErroId = `kpi-limites-erro-${widget.id}`
 
   // Toda edição flui por onChange (nunca escrita direta no servidor); grava
   // em options fazendo merge com o que já existe, para não perder outras
@@ -103,7 +115,8 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
                   placeholder={limiteMinPlaceholder}
                   className={selectClass}
                   style={inputStyle}
-                  value={(widget.options?.limiteMin as number | undefined) ?? ''}
+                  value={limiteMin ?? ''}
+                  aria-describedby={limitesInvalidos ? limitesErroId : undefined}
                   onChange={(e) => setOption({ limiteMin: e.target.value === '' ? undefined : Number(e.target.value) })}
                 />
               </label>
@@ -113,10 +126,16 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
                   placeholder={limiteMaxPlaceholder}
                   className={selectClass}
                   style={inputStyle}
-                  value={(widget.options?.limiteMax as number | undefined) ?? ''}
+                  value={limiteMax ?? ''}
+                  aria-describedby={limitesInvalidos ? limitesErroId : undefined}
                   onChange={(e) => setOption({ limiteMax: e.target.value === '' ? undefined : Number(e.target.value) })}
                 />
               </label>
+              {limitesInvalidos && (
+                <p id={limitesErroId} role="alert" className="text-xs" style={{ color: statusTextColor('crit') }}>
+                  Limite mín. deve ser ≤ limite máx.
+                </p>
+              )}
             </div>
           )}
 

@@ -28,7 +28,10 @@ export function TimeseriesWidget({
   if (!sensorCode) return <WidgetPlaceholder texto="Configurar sensor" />
 
   return (
-    <div className="flex h-full flex-col">
+    <div
+      className="flex h-full flex-col rounded-lg p-3"
+      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)' }}
+    >
       <div className="mb-2 flex items-center gap-2">
         <span className="truncate text-sm font-bold" style={{ color: 'var(--color-ink)' }}>
           {sensor?.name ?? sensorCode}

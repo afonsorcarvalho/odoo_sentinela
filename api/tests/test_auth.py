@@ -60,3 +60,13 @@ def test_get_cliente_usuario_sem_sessao_valida_levanta_401():
     with pytest.raises(HTTPException) as exc:
         get_cliente_usuario({'jti': 'jti-que-nao-existe'})
     assert exc.value.status_code == 401
+
+
+def test_get_cliente_usuario_sem_jti_no_claims_levanta_401():
+    from fastapi import HTTPException
+
+    from api.auth import get_cliente_usuario
+
+    with pytest.raises(HTTPException) as exc:
+        get_cliente_usuario({'sub': '2'})
+    assert exc.value.status_code == 401

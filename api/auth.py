@@ -101,7 +101,7 @@ def exigir_admin(claims: dict = Depends(verificar_token)):
 
 
 def resolver_cliente_usuario(claims: dict):
-    cliente = sessions.obter(claims['jti'])
+    cliente = sessions.obter(claims.get('jti'))
     if cliente is None:
         raise HTTPException(status_code=401, detail='sessão expirada — faça login novamente')
     return cliente

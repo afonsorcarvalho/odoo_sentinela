@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WidgetConfigPopover } from './WidgetConfigPopover'
 import { useThreshold } from '../lib/queries'
@@ -109,12 +109,12 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
     })
   })
 
-  describe('alarms', () => {
-    it('trocar escopo para Área revela o select de área e grava binding.areaCode', async () => {
+  describe('alarms — escopo', () => {
+    it('trocar escopo para Área revela a seção multi-área (dropdown "Adicionar área")', async () => {
       const onChange = vi.fn()
       const { rerender } = render(<WidgetConfigPopover widget={alarmsWidget} onChange={onChange} onClose={vi.fn()} />)
 
-      expect(screen.queryByLabelText('Área')).toBeNull()
+      expect(screen.queryByLabelText('Adicionar área')).toBeNull()
 
       await userEvent.selectOptions(screen.getByLabelText('Escopo'), 'area')
       expect(onChange).toHaveBeenLastCalledWith({
@@ -124,24 +124,93 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
 
       const widgetComEscopoArea: WidgetInstance = { ...alarmsWidget, options: { scope: 'area' } }
       rerender(<WidgetConfigPopover widget={widgetComEscopoArea} onChange={onChange} onClose={vi.fn()} />)
-      expect(screen.getByLabelText('Área')).toBeInTheDocument()
-
-      await userEvent.selectOptions(screen.getByLabelText('Área'), 'A2')
-      expect(onChange).toHaveBeenLastCalledWith({
-        ...widgetComEscopoArea,
-        binding: { ...widgetComEscopoArea.binding, areaCode: 'A2' },
-      })
+      expect(screen.getByLabelText('Adicionar área')).toBeInTheDocument()
     })
 
-    it('voltar para Site mantém scope: site', async () => {
+    it('voltar para Site mantém scope: site (e a seção de áreas some, sem limpar areaCodes)', async () => {
       const onChange = vi.fn()
-      const widgetComEscopoArea: WidgetInstance = { ...alarmsWidget, binding: { areaCode: 'A2' }, options: { scope: 'area' } }
+      const widgetComEscopoArea: WidgetInstance = { ...alarmsWidget, binding: { areaCodes: ['A2'] }, options: { scope: 'area' } }
       render(<WidgetConfigPopover widget={widgetComEscopoArea} onChange={onChange} onClose={vi.fn()} />)
 
       await userEvent.selectOptions(screen.getByLabelText('Escopo'), 'site')
       expect(onChange).toHaveBeenLastCalledWith({
         ...widgetComEscopoArea,
         options: { ...widgetComEscopoArea.options, scope: 'site' },
+      })
+    })
+
+    it('scope=site: seção de áreas ausente do DOM', () => {
+      render(<WidgetConfigPopover widget={alarmsWidget} onChange={vi.fn()} onClose={vi.fn()} />)
+      expect(screen.queryByLabelText('Adicionar área')).toBeNull()
+    })
+  })
+
+  describe('alarms — multi-área (dropdown + chips)', () => {
+    const alarmsAreaScope: WidgetInstance = { ...alarmsWidget, options: { scope: 'area' } }
+
+    it('dropdown "Adicionar área" lista todas as áreas do site quando nenhuma foi escolhida ainda', () => {
+      render(<WidgetConfigPopover widget={alarmsAreaScope} onChange={vi.fn()} onClose={vi.fn()} />)
+      const select = screen.getByLabelText('Adicionar área')
+      expect(within(select).getByRole('option', { name: 'Área Um' })).toBeInTheDocument()
+      expect(within(select).getByRole('option', { name: 'Área Dois' })).toBeInTheDocument()
+    })
+
+    it('escolher uma área no dropdown adiciona chip e grava binding.areaCodes via onChange', async () => {
+      const onChange = vi.fn()
+      const { rerender } = render(<WidgetConfigPopover widget={alarmsAreaScope} onChange={onChange} onClose={vi.fn()} />)
+
+      await userEvent.selectOptions(screen.getByLabelText('Adicionar área'), 'A2')
+
+      expect(onChange).toHaveBeenLastCalledWith({
+        ...alarmsAreaScope,
+        binding: { ...alarmsAreaScope.binding, areaCodes: ['A2'] },
+      })
+
+      // Round-trip: com o pai reaplicando o widget atualizado (como o onChange real
+      // faria), a chip aparece, a opção some do dropdown e o select volta ao "—".
+      const widgetComA2: WidgetInstance = { ...alarmsAreaScope, binding: { areaCodes: ['A2'] } }
+      rerender(<WidgetConfigPopover widget={widgetComA2} onChange={onChange} onClose={vi.fn()} />)
+
+      expect(screen.getByRole('button', { name: 'Remover área Área Dois' })).toBeInTheDocument()
+      const select = screen.getByLabelText('Adicionar área') as HTMLSelectElement
+      expect(select.value).toBe('')
+      expect(within(select).queryByRole('option', { name: 'Área Dois' })).toBeNull()
+    })
+
+    it('área já escolhida some das opções do dropdown "Adicionar área"', () => {
+      const widgetComA2: WidgetInstance = { ...alarmsAreaScope, binding: { areaCodes: ['A2'] } }
+      render(<WidgetConfigPopover widget={widgetComA2} onChange={vi.fn()} onClose={vi.fn()} />)
+
+      const select = screen.getByLabelText('Adicionar área')
+      expect(within(select).queryByRole('option', { name: 'Área Dois' })).toBeNull()
+      expect(within(select).getByRole('option', { name: 'Área Um' })).toBeInTheDocument()
+    })
+
+    it('remover chip (×) tira a área de binding.areaCodes', async () => {
+      const onChange = vi.fn()
+      const widgetComDuasAreas: WidgetInstance = { ...alarmsAreaScope, binding: { areaCodes: ['A1', 'A2'] } }
+      render(<WidgetConfigPopover widget={widgetComDuasAreas} onChange={onChange} onClose={vi.fn()} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remover área Área Um' }))
+
+      expect(onChange).toHaveBeenLastCalledWith({
+        ...widgetComDuasAreas,
+        binding: { ...widgetComDuasAreas.binding, areaCodes: ['A2'] },
+      })
+    })
+
+    it('widget legado (binding.areaCode, sem areaCodes) mostra o chip da área legada; adicionar outra grava as duas em areaCodes', async () => {
+      const onChange = vi.fn()
+      const widgetLegado: WidgetInstance = { ...alarmsAreaScope, binding: { areaCode: 'A1' } }
+      render(<WidgetConfigPopover widget={widgetLegado} onChange={onChange} onClose={vi.fn()} />)
+
+      expect(screen.getByRole('button', { name: 'Remover área Área Um' })).toBeInTheDocument()
+
+      await userEvent.selectOptions(screen.getByLabelText('Adicionar área'), 'A2')
+
+      expect(onChange).toHaveBeenLastCalledWith({
+        ...widgetLegado,
+        binding: { ...widgetLegado.binding, areaCodes: ['A1', 'A2'] },
       })
     })
   })

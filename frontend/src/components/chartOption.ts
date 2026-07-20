@@ -35,6 +35,10 @@ export function buildChartOption(
     ? {
         symbol: 'none',
         lineStyle: { type: 'dashed' as const, color: critColor },
+        // Label do limite DENTRO da area de plot (insideEndTop): o default
+        // 'end' fica no fim do eixo, fora do grid, e era clipado pelo
+        // overflow-hidden do card. 'inside...' garante que nunca vaza.
+        label: { position: 'insideEndTop' as const, color: critColor, fontSize: 10 },
         data: [{ yAxis: threshold.limite_min }, { yAxis: threshold.limite_max }],
       }
     : undefined
@@ -70,7 +74,10 @@ export function buildChartOption(
 
   return {
     animation: false,
-    grid: { left: 44, right: 16, top: 16, bottom: 28 },
+    // containLabel: ECharts reserva o espaco dos labels dos eixos DENTRO do
+    // grid, entao left/bottom nao precisam ser chutados (44px cortava labels
+    // Y mais largos, ex.: "50.07"). left/right/top/bottom viram so a folga.
+    grid: { left: 8, right: 14, top: 22, bottom: 8, containLabel: true },
     xAxis: { type: 'time' as const },
     yAxis: { type: 'value' as const, scale: true, min: yMin, max: yMax },
     series: [{ type: 'line' as const, showSymbol: false, data, markLine, markArea }],

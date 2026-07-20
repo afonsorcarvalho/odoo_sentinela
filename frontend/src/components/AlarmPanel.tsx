@@ -18,7 +18,7 @@ export function AlarmPanel({
 
   return (
     <aside
-      className="sticky top-[78px] flex w-full flex-col gap-3 rounded-md p-4 md:w-[300px]"
+      className="flex h-full w-full flex-col gap-3 rounded-md p-4"
       style={{
         background: 'var(--color-surface)',
         border: '1px solid var(--color-line)',
@@ -46,7 +46,7 @@ export function AlarmPanel({
         </p>
       ) : (
         <>
-          <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {visiveis.map((a) => (
               <AlarmItem key={a.id} alarm={a} areaName={areaNameByCode[a.area_code] ?? a.area_code} />
             ))}

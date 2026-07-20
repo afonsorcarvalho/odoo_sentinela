@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,9 +9,15 @@ from pydantic import BaseModel
 
 from ingestao import odoo_cliente
 
+from . import sessions
 from .odoo import ODOO_DB, ODOO_URL, get_cliente_servico
 
-SECRET = os.environ.get('API_JWT_SECRET', 'dev-secret-troque-em-producao')
+SECRET = os.environ.get('API_JWT_SECRET')
+if not SECRET:
+    raise RuntimeError(
+        "API_JWT_SECRET não definido. Defina a variável de ambiente antes de subir a API "
+        "(sem isso, tokens JWT usariam um segredo previsível e poderiam ser forjados)."
+    )
 ALGORITHM = 'HS256'
 EXPIRACAO_SEGUNDOS = 3600
 
@@ -58,11 +65,16 @@ def login(dados: LoginRequest):
         )
         is_admin = bool(usuarios_admin)
 
+    jti = uuid.uuid4().hex
+    exp = int(time.time()) + EXPIRACAO_SEGUNDOS
+    sessions.guardar(jti, cliente_usuario, exp)
+
     payload = {
         'sub': str(cliente_usuario.uid),
         'partner_id': partner_id,
         'is_admin': is_admin,
-        'exp': int(time.time()) + EXPIRACAO_SEGUNDOS,
+        'jti': jti,
+        'exp': exp,
     }
     token = jwt.encode(payload, SECRET, algorithm=ALGORITHM)
     return LoginResponse(access_token=token)
@@ -86,3 +98,18 @@ def exigir_admin(claims: dict = Depends(verificar_token)):
     if not claims.get('is_admin'):
         raise HTTPException(status_code=403, detail='requer privilégio de administrador')
     return claims
+
+
+def resolver_cliente_usuario(claims: dict):
+    cliente = sessions.obter(claims['jti'])
+    if cliente is None:
+        raise HTTPException(status_code=401, detail='sessão expirada — faça login novamente')
+    return cliente
+
+
+def get_cliente_usuario(claims: dict = Depends(verificar_token)):
+    return resolver_cliente_usuario(claims)
+
+
+def get_cliente_usuario_query(claims: dict = Depends(verificar_token_query)):
+    return resolver_cliente_usuario(claims)

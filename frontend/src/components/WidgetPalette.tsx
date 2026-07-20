@@ -3,7 +3,11 @@ import { WIDGET_REGISTRY } from '../lib/widgets/registry'
 import { WIDGET_TYPES } from '../lib/layout/schema'
 import type { WidgetType } from '../lib/layout/schema'
 
-export function WidgetPalette({ onAdd }: { onAdd: (type: WidgetType) => void }) {
+export function WidgetPalette({ onAdd, onDragStartType, onDragEnd }: {
+  onAdd: (type: WidgetType) => void
+  onDragStartType?: (type: WidgetType) => void
+  onDragEnd?: () => void
+}) {
   const [open, setOpen] = useState(false)
 
   function handlePick(t: WidgetType) {
@@ -31,8 +35,14 @@ export function WidgetPalette({ onAdd }: { onAdd: (type: WidgetType) => void }) 
             <button
               key={t}
               type="button"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/widget-type', t)
+                onDragStartType?.(t)
+              }}
+              onDragEnd={() => onDragEnd?.()}
               onClick={() => handlePick(t)}
-              className="rounded border px-2 py-1 text-left text-xs whitespace-nowrap"
+              className="cursor-grab rounded border px-2 py-1 text-left text-xs whitespace-nowrap"
               style={{ borderColor: 'var(--color-muted)' }}
             >
               + {WIDGET_REGISTRY[t].label}

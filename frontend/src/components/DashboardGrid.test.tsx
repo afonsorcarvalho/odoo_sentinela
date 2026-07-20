@@ -63,6 +63,20 @@ describe('DashboardGrid', () => {
     expect(screen.getAllByLabelText('Configurar widget').length).toBe(2)
   })
 
+  it('mostra a grade de fundo apenas no modo edicao', () => {
+    const { rerender } = renderWithClient(<DashboardGrid layout={layout} editing={false} />)
+    expect(screen.queryByTestId('edit-grid-overlay')).toBeNull()
+
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <DashboardGrid layout={layout} editing={true} />
+      </QueryClientProvider>,
+    )
+    const overlay = screen.getByTestId('edit-grid-overlay')
+    // Nao deve capturar o mouse, senao bloquearia drag/resize dos widgets.
+    expect(overlay.className).toContain('pointer-events-none')
+  })
+
   it('handleChange mapeia de allLayouts.lg, nao do breakpoint ativo (regressao)', () => {
     // Reproduz o finding: RGL dispara onLayoutChange(current=xxs, allLayouts)
     // ao cruzar breakpoint durante a edicao. O callback exposto pelo

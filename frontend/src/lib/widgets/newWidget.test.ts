@@ -22,4 +22,8 @@ describe('newWidget', () => {
   it('não-alarms recebe options vazio', () => {
     expect(newWidget('kpi', []).options).toEqual({})
   })
+  it('usa a posição informada quando fornecida', () => {
+    const w = newWidget('kpi', [], { x: 4, y: 2 })
+    expect(w.layout).toMatchObject({ x: 4, y: 2 })
+  })
 })

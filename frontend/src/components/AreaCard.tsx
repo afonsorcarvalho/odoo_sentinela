@@ -44,7 +44,7 @@ export function AreaCard({
 
   return (
     <div
-      className="rounded-md p-4"
+      className="flex h-full flex-col rounded-md p-4"
       style={{
         background: 'var(--color-surface)',
         border: '1px solid var(--color-line)',
@@ -76,7 +76,11 @@ export function AreaCard({
 
       <div className="mt-3 border-t" style={{ borderColor: 'var(--color-line)' }} />
 
-      <div className="mt-2">
+      {/* flex-1: preenche a altura restante do card para que áreas com 1
+          sensor (sem carrossel) fiquem com a MESMA altura das de vários
+          sensores — evita cards curtos e desalinhados do canto de resize.
+          justify-between mantém o valor no topo e os dots no rodapé. */}
+      <div className="mt-2 flex flex-1 flex-col justify-between">
         <button
           type="button"
           onClick={() => onSelectSensor(activeSensor.sensor_code)}

@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright artefatos
+e2e/__shots__/
+test-results/
+playwright-report/

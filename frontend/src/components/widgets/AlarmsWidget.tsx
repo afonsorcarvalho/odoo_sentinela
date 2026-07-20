@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { useAlarms, useSensors } from '../../lib/queries'
 import { AlarmPanel } from '../AlarmPanel'
 import { AlarmsModal } from '../AlarmsModal'
@@ -97,22 +97,32 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
   // menor). O foco (focus-visible) fica no botao, entao o anel de foco cobre
   // a hit-area toda, nao so o pill pequeno.
   const chipButtonClass =
-    'flex min-h-11 shrink-0 items-center justify-center rounded-full bg-transparent px-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]'
+    'flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-transparent px-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]'
   const chipPillClass =
     'rounded-full px-2 py-1 text-[11px] font-medium transition-colors duration-200 ease-out motion-reduce:transition-none'
+
+  // Estilo do pill por estado -- 3 aparencias distintas (produto medico: um
+  // subconjunto ativo ("mixed") nao pode parecer igual a "nenhuma selecionada"
+  // (false), senao o operador le "Todas" apagado e confia num alarme filtrado
+  // como se estivesse all-clear). true = preenchido primary; false = panel
+  // liso; mixed = panel + borda primary (sinaliza "parcialmente ligado" sem
+  // ocupar o peso visual do preenchido).
+  function pillStyle(pressed: boolean | 'mixed'): CSSProperties {
+    if (pressed === true) return { background: 'var(--color-primary)', color: 'var(--color-panel)' }
+    if (pressed === 'mixed')
+      return {
+        background: 'var(--color-panel)',
+        color: 'var(--color-muted)',
+        border: '1.5px solid var(--color-primary)',
+      }
+    return { background: 'var(--color-panel)', color: 'var(--color-muted)' }
+  }
 
   const filtro =
     todasAreas.length > 0 ? (
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filtro de áreas">
         <button type="button" aria-pressed={todasPressed} onClick={toggleTodas} className={chipButtonClass}>
-          <span
-            className={chipPillClass}
-            style={
-              todasPressed === true
-                ? { background: 'var(--color-primary)', color: 'var(--color-panel)' }
-                : { background: 'var(--color-panel)', color: 'var(--color-muted)' }
-            }
-          >
+          <span className={chipPillClass} style={pillStyle(todasPressed)}>
             Todas
           </span>
         </button>
@@ -126,14 +136,7 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
               onClick={() => toggleArea(a.area_code)}
               className={chipButtonClass}
             >
-              <span
-                className={chipPillClass}
-                style={
-                  ativa
-                    ? { background: 'var(--color-primary)', color: 'var(--color-panel)' }
-                    : { background: 'var(--color-panel)', color: 'var(--color-muted)' }
-                }
-              >
+              <span className={chipPillClass} style={pillStyle(ativa)}>
                 {a.name}
               </span>
             </button>

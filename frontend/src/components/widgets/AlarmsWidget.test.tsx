@@ -367,5 +367,45 @@ describe('AlarmsWidget', () => {
       expect(screen.queryByText(/SENSOR-A/)).not.toBeInTheDocument()
       expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
     })
+
+    // Regressao de polish (produto medico): antes desta correcao, 'mixed' e
+    // 'false' tinham EXATAMENTE o mesmo visual (ambos caiam no ramo "senao" do
+    // ternario true/false), entao um operador com subconjunto ativo via
+    // "Todas" apagado, indistinguivel de "nenhuma area selecionada". O pill
+    // 'mixed' agora ganha uma borda propria (--color-primary) que nem 'true'
+    // (preenchido) nem 'false' (liso) tem -- comparacao nao-tautologica entre
+    // os dois estados, nao so um assert isolado no mixed.
+    it('estado "mixed" do chip "Todas" tem visual distinto de "false" (borda de destaque)', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const chipA = await screen.findByRole('button', { name: 'Área A' })
+      await userEvent.click(chipA)
+
+      const todas = screen.getByRole('button', { name: 'Todas' })
+      expect(todas).toHaveAttribute('aria-pressed', 'mixed')
+      const pillMixed = within(todas).getByText('Todas')
+
+      // Chip de área "Área A", agora inativa (false), como referencia do
+      // visual "false" para comparar contra o "mixed" acima.
+      const pillFalse = within(chipA).getByText('Área A')
+
+      expect(pillMixed.style.border).not.toBe('')
+      expect(pillFalse.style.border).toBe('')
+      expect(pillMixed.style.border).not.toBe(pillFalse.style.border)
+    })
+  })
+
+  describe('alvo de toque mínimo dos chips (min-w)', () => {
+    it('botão do chip "Todas" e de área têm min-w-11 (alvo tocável ≥44px mesmo com nome curto)', async () => {
+      const alarms = [alarme('SENSOR-A', 'a')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] }, [sensor('a', 'A')])
+
+      const todas = await screen.findByRole('button', { name: 'Todas' })
+      const chipA = screen.getByRole('button', { name: 'A' })
+
+      expect(todas.className).toMatch(/\bmin-w-11\b/)
+      expect(chipA.className).toMatch(/\bmin-w-11\b/)
+    })
   })
 })

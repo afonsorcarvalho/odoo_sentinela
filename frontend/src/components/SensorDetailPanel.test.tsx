@@ -51,4 +51,33 @@ describe('SensorDetailPanel', () => {
     screen.getByRole('button', { name: 'Pressão' }).click()
     expect(onSelectSensor).toHaveBeenCalledWith('PRESS-EXP-01')
   })
+
+  // DT/M2 (docs/superpowers/specs/2026-07-19-widget-drilldown-sensor-detail-design.md):
+  // o teste NAO consegue medir a altura renderizada real (echarts mockado,
+  // sem canvas em jsdom -- ver comentario no topo deste arquivo). Isso e
+  // validado no browser (Playwright), fora do escopo de T1. O que da para
+  // provar aqui, honestamente, e a ESTRUTURA que faz o preenchimento de
+  // altura funcionar quando um ancestral (o drawer, em T2/T3) tiver altura
+  // definida: painel = coluna flex full-height, chart embrulhado num
+  // wrapper min-h-0 flex-1 -- mesmo padrao ja provado em TimeseriesWidget.tsx.
+  it('e uma coluna flex full-height (h-full flex-col) com o TimeSeriesChart num wrapper min-h-0 flex-1 (DT/M2)', () => {
+    const { container } = render(
+      <SensorDetailPanel
+        group={group} selectedCode="TEMP-EXP-01" onSelectSensor={vi.fn()}
+        threshold={null} unidade="°C" value={21} state="ok"
+        window="24h" onWindowChange={vi.fn()} history={undefined} tail={[]}
+      />,
+    )
+
+    const root = container.firstElementChild as HTMLElement
+    expect(root.classList.contains('flex')).toBe(true)
+    expect(root.classList.contains('h-full')).toBe(true)
+    expect(root.classList.contains('flex-col')).toBe(true)
+
+    const chartWrapper = screen.getByTestId('sensor-detail-chart-wrapper')
+    expect(chartWrapper.classList.contains('min-h-0')).toBe(true)
+    expect(chartWrapper.classList.contains('flex-1')).toBe(true)
+    // TimeSeriesChart deve estar DENTRO do wrapper, nao como filho nu do painel.
+    expect(chartWrapper.querySelector('div')).not.toBeNull()
+  })
 })

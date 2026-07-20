@@ -30,7 +30,7 @@ export function SensorDetailPanel({
   const st = state ?? derived.state
 
   return (
-    <div className="rounded-md p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)' }}>
+    <div className="flex h-full flex-col rounded-md p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)' }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold" style={{ color: 'var(--color-ink)' }}>Detalhe do sensor</h2>
@@ -75,7 +75,9 @@ export function SensorDetailPanel({
       <div className="mt-5 mb-3 flex justify-end">
         <WindowSelector value={window} onChange={onWindowChange} />
       </div>
-      <TimeSeriesChart history={history} threshold={threshold} tail={tail} />
+      <div data-testid="sensor-detail-chart-wrapper" className="min-h-0 flex-1">
+        <TimeSeriesChart history={history} threshold={threshold} tail={tail} />
+      </div>
     </div>
   )
 }

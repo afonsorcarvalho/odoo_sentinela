@@ -178,15 +178,27 @@ describe('AlarmsWidget', () => {
     expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
   })
 
-  it('desativar todas as áreas mostra "Nenhuma área selecionada" (não "Nenhum alarme ativo.")', async () => {
-    const alarms = [alarme('SENSOR-A', 'a')]
-    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a'] }, [sensor('a', 'Área A')])
+  it('desativar todas as áreas (múltiplos chips ativos) mostra "Nenhuma área selecionada" (não "Nenhum alarme ativo.")', async () => {
+    const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b')]
+    renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a', 'b'] }, [
+      sensor('a', 'Área A'),
+      sensor('b', 'Área B'),
+    ])
 
     const chipA = await screen.findByRole('button', { name: 'Área A' })
-    await userEvent.click(chipA)
+    const chipB = screen.getByRole('button', { name: 'Área B' })
+    expect(chipA).toHaveAttribute('aria-pressed', 'true')
+    expect(chipB).toHaveAttribute('aria-pressed', 'true')
 
+    await userEvent.click(chipA)
+    await userEvent.click(chipB)
+
+    expect(chipA).toHaveAttribute('aria-pressed', 'false')
+    expect(chipB).toHaveAttribute('aria-pressed', 'false')
     expect(await screen.findByText('Nenhuma área selecionada')).toBeInTheDocument()
     expect(screen.queryByText('Nenhum alarme ativo.')).not.toBeInTheDocument()
+    expect(screen.queryByText(/SENSOR-A/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/SENSOR-B/)).not.toBeInTheDocument()
   })
 
   it('config legada resolvida para areaCodes=["a"]: chip a ativo por default', async () => {
@@ -208,5 +220,34 @@ describe('AlarmsWidget', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Todos os alarmes' })
     expect(within(dialog).queryByText(/SENSOR-C-EXTRA/)).not.toBeInTheDocument()
+  })
+
+  // Regressao CRITICAL (produto medico): useAlarms e useSensors sao queries
+  // independentes, sem ordem garantida. Se useSensors ainda nao resolveu (ou
+  // retorna vazio) enquanto useAlarms ja tem dados reais, o universo de areas
+  // (todasAreas) nao pode depender so de useSensors -- senao defaultAtivas
+  // fica vazio e em scope='site' TODOS os alarmes reais somem, exibindo
+  // "Nenhum alarme ativo." (all-clear falso) no exato momento em que o
+  // alarme mais precisa aparecer.
+  it('CRITICAL: useSensors vazio + useAlarms com alarmes reais (scope=site) -- alarmes aparecem, nao all-clear falso', async () => {
+    const alarms = [alarme('SENSOR-X', 'x'), alarme('SENSOR-Y', 'y')]
+    renderWithAlarms(alarms, { scope: 'site', areaCodes: [] }, [])
+
+    expect(await screen.findByText(/SENSOR-X/)).toBeInTheDocument()
+    expect(screen.getByText(/SENSOR-Y/)).toBeInTheDocument()
+    expect(screen.queryByText('Nenhum alarme ativo.')).not.toBeInTheDocument()
+
+    // chips das areas dos alarmes devem existir mesmo sem sensor correspondente
+    expect(screen.getByRole('button', { name: 'x' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'y' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('alarme com area_code sem sensor correspondente tem chip proprio e aparece em scope=site', async () => {
+    const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-ORFAO', 'orfao')]
+    renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+    expect(await screen.findByText(/SENSOR-A/)).toBeInTheDocument()
+    expect(screen.getByText(/SENSOR-ORFAO/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'orfao' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

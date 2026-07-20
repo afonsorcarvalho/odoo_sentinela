@@ -19,18 +19,27 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
   const sensors = useSensors().data ?? []
   const areaNameByCode = Object.fromEntries(sensors.map((s) => [s.area.area_code, s.area.name]))
 
-  // Universo dos chips: todas as areas do site, dedup por area_code, ordem
-  // estavel por nome. useSensors e assincrono -- enquanto vazio, todasAreas
-  // e [] e o default (abaixo) fica vazio ate os sensores chegarem.
+  // Universo dos chips: UNIAO das areas de useSensors com as areas presentes
+  // nos alarmes correntes (useAlarms), dedup por area_code, ordem estavel por
+  // nome. useAlarms e useSensors sao queries independentes sem ordem
+  // garantida -- se o universo dependesse so de useSensors, enquanto essa
+  // query nao resolvesse (ou retornasse vazia) o default ficaria vazio e, em
+  // scope='site', TODOS os alarmes reais seriam filtrados para fora (ver
+  // CRITICAL no design doc). Alarmes cujo area_code nao tem sensor
+  // correspondente tambem entram, com nome = areaNameByCode[code] ?? code
+  // (mesmo fallback usado pelo AlarmItem), para nunca ficarem sem chip.
   const todasAreas = useMemo(() => {
     const porCodigo = new Map<string, string>()
     for (const s of sensors) {
       if (!porCodigo.has(s.area.area_code)) porCodigo.set(s.area.area_code, s.area.name)
     }
+    for (const a of alarmsQuery.data ?? []) {
+      if (!porCodigo.has(a.area_code)) porCodigo.set(a.area_code, areaNameByCode[a.area_code] ?? a.area_code)
+    }
     return Array.from(porCodigo, ([area_code, name]) => ({ area_code, name })).sort((a, b) =>
       a.name.localeCompare(b.name),
     )
-  }, [sensors])
+  }, [sensors, alarmsQuery.data, areaNameByCode])
 
   // Default derivado da config: scope='area' com areaCodes definido usa
   // exatamente essas areas (nao depende de useSensors); scope='site' (ou

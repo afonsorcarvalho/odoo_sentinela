@@ -250,4 +250,122 @@ describe('AlarmsWidget', () => {
     expect(screen.getByText(/SENSOR-ORFAO/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'orfao' })).toHaveAttribute('aria-pressed', 'true')
   })
+
+  describe('chip "Todas" (toggle-all)', () => {
+    it('está presente e é o primeiro botão da linha de filtro', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const grupo = await screen.findByRole('group', { name: 'Filtro de áreas' })
+      const botoes = within(grupo).getAllByRole('button')
+      expect(botoes[0]).toHaveTextContent('Todas')
+    })
+
+    it('default scope="site" (todas ativas) -> "Todas" aria-pressed="true"', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const todas = await screen.findByRole('button', { name: 'Todas' })
+      expect(todas).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('tap em "Todas" com todas ativas -> limpa (chips de área false, painel "Nenhuma área selecionada")', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const todas = await screen.findByRole('button', { name: 'Todas' })
+      await userEvent.click(todas)
+
+      expect(todas).toHaveAttribute('aria-pressed', 'false')
+      for (const name of ['Área A', 'Área B', 'Área C']) {
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false')
+      }
+      expect(await screen.findByText('Nenhuma área selecionada')).toBeInTheDocument()
+    })
+
+    it('a partir de "nenhuma", tap em "Todas" -> ativa todas', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b')]
+      renderWithAlarms(
+        alarms,
+        { scope: 'area', areaCodes: ['a', 'b'] },
+        [sensor('a', 'Área A'), sensor('b', 'Área B')],
+      )
+
+      const chipA = await screen.findByRole('button', { name: 'Área A' })
+      const chipB = screen.getByRole('button', { name: 'Área B' })
+      await userEvent.click(chipA)
+      await userEvent.click(chipB)
+      expect(chipA).toHaveAttribute('aria-pressed', 'false')
+      expect(chipB).toHaveAttribute('aria-pressed', 'false')
+
+      const todas = screen.getByRole('button', { name: 'Todas' })
+      expect(todas).toHaveAttribute('aria-pressed', 'false')
+      await userEvent.click(todas)
+
+      expect(todas).toHaveAttribute('aria-pressed', 'true')
+      expect(chipA).toHaveAttribute('aria-pressed', 'true')
+      expect(chipB).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByText(/SENSOR-A/)).toBeInTheDocument()
+      expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+    })
+
+    it('desativar 1 área -> "Todas" aria-pressed="mixed"', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const chipA = await screen.findByRole('button', { name: 'Área A' })
+      await userEvent.click(chipA)
+
+      const todas = screen.getByRole('button', { name: 'Todas' })
+      expect(todas).toHaveAttribute('aria-pressed', 'mixed')
+    })
+
+    it('isolar em 2 toques: tap "Todas" (limpa) -> tap área X -> só alarmes de X; "Todas" volta a "mixed"', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const todas = await screen.findByRole('button', { name: 'Todas' })
+      await userEvent.click(todas)
+
+      const chipB = screen.getByRole('button', { name: 'Área B' })
+      await userEvent.click(chipB)
+
+      expect(chipB).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Área A' })).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.getByRole('button', { name: 'Área C' })).toHaveAttribute('aria-pressed', 'false')
+      expect(todas).toHaveAttribute('aria-pressed', 'mixed')
+      expect(screen.queryByText(/SENSOR-A/)).not.toBeInTheDocument()
+      expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+      expect(screen.queryByText(/SENSOR-C/)).not.toBeInTheDocument()
+    })
+
+    it('voltar a todas em 1 toque: de subconjunto, tap "Todas" -> todos os alarmes de volta', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b'), alarme('SENSOR-C', 'c')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const chipA = await screen.findByRole('button', { name: 'Área A' })
+      await userEvent.click(chipA)
+
+      const todas = screen.getByRole('button', { name: 'Todas' })
+      expect(todas).toHaveAttribute('aria-pressed', 'mixed')
+      await userEvent.click(todas)
+
+      expect(todas).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByText(/SENSOR-A/)).toBeInTheDocument()
+      expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+      expect(screen.getByText(/SENSOR-C/)).toBeInTheDocument()
+    })
+
+    it('tap numa área continua sendo liga/desliga individual (não regride)', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b')]
+      renderWithAlarms(alarms, { scope: 'area', areaCodes: ['a', 'b'] })
+
+      const chipA = await screen.findByRole('button', { name: 'Área A' })
+      await userEvent.click(chipA)
+
+      expect(chipA).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.queryByText(/SENSOR-A/)).not.toBeInTheDocument()
+      expect(screen.getByText(/SENSOR-B/)).toBeInTheDocument()
+    })
+  })
 })

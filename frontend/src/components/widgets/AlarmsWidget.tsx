@@ -65,12 +65,57 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
     })
   }
 
-  const all = alarmsQuery.data ?? []
-  const alarms = all.filter((a) => areasAtivas.has(a.area_code))
+  // Chip "Todas" (toggle-all, ver docs/superpowers/specs/2026-07-20-alarme-filtro-polish-design.md):
+  // estado 3-valores derivado de areasAtivas (efetivo) vs o universo todasAreas.
+  // Tap: se todas ativas -> limpa (Set vazio explicito, NAO null -- null cairia
+  // de volta no default via areasAtivas = override ?? defaultAtivas e o "limpar"
+  // nao pegaria); senao (mixed ou nenhuma) -> ativa todas.
+  const totalAreasUniverso = todasAreas.length
+  const totalAreasAtivas = todasAreas.filter((a) => areasAtivas.has(a.area_code)).length
+  const todasPressed: boolean | 'mixed' =
+    totalAreasUniverso > 0 && totalAreasAtivas === totalAreasUniverso
+      ? true
+      : totalAreasAtivas === 0
+        ? false
+        : 'mixed'
+
+  function toggleTodas() {
+    if (todasPressed === true) {
+      setOverride(new Set())
+    } else {
+      setOverride(new Set(todasAreas.map((a) => a.area_code)))
+    }
+  }
+
+  // Chips ~50% menores no VISUAL, mas alvo de toque ~44px preservado (WCAG
+  // 2.5.5 / uso com luva). O peso visual (a mancha colorida) e o alvo tocavel
+  // sao elementos DIFERENTES: o <button> e transparente e so define a hit-area
+  // (min-h-11 = 44px, flex+centralizado); quem carrega a cor/fundo e um <span>
+  // interno menor (py-1, texto text-[11px]/font-medium) -- e esse span que fica
+  // ~metade da altura do pill anterior. Sem essa separacao, colorir o botao
+  // inteiro manteria a mancha visual do tamanho da hit-area de 44px (nao 50%
+  // menor). O foco (focus-visible) fica no botao, entao o anel de foco cobre
+  // a hit-area toda, nao so o pill pequeno.
+  const chipButtonClass =
+    'flex min-h-11 shrink-0 items-center justify-center rounded-full bg-transparent px-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]'
+  const chipPillClass =
+    'rounded-full px-2 py-1 text-[11px] font-medium transition-colors duration-200 ease-out motion-reduce:transition-none'
 
   const filtro =
     todasAreas.length > 0 ? (
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filtro de áreas">
+        <button type="button" aria-pressed={todasPressed} onClick={toggleTodas} className={chipButtonClass}>
+          <span
+            className={chipPillClass}
+            style={
+              todasPressed === true
+                ? { background: 'var(--color-primary)', color: 'var(--color-panel)' }
+                : { background: 'var(--color-panel)', color: 'var(--color-muted)' }
+            }
+          >
+            Todas
+          </span>
+        </button>
         {todasAreas.map((a) => {
           const ativa = areasAtivas.has(a.area_code)
           return (
@@ -79,19 +124,26 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
               type="button"
               aria-pressed={ativa}
               onClick={() => toggleArea(a.area_code)}
-              className="min-h-11 shrink-0 rounded-full px-3 text-sm font-semibold outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
-              style={
-                ativa
-                  ? { background: 'var(--color-primary)', color: 'var(--color-panel)' }
-                  : { background: 'var(--color-panel)', color: 'var(--color-muted)' }
-              }
+              className={chipButtonClass}
             >
-              {a.name}
+              <span
+                className={chipPillClass}
+                style={
+                  ativa
+                    ? { background: 'var(--color-primary)', color: 'var(--color-panel)' }
+                    : { background: 'var(--color-panel)', color: 'var(--color-muted)' }
+                }
+              >
+                {a.name}
+              </span>
             </button>
           )
         })}
       </div>
     ) : undefined
+
+  const all = alarmsQuery.data ?? []
+  const alarms = all.filter((a) => areasAtivas.has(a.area_code))
 
   // "Nenhuma area selecionada" so faz sentido quando ja ha universo de areas
   // (todasAreas carregado) e o operador desligou todas -- distingue essa

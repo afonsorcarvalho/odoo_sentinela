@@ -1,3 +1,4 @@
+import type { FreshnessTier } from './freshness'
 import type { StatusResult } from './status'
 import type { LivePoint, SensorMeta, Threshold } from './types'
 
@@ -23,6 +24,33 @@ const SEVERITY: Record<StatusResult['state'], number> = { unknown: 0, ok: 1, war
 export function worstAlarmState(states: StatusResult['state'][]): StatusResult['state'] {
   if (states.length === 0) return 'unknown'
   return states.reduce((worst, s) => (SEVERITY[s] > SEVERITY[worst] ? s : worst), states[0])
+}
+
+// Entrada por sensor para a agregacao da area (ver areaAggregateState).
+// `freshness` aqui e o freshness JA EFETIVO: quem chama (AreaCard) decide se
+// um 'never' deve ser tratado como 'offline' apos a janela de graca -- esta
+// funcao so olha o valor que recebe, sem conhecer relogio/graca.
+export type SensorAggregateInput = { display: StatusResult['state']; freshness: FreshnessTier }
+
+// Agregacao da area (guarda de regressao da razao de ser da feature A2):
+// um sensor com freshness 'offline' forca sua contribuicao para a agregacao
+// a ser NO MINIMO 'warn', mesmo que o displayState dele seja 'ok' ou
+// 'unknown' (sem threshold). Sem isso, um sensor morto sem limite configurado
+// contribuiria 'unknown' -- a severidade MAIS BAIXA -- e a area agregaria
+// para verde/neutro com um sensor silencioso. 'stale' NAO altera a
+// contribuicao nesta fase (so vira badge por-sensor em T3): o offline e o
+// unico tier que escala a agregacao, e escala para 'warn' (nao 'crit') --
+// default conservador de fase 1 (ver doc, "Fora de escopo").
+//
+// Reusa worstAlarmState para a ordenacao crit>warn>ok>unknown em vez de
+// reimplementar SEVERITY aqui: a contribuicao de um sensor offline e
+// worstAlarmState([display, 'warn']) (isto e, max(display, 'warn') na mesma
+// ordem), e o resultado final e o pior entre todas as contribuicoes.
+export function areaAggregateState(perSensor: SensorAggregateInput[]): StatusResult['state'] {
+  const contributions = perSensor.map(({ display, freshness }) =>
+    freshness === 'offline' ? worstAlarmState([display, 'warn']) : display,
+  )
+  return worstAlarmState(contributions)
 }
 
 export type AreaGroup = { area: SensorMeta['area']; sensors: SensorMeta[] }

@@ -172,6 +172,102 @@ describe('AreaCard', () => {
     expect(value.style.color).toBe(statusTextColor('crit'))
   })
 
+  it('avancar o now faz a area cruzar para warn quando um sensor cruza para offline SEM nenhum LivePoint novo (tick, nao evento)', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const freshLive = {
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={freshLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    // Aggregate comeca 'ok': ambos os sensores fresh e dentro do limite.
+    expect(screen.getByText('OK')).toBeInTheDocument()
+
+    // Nenhum LivePoint novo chega -- so o relogio (useNow, tick de 30s) anda.
+    // useNow so reavalia `now` em multiplos do seu intervalMs (30s) a partir
+    // do mount, entao para garantir que o TICK observado fique estritamente
+    // acima de DEFAULT_OFFLINE_MS (15min) avancamos alem do proximo multiplo
+    // de 30s depois de 15min (900000ms -> proximo tick em 930000ms), nao so
+    // 15min+1ms (que ficaria "preso" no ultimo tick <= 900000 e nao mostraria
+    // a transicao). 16min cobre essa margem com folga.
+    act(() => {
+      vi.advanceTimersByTime(16 * 60_000)
+    })
+    expect(screen.getByText('Perto do limite')).toBeInTheDocument()
+    expect(screen.queryByText('OK')).not.toBeInTheDocument()
+  })
+
+  it('sensor offline SEM threshold (display unknown) faz a area virar warn, nao ok/unknown', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const oldLive = {
+      // ts muito antigo -> ja nasce offline (sem depender de tick), sem
+      // threshold configurado (nao esta em thresholdsByCode) -> display
+      // 'unknown'. E o caso fatal que a feature existe para fechar.
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start - 20 * 60_000, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={{}} liveByCode={oldLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.queryByText('OK')).not.toBeInTheDocument()
+    expect(screen.queryByText('Sem limite')).not.toBeInTheDocument()
+    expect(screen.getByText('Perto do limite')).toBeInTheDocument()
+  })
+
+  it('sensor never (nenhum LivePoint) escala para offline apos a janela de graca (2x staleMs)', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const partialLive = {
+      // TEMP-EXP-01 sem entrada em liveByCode -> live undefined -> freshness
+      // 'never' (caso "morto no page-load", o mais perigoso da doc).
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={partialLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    // No load, 'never' ainda dentro da graca -- nao escala. Contribuicao do
+    // TEMP (unknown) fica abaixo da do PRESS (ok, fresh), entao a area
+    // agrega para 'ok' (worst entre unknown e ok e ok) -- nao ha falso
+    // warn so por existir um sensor sem dado ainda.
+    expect(screen.getByText('OK')).toBeInTheDocument()
+
+    // Janela de graca = 2*staleMs = 10min (600000ms). useNow so reavalia em
+    // multiplos de 30s a partir do mount, entao (mesma armadilha do teste
+    // anterior) avancar so 10min+1ms ficaria preso no ultimo tick <= 600000.
+    // 11min passa do proximo tick estrito (630000) com folga.
+    act(() => {
+      vi.advanceTimersByTime(11 * 60_000)
+    })
+    expect(screen.queryByText('OK')).not.toBeInTheDocument()
+    expect(screen.getByText('Perto do limite')).toBeInTheDocument()
+  })
+
+  it('sensor stale (velho, mas nao offline) NAO altera a agregacao da area', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const staleLive = {
+      // 10min de idade: > staleMs(5min), <= offlineMs(15min) -> 'stale', que
+      // nao deve escalar a agregacao (so o valor bruto 'ok'/'ok' conta).
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start - 10 * 60_000, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={staleLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.getByText('OK')).toBeInTheDocument()
+  })
+
   it('carouselIntervalMs vindo por prop governa o intervalo (nao mais fixo em 3000)', () => {
     vi.useFakeTimers()
     render(

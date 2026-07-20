@@ -1,9 +1,22 @@
-import { sensorDisplayState, worstAlarmState, type AreaGroup } from '../lib/aggregateStatus'
+import { useRef } from 'react'
+import { areaAggregateState, sensorDisplayState, worstAlarmState, type AreaGroup } from '../lib/aggregateStatus'
+import { DEFAULT_STALE_MS, freshness, type FreshnessTier } from '../lib/freshness'
+import { useNow } from '../lib/useNow'
 import { useSensorCarousel } from '../lib/useSensorCarousel'
 import { StatusChip } from './StatusChip'
 import { StatusDot } from './StatusDot'
 import { statusTextColor } from './statusVisuals'
 import type { LivePoint, Threshold } from '../lib/types'
+
+// Janela de graca antes de escalar um sensor 'never' (nunca recebeu
+// LivePoint nesta sessao) para 'offline' na agregacao da area. Proposta da
+// doc: 2x staleMs. Medida a partir do MOUNT deste AreaCard -- e a melhor
+// aproximacao disponivel no cliente de "desde quando estamos observando este
+// sensor" quando nao ha nenhum ts para envelhecer (ver doc, "Limitacao
+// honesta desta fase": sensor ja morto no load nao emite ts algum). Isto e
+// uma escolha desta fase, nao um requisito da spec -- documentado aqui por
+// ser a decisao mais visivel do T2.
+const NEVER_GRACE_MS = 2 * DEFAULT_STALE_MS
 
 const BORDER_COLOR: Record<ReturnType<typeof worstAlarmState>, string> = {
   ok: 'var(--color-line)',
@@ -29,10 +42,22 @@ export function AreaCard({
   hadAlarmToday: boolean
   carouselIntervalMs: number
 }) {
-  const states = group.sensors.map((s) =>
-    sensorDisplayState(thresholdsByCode[s.sensor_code] ?? null, liveByCode[s.sensor_code]),
-  )
-  const aggregate = worstAlarmState(states)
+  // mountedAtRef: referencia de "desde quando este AreaCard observa estes
+  // sensores", usada so para escalar 'never' -> 'offline' apos a janela de
+  // graca (ver NEVER_GRACE_MS acima). Sensores com live definido envelhecem
+  // via ts real, sem depender disto.
+  const mountedAtRef = useRef(Date.now())
+  const now = useNow()
+
+  const perSensor = group.sensors.map((s) => {
+    const live = liveByCode[s.sensor_code]
+    const display = sensorDisplayState(thresholdsByCode[s.sensor_code] ?? null, live)
+    const rawFreshness = freshness(live, now)
+    const effectiveFreshness: FreshnessTier =
+      rawFreshness === 'never' && now - mountedAtRef.current > NEVER_GRACE_MS ? 'offline' : rawFreshness
+    return { display, freshness: effectiveFreshness }
+  })
+  const aggregate = areaAggregateState(perSensor)
   const carousel = useSensorCarousel(group.sensors.length, carouselIntervalMs)
   const activeSensor = group.sensors[carousel.activeIndex] ?? group.sensors[0]
   const activeState = sensorDisplayState(

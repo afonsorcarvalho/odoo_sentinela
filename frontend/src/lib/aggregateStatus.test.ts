@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sensorDisplayState, worstAlarmState, groupSensorsByArea } from './aggregateStatus'
+import { sensorDisplayState, worstAlarmState, groupSensorsByArea, areaAggregateState } from './aggregateStatus'
 import type { LivePoint, SensorMeta, Threshold } from './types'
 
 const t: Threshold = { sensor_id: 'S', limite_min: 18, limite_max: 22, is_valor_padrao_regulatorio: true }
@@ -37,6 +37,44 @@ describe('worstAlarmState', () => {
   })
   it('todos unknown e unknown', () => {
     expect(worstAlarmState(['unknown', 'unknown'])).toBe('unknown')
+  })
+})
+
+describe('areaAggregateState', () => {
+  it('CRITICO: sensor offline sem threshold (display unknown) NAO agrega para ok/unknown -- vira warn', () => {
+    const result = areaAggregateState([{ display: 'unknown', freshness: 'offline' }])
+    expect(result).not.toBe('ok')
+    expect(result).not.toBe('unknown')
+    expect(result).toBe('warn')
+  })
+
+  it('sensor offline com display ok tambem escala a area para warn', () => {
+    expect(areaAggregateState([{ display: 'ok', freshness: 'offline' }])).toBe('warn')
+  })
+
+  it('sensor crit por valor + outro offline -- area permanece crit (offline nao rebaixa)', () => {
+    const result = areaAggregateState([
+      { display: 'crit', freshness: 'fresh' },
+      { display: 'ok', freshness: 'offline' },
+    ])
+    expect(result).toBe('crit')
+  })
+
+  it('todos fresh e ok -- area ok (offline nao gera falso-positivo quando ninguem esta offline)', () => {
+    const result = areaAggregateState([
+      { display: 'ok', freshness: 'fresh' },
+      { display: 'ok', freshness: 'fresh' },
+    ])
+    expect(result).toBe('ok')
+  })
+
+  it('stale NAO altera a agregacao -- area segue como se fresh', () => {
+    expect(areaAggregateState([{ display: 'ok', freshness: 'stale' }])).toBe('ok')
+    expect(areaAggregateState([{ display: 'unknown', freshness: 'stale' }])).toBe('unknown')
+  })
+
+  it('lista vazia -- unknown (nada para agregar, mesmo comportamento de worstAlarmState)', () => {
+    expect(areaAggregateState([])).toBe('unknown')
   })
 })
 

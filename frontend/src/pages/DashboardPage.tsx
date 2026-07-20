@@ -11,7 +11,9 @@ import { DashboardEditor } from '../components/DashboardEditor'
 import { Topbar } from '../components/Topbar'
 import { ToastContainer } from '../components/ToastContainer'
 import { DemoBanner } from '../components/DemoBanner'
+import { SensorDetailDrawer } from '../components/SensorDetailDrawer'
 import { isDemoMode } from '../lib/demoMode'
+import { DrillDownContext } from '../lib/drilldown/DrillDownContext'
 import type { AlarmEvent } from '../lib/types'
 
 const UNIT_NAME = import.meta.env.VITE_UNIT_NAME ?? 'Unidade não configurada'
@@ -22,6 +24,12 @@ export function DashboardPage() {
   const liveState = useLiveConnection()
   const [editing, setEditing] = useState(false)
   const [simulating, setSimulating] = useState(false)
+  // null = drawer fechado; string = aberto naquele sensor. A MESMA callback
+  // (setSelectedSensorCode) serve dois papeis (ver design doc D3, "Estado e
+  // a callback de duplo uso"): abrir via AreaCard (context) e trocar de
+  // metrica dentro do SensorDetailDrawer (botao de metrica no painel).
+  const [selectedSensorCode, setSelectedSensorCode] = useState<string | null>(null)
+  const drillDown = useMemo(() => ({ open: setSelectedSensorCode }), [])
 
   const sensorsQuery = useSensors()
   const configQuery = useConfig()
@@ -83,9 +91,36 @@ export function DashboardPage() {
         {editing ? (
           <DashboardEditor layout={layout} onExit={() => setEditing(false)} />
         ) : (
-          <DashboardGrid layout={layout} editing={false} />
+          // Provider só no ramo de view: em edição não há DrillDownContext,
+          // então AreaWidget cai no no-op (ver design doc D3, "Modo edição
+          // vs view") — clicar no valor do card durante edição não abre o
+          // drawer, deixa o admin manipular o widget (draggableCancel="button"
+          // do DashboardGrid).
+          <DrillDownContext.Provider value={drillDown}>
+            <DashboardGrid layout={layout} editing={false} />
+          </DrillDownContext.Provider>
         )}
       </div>
+
+      {/* Montagem condicional: o SensorDetailDrawer só existe no DOM depois
+          que selectedSensorCode vira não-null, ou seja, depois que o clique
+          que o abriu (no AreaCard) já terminou de se propagar. O
+          useDismiss({ outsidePress: true }) do drawer registra seu listener
+          de pointerdown num useEffect, que só roda após esse mount — não há
+          como o próprio clique de abertura ser lido como "clique fora" pelo
+          listener de uma instância que ainda não existia quando o evento
+          disparou. Se o drawer ficasse sempre montado (open controlado só
+          por uma prop), o mesmo pointerdown que abre poderia, a depender da
+          ordem de effects, ser capturado como outside-press e fechar
+          imediatamente — daí a montagem condicional ser estrutural, não
+          cosmética. */}
+      {selectedSensorCode != null && (
+        <SensorDetailDrawer
+          sensorCode={selectedSensorCode}
+          onSelectSensor={setSelectedSensorCode}
+          onClose={() => setSelectedSensorCode(null)}
+        />
+      )}
     </div>
   )
 }

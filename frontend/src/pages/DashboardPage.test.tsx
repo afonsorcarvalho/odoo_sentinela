@@ -117,4 +117,74 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /editar/i })).toBeNull()
   })
+
+  describe('drill-down (D3)', () => {
+    // EXPURGO e o 1o grupo do fixture, com sensor ativo default TEMP-EXP-01
+    // ("Temperatura") -- mesma base dos testes de carrossel acima.
+
+    it('clicar no valor do AreaCard (view) abre o SensorDetailDrawer com o sensor certo', async () => {
+      renderWithProviders(['/'])
+      const expurgoCard = await screen.findByTestId('area-card-EXPURGO')
+
+      // userEvent.click dispara a sequencia real de eventos de ponteiro
+      // (pointerdown/mousedown/pointerup/mouseup/click) -- e exatamente essa
+      // sequencia que exercitaria uma falsa deteccao de "clique fora"
+      // (useDismiss outsidePress escuta pointerdown) SE o drawer ja existisse
+      // no DOM no momento do clique. Como o drawer so monta depois que
+      // selectedSensorCode vira nao-null (DashboardPage.tsx), o listener de
+      // outsidePress do floating-ui (registrado em useEffect apos o mount)
+      // nasce depois que este clique ja terminou de se propagar -- por isso
+      // basta afirmar que o dialog aparece E continua aberto apos o clique
+      // resolver: se houvesse a race, o drawer teria fechado (ou nunca
+      // aberto de forma estavel) neste mesmo passo.
+      await userEvent.click(within(expurgoCard).getByText('Temperatura'))
+
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('Expurgo · Temperatura')).toBeInTheDocument()
+    })
+
+    it('em modo edição (sem provider), clicar no valor do AreaCard NÃO abre o drawer', async () => {
+      setAdminToken()
+      renderWithProviders(['/'])
+      await userEvent.click(await screen.findByRole('button', { name: /editar/i }))
+      // Confirma que o DashboardEditor montou (mesmo teste de fumaca do bloco
+      // acima) antes de procurar o card dentro dele.
+      expect(await screen.findByRole('button', { name: 'Salvar' })).toBeInTheDocument()
+
+      const expurgoCard = await screen.findByTestId('area-card-EXPURGO')
+      await userEvent.click(within(expurgoCard).getByText('Temperatura'))
+
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('botão de métrica dentro do painel troca o sensor exibido sem fechar o drawer', async () => {
+      renderWithProviders(['/'])
+      const expurgoCard = await screen.findByTestId('area-card-EXPURGO')
+      await userEvent.click(within(expurgoCard).getByText('Temperatura'))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('Expurgo · Temperatura')).toBeInTheDocument()
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Pressão diferencial' }))
+
+      // Mesmo dialog (nao fechou e reabriu) com o outro sensor.
+      expect(await screen.findByRole('dialog')).toBe(dialog)
+      expect(within(dialog).getByText('Expurgo · Pressão diferencial')).toBeInTheDocument()
+    })
+
+    it('fechar pelo botão ✕ seta selectedSensorCode=null (drawer some) e restaura o foco no botão de origem', async () => {
+      renderWithProviders(['/'])
+      const expurgoCard = await screen.findByTestId('area-card-EXPURGO')
+      const valueButton = within(expurgoCard).getByText('Temperatura').closest('button')!
+      await userEvent.click(valueButton)
+      const dialog = await screen.findByRole('dialog')
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }))
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+      // FloatingFocusManager (returnFocus, default true) restaura o foco ao
+      // activeElement capturado no momento em que o drawer abriu -- que era
+      // o botao de valor do AreaCard (foi ele que recebeu o clique).
+      await waitFor(() => expect(document.activeElement).toBe(valueButton))
+    })
+  })
 })

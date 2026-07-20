@@ -54,7 +54,8 @@ const widgetInstanceSchema = z
     type: z.enum(WIDGET_TYPES),
     layout: widgetLayoutSchema,
     binding: z.object({
-      areaCode: z.string().optional(),
+      areaCode: z.string().optional(), // legado (single) — mantido p/ backward-compat
+      areaCodes: z.array(z.string()).optional(), // novo: multi-área (alarms scope='area')
       sensorCode: z.string().optional(),
     }),
     options: z.record(z.string(), z.unknown()).optional().default({}),

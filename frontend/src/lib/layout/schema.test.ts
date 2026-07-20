@@ -205,4 +205,62 @@ describe('parseLayout — options por tipo (transform em runtime)', () => {
     expect(result).not.toBeNull()
     expect(result?.widgets[0].options).toEqual({ defaultWindow: '24h' })
   })
+
+  it('binding.areaCodes: array de strings valida', () => {
+    const raw = {
+      version: 1,
+      grid: { cols: 12, rowHeight: 40, margin: [8, 8] },
+      widgets: [
+        {
+          id: 'w1',
+          type: 'alarms',
+          layout: { x: 0, y: 0, w: 2, h: 2 },
+          binding: { areaCodes: ['a', 'b'] },
+          options: { scope: 'area' },
+        },
+      ],
+    }
+    const result = parseLayout(raw)
+    expect(result).not.toBeNull()
+    expect(result?.widgets[0].binding).toEqual({ areaCodes: ['a', 'b'] })
+  })
+
+  it('binding.areaCodes: ausente é ok (opcional)', () => {
+    const raw = {
+      version: 1,
+      grid: { cols: 12, rowHeight: 40, margin: [8, 8] },
+      widgets: [
+        {
+          id: 'w1',
+          type: 'alarms',
+          layout: { x: 0, y: 0, w: 2, h: 2 },
+          binding: {},
+          options: { scope: 'site' },
+        },
+      ],
+    }
+    const result = parseLayout(raw)
+    expect(result).not.toBeNull()
+    expect(result?.widgets[0].binding).toEqual({})
+  })
+
+  it('backward-compat: blob antigo com só binding.areaCode (sem areaCodes) parseia, version continua 1', () => {
+    const raw = {
+      version: 1,
+      grid: { cols: 12, rowHeight: 40, margin: [8, 8] },
+      widgets: [
+        {
+          id: 'w1',
+          type: 'alarms',
+          layout: { x: 0, y: 0, w: 2, h: 2 },
+          binding: { areaCode: 'a' },
+          options: { scope: 'area' },
+        },
+      ],
+    }
+    const result = parseLayout(raw)
+    expect(result).not.toBeNull()
+    expect(result?.version).toBe(1)
+    expect(result?.widgets[0].binding).toEqual({ areaCode: 'a' })
+  })
 })

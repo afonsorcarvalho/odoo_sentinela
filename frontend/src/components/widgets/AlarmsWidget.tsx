@@ -8,13 +8,16 @@ import { AlarmsModal } from '../AlarmsModal'
 // (uso em dashboards de site menores, focados numa unica sala).
 // Dono da propria modal "Ver mais": um widget no meio do grid nao tem um
 // callback natural a nivel de pagina, entao o widget se auto-contem.
-export function AlarmsWidget({ scope, areaCode }: { scope: 'site' | 'area'; areaCode?: string }) {
+export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; areaCodes: string[] }) {
   const [modalOpen, setModalOpen] = useState(false)
   const alarmsQuery = useAlarms()
   const sensors = useSensors().data ?? []
   const areaNameByCode = Object.fromEntries(sensors.map((s) => [s.area.area_code, s.area.name]))
   const all = alarmsQuery.data ?? []
-  const alarms = scope === 'area' && areaCode ? all.filter((a) => a.area_code === areaCode) : all
+  // areaCodes=[] em scope='area' é fallback seguro para o site inteiro (não esconde alarme).
+  const alarms = scope === 'area' && areaCodes.length > 0
+    ? all.filter((a) => areaCodes.includes(a.area_code))
+    : all
 
   return (
     <>

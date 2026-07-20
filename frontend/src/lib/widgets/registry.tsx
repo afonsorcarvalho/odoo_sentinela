@@ -34,7 +34,10 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetDescriptor> = {
   alarms: {
     type: 'alarms', label: 'Painel de alarmes', needs: 'none',
     defaultSize: { w: 3, h: 6 }, minSize: { w: 2, h: 3 },
-    render: (w) => <AlarmsWidget scope={(w.options?.scope as 'site' | 'area') ?? 'site'} areaCode={w.binding.areaCode} />,
+    render: (w) => <AlarmsWidget
+      scope={(w.options?.scope as 'site' | 'area') ?? 'site'}
+      areaCodes={w.binding.areaCodes ?? (w.binding.areaCode ? [w.binding.areaCode] : [])}
+    />,
   },
   kpi: {
     type: 'kpi', label: 'KPI (valor único)', needs: 'sensor',

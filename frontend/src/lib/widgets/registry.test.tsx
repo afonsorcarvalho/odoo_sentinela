@@ -10,6 +10,12 @@ vi.mock('../../components/widgets/KpiWidget', () => ({
   ),
 }))
 
+vi.mock('../../components/widgets/AlarmsWidget', () => ({
+  AlarmsWidget: (props: { scope: 'site' | 'area'; areaCodes: string[] }) => (
+    <div data-testid="alarms" data-scope={props.scope} data-area-codes={JSON.stringify(props.areaCodes)} />
+  ),
+}))
+
 function widget(overrides: Partial<WidgetInstance>): WidgetInstance {
   return {
     id: 'w1',
@@ -51,5 +57,27 @@ describe('WIDGET_REGISTRY', () => {
     const el = screen.getByTestId('kpi')
     expect(el.dataset.limiteMin).toBeUndefined()
     expect(el.dataset.limiteMax).toBeUndefined()
+  })
+
+  it('alarms.render com binding.areaCodes -> passa areaCodes tal qual', () => {
+    const w = widget({ type: 'alarms', binding: { areaCodes: ['a', 'b'] }, options: { scope: 'area' } })
+    render(<>{WIDGET_REGISTRY.alarms.render(w)}</>)
+    const el = screen.getByTestId('alarms')
+    expect(el.dataset.scope).toBe('area')
+    expect(JSON.parse(el.dataset.areaCodes ?? '[]')).toEqual(['a', 'b'])
+  })
+
+  it('alarms.render legado (só binding.areaCode) -> resolve para [areaCode]', () => {
+    const w = widget({ type: 'alarms', binding: { areaCode: 'a' }, options: { scope: 'area' } })
+    render(<>{WIDGET_REGISTRY.alarms.render(w)}</>)
+    const el = screen.getByTestId('alarms')
+    expect(JSON.parse(el.dataset.areaCodes ?? '[]')).toEqual(['a'])
+  })
+
+  it('alarms.render sem área -> passa areaCodes vazio', () => {
+    const w = widget({ type: 'alarms', binding: {}, options: { scope: 'site' } })
+    render(<>{WIDGET_REGISTRY.alarms.render(w)}</>)
+    const el = screen.getByTestId('alarms')
+    expect(JSON.parse(el.dataset.areaCodes ?? '[]')).toEqual([])
   })
 })

@@ -5,13 +5,43 @@ import type { StatusResult } from '../../lib/status'
 
 type State = StatusResult['state']
 
+// Ranking de severidade para a semântica `max()` do override de threshold:
+// quanto maior o índice, mais severo. unknown < ok < warn < crit.
+const SEVERITY_RANK: Record<State, number> = { unknown: 0, ok: 1, warn: 2, crit: 3 }
+
+function maisSevero(a: State, b: State): State {
+  return SEVERITY_RANK[b] > SEVERITY_RANK[a] ? b : a
+}
+
 // KPI: valor atual (live) de 1 sensor em destaque, cor por estado de alarme.
-export function KpiWidget({ sensorCode, label }: { sensorCode: string; label?: string }) {
+// `limiteMin`/`limiteMax` são um override display-only, configurável por widget
+// (options do layout): quando o valor ao vivo está fora dessa faixa, ELEVA o
+// estado para 'crit'. O override NUNCA rebaixa o alarm_state autoritativo que
+// vem do backend — a cor final é sempre o mais severo entre os dois (ver spec
+// B2 §KPI — threshold). Sem limiteMin/limiteMax, comportamento idêntico ao
+// atual: cor só por alarm_state.
+export function KpiWidget({
+  sensorCode,
+  label,
+  limiteMin,
+  limiteMax,
+}: {
+  sensorCode: string
+  label?: string
+  limiteMin?: number
+  limiteMax?: number
+}) {
   const meta = useSensorMeta(sensorCode)
   const { last } = useLiveTail(sensorCode)
   const titulo = label ?? meta.data?.name ?? sensorCode
   const unidade = meta.data?.unidade ?? ''
-  const state: State = last?.alarm_state ?? 'unknown'
+  const estadoBackend: State = last?.alarm_state ?? 'unknown'
+  const temOverride = limiteMin != null || limiteMax != null
+  const foraDaFaixa =
+    temOverride &&
+    last != null &&
+    ((limiteMin != null && last.value < limiteMin) || (limiteMax != null && last.value > limiteMax))
+  const state: State = foraDaFaixa ? maisSevero(estadoBackend, 'crit') : estadoBackend
   // Mesma convenção do AreaCard: ok/unknown usam --color-ink (contraste
   // padrão); apenas warn/crit usam o token de cor de estado.
   const cor = state === 'ok' || state === 'unknown' ? 'var(--color-ink)' : statusTextColor(state)

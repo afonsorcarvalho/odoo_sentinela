@@ -40,7 +40,12 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetDescriptor> = {
     type: 'kpi', label: 'KPI (valor único)', needs: 'sensor',
     defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 },
     render: (w) => w.binding.sensorCode
-      ? <KpiWidget sensorCode={w.binding.sensorCode} label={w.options?.label as string | undefined} />
+      ? <KpiWidget
+          sensorCode={w.binding.sensorCode}
+          label={w.options?.label as string | undefined}
+          limiteMin={w.options?.limiteMin as number | undefined}
+          limiteMax={w.options?.limiteMax as number | undefined}
+        />
       : <WidgetPlaceholder texto="Configurar sensor" />,
   },
 }

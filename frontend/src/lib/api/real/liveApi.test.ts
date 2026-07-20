@@ -262,4 +262,34 @@ describe('realLiveApi estado de conexao (subscribeConnection)', () => {
     es.onopen?.()
     expect(states).toEqual(['live', 'offline'])
   })
+
+  it('source fecha (subscribers de dados a zero) com subscribeConnection ainda ativo; novo subscribe reabre e onopen notifica live', () => {
+    vi.useFakeTimers()
+    const unsubData = subscribe('SNR-1', () => {})
+    const es1 = MockEventSource.instances[0]
+    const states: string[] = []
+    subscribeConnection((s) => states.push(s))
+
+    // Cai numa reconexao real -> 'reconnecting'
+    es1.readyState = 0 // CONNECTING
+    es1.onerror?.()
+    vi.advanceTimersByTime(3000)
+    expect(states).toEqual(['live', 'reconnecting'])
+
+    // Todo mundo que consumia dados sai: source fecha, mas o listener de
+    // conexao (ex.: badge no Topbar/DashboardPage) segue inscrito.
+    unsubData()
+    expect(es1.closed).toBe(true)
+
+    // Um novo subscribe() de dados reabre o EventSource compartilhado.
+    subscribe('SNR-2', () => {})
+    const es2 = MockEventSource.instances[1]
+
+    // Ao conectar de fato, o listener pendurado DEVE ser notificado com 'live'
+    // -- sem isso o badge trava mostrando 'reconnecting' pra sempre.
+    es2.readyState = 1
+    es2.onopen?.()
+
+    expect(states).toEqual(['live', 'reconnecting', 'live'])
+  })
 })

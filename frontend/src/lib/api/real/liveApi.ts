@@ -57,7 +57,7 @@ function ensureSharedSource(): EventSource {
   // dele: um 2o subscribe() no meio da sessao so reusa o source existente e
   // NAO deve resetar um 'reconnecting'/'offline' real de volta pra 'live'.
   clearGraceTimer()
-  connectionState = 'live'
+  setConnectionState('live')
 
   const token = localStorage.getItem(TOKEN_STORAGE_KEY)
   const es = new EventSource(`${BASE_URL}/live?token=${token}`)

@@ -80,7 +80,7 @@ export function Topbar({
         >
           <span
             aria-hidden="true"
-            className={`size-[9px] rounded-full ${badge.dotClassName}`}
+            className={`size-[9px] rounded-full${badge.dotClassName ? ` ${badge.dotClassName}` : ''}`}
             style={{ background: badge.color }}
           />
           {badge.label}

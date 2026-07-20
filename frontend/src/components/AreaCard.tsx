@@ -3,6 +3,7 @@ import { areaAggregateState, sensorDisplayState, worstAlarmState, type AreaGroup
 import { DEFAULT_STALE_MS, freshness, type FreshnessTier } from '../lib/freshness'
 import { useNow } from '../lib/useNow'
 import { useSensorCarousel } from '../lib/useSensorCarousel'
+import { DisconnectIcon, FreshnessBadge } from './FreshnessBadge'
 import { StatusChip } from './StatusChip'
 import { StatusDot } from './StatusDot'
 import { statusTextColor } from './statusVisuals'
@@ -58,6 +59,13 @@ export function AreaCard({
     return { display, freshness: effectiveFreshness }
   })
   const aggregate = areaAggregateState(perSensor)
+  // Marcador de offline no cabecalho: distingue "warn/crit por offline" de
+  // "warn por valor perto do limite" (ver design doc, "Marcador distinto no
+  // nivel da area"). Nao restrito a aggregate==='warn' de proposito: um
+  // sensor offline e sempre informacao acionavel p/ o operador, mesmo que a
+  // area ja esteja 'crit' por outro motivo (crit nao e rebaixado por
+  // offline -- areaAggregateState so escala p/ >= warn).
+  const anyOffline = perSensor.some((p) => p.freshness === 'offline')
   const carousel = useSensorCarousel(group.sensors.length, carouselIntervalMs)
   const activeSensor = group.sensors[carousel.activeIndex] ?? group.sensors[0]
   const activeState = sensorDisplayState(
@@ -66,6 +74,20 @@ export function AreaCard({
   )
   const activeLive = liveByCode[activeSensor.sensor_code]
   const activeSelected = activeSensor.sensor_code === selectedSensorCode
+  // Freshness efetivo (ja com a escalada never->offline pos-graca) do sensor
+  // ATIVO -- mesmo indice de perSensor, pois ambos vem de group.sensors.map
+  // na mesma ordem (ver useSensorCarousel: activeIndex indexa group.sensors).
+  const activeFreshness: FreshnessTier = perSensor[carousel.activeIndex]?.freshness ?? 'never'
+  const activeAgeMs = activeLive ? now - activeLive.ts : undefined
+  // offline (real ou escalado de never) faz o StatusDot refletir o estado da
+  // CONEXAO, nao mais o alarm_state antigo do ultimo valor conhecido (ver
+  // doc, secao Visual, tier 'offline').
+  const dotState = activeFreshness === 'offline' ? 'crit' : activeState
+  // Atenuacao do valor: 'stale' fica visivel mas suspeito; 'offline' e
+  // substituido por '—' (opcao explicita da doc: "ou substituido por '—'")
+  // pois nao deve mais ser lido como leitura atual.
+  const valueOpacity = activeFreshness === 'stale' ? 0.55 : activeFreshness === 'offline' ? 0.4 : 1
+  const displayValue = activeFreshness === 'offline' ? '—' : activeLive ? activeLive.value.toFixed(1) : '—'
 
   return (
     <div
@@ -95,6 +117,15 @@ export function AreaCard({
               !
             </span>
           )}
+          {anyOffline && (
+            <span
+              aria-label="Sensor offline nesta área"
+              className="flex size-[18px] items-center justify-center rounded-full"
+              style={{ background: 'var(--color-crit-soft)', color: 'var(--color-crit)' }}
+            >
+              <DisconnectIcon />
+            </span>
+          )}
           <StatusChip state={aggregate} />
         </div>
       </div>
@@ -113,16 +144,20 @@ export function AreaCard({
           style={{ background: activeSelected ? 'var(--color-panel)' : 'transparent' }}
         >
           <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--color-muted)' }}>
-            <StatusDot state={activeState} />
+            <span data-testid="sensor-status-dot">
+              <StatusDot state={dotState} />
+            </span>
             {activeSensor.measurement_type.name}
+            {activeFreshness !== 'fresh' && <FreshnessBadge tier={activeFreshness} ageMs={activeAgeMs} />}
           </span>
           <span
             className="font-mono text-3xl font-bold tabular-nums"
             style={{
               color: activeState === 'ok' || activeState === 'unknown' ? 'var(--color-ink)' : statusTextColor(activeState),
+              opacity: valueOpacity,
             }}
           >
-            {activeLive ? activeLive.value.toFixed(1) : '—'}{' '}
+            {displayValue}{' '}
             <span className="text-base font-medium">{activeSensor.unidade}</span>
           </span>
         </button>

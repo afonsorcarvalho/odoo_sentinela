@@ -21,9 +21,16 @@ const thresholdsByCode = {
   'TEMP-EXP-01': { sensor_id: 'TEMP-EXP-01', limite_min: 18, limite_max: 26, is_valor_padrao_regulatorio: false },
   'PRESS-EXP-01': { sensor_id: 'PRESS-EXP-01', limite_min: -15, limite_max: -2.5, is_valor_padrao_regulatorio: true },
 }
+// ts "agora" (nao um literal antigo tipo `1`): com freshness() novo (T3), um
+// ts de 1970 daria idade de DECADAS e todo sensor nasceria 'offline' nestes
+// testes que nao mockam o relogio -- a mesma armadilha do "ts sintetico" ja
+// registrada na doc da feature (mock ts sintetico -> tudo parece offline).
+// Avaliado 1x no import do modulo; os testes deste arquivo rodam em
+// segundos, entao a idade fica bem dentro de staleMs (5min) => tier 'fresh'.
+const NOW_TS = Date.now()
 const liveByCode = {
-  'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: 1, value: 21, alarm_state: 'ok' as const },
-  'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: 1, value: -3.6, alarm_state: 'ok' as const },
+  'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: NOW_TS, value: 21, alarm_state: 'ok' as const },
+  'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: NOW_TS, value: -3.6, alarm_state: 'ok' as const },
 }
 
 describe('AreaCard', () => {
@@ -162,7 +169,7 @@ describe('AreaCard', () => {
   it('cor do valor em destaque reflete alarm_state (crit)', () => {
     const critLive = {
       ...liveByCode,
-      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: 1, value: 30, alarm_state: 'crit' as const },
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: NOW_TS, value: 30, alarm_state: 'crit' as const },
     }
     render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={critLive}
@@ -266,6 +273,176 @@ describe('AreaCard', () => {
         selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
     )
     expect(screen.getByText('OK')).toBeInTheDocument()
+  })
+
+  it('sensor ativo fresh: valor normal, sem badge de idade', () => {
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.getByText(/21\.0/)).toBeInTheDocument()
+    expect(screen.queryByTestId('freshness-badge')).not.toBeInTheDocument()
+  })
+
+  it('sensor ativo stale: valor atenuado + badge "ha N min" em tom de atencao', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const staleLive = {
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start - 6 * 60_000, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={staleLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    const badge = screen.getByTestId('freshness-badge')
+    expect(badge).toHaveTextContent('há 6 min')
+    expect(badge.style.color).toBe('var(--color-warn)')
+    const value = screen.getByText(/21\.0/)
+    expect(Number(value.style.opacity)).toBeLessThan(1)
+  })
+
+  it('sensor ativo offline: badge de desconexao + valor atenuado/—; StatusDot reflete offline (crit)', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const offlineLive = {
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start - 20 * 60_000, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={offlineLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    const badge = screen.getByTestId('freshness-badge')
+    expect(badge).toHaveTextContent('há 20 min')
+    expect(badge.style.color).toBe('var(--color-crit)')
+    expect(screen.queryByText(/21\.0/)).not.toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+    const dot = screen.getByTestId('sensor-status-dot').firstElementChild as HTMLElement
+    expect(dot.style.background).toBe('var(--color-crit)')
+  })
+
+  it('sensor ativo never (sem LivePoint): rotulo neutro "aguardando dado", nao "offline"', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const partialLive = {
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={partialLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    const badge = screen.getByTestId('freshness-badge')
+    expect(badge).toHaveTextContent('aguardando dado')
+    expect(badge).not.toHaveTextContent('offline')
+  })
+
+  it('sensor ativo never escala visualmente para offline apos a janela de graca', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    // singleGroup (1 sensor, sem carrossel) de proposito: com 2 sensores em
+    // estados diferentes (never vs fresh), o carrossel automatico (3s) pode
+    // trocar qual sensor esta ativo entre o mount e o advanceTimersByTime,
+    // e o resultado dependeria da paridade do numero de ticks (ex.: 11min /
+    // 3s = 220 ticks, par -> por coincidencia volta ao sensor original).
+    // Com 1 sensor so, activeIndex e sempre 0 -- o teste prova a escalada do
+    // sensor ATIVO de forma deterministica, nao por sorte de paridade.
+    render(
+      <AreaCard group={singleGroup} thresholdsByCode={thresholdsByCode} liveByCode={{}}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.getByTestId('freshness-badge')).toHaveTextContent('aguardando dado')
+
+    // Janela de graca = 2*staleMs = 10min; useNow tem granularidade de 30s a
+    // partir do mount (mesma ressalva dos testes de agregacao do T2).
+    act(() => {
+      vi.advanceTimersByTime(11 * 60_000)
+    })
+    const badge = screen.getByTestId('freshness-badge')
+    expect(badge).toHaveTextContent('offline')
+    expect(badge.style.color).toBe('var(--color-crit)')
+  })
+
+  it('"Sem limite" + fresh (vivo, sem threshold): valor normal, sem badge de idade -- nao confunde com offline', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const freshUnknownLive = {
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={{}} liveByCode={freshUnknownLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.getByText(/21\.0/)).toBeInTheDocument()
+    expect(screen.queryByTestId('freshness-badge')).not.toBeInTheDocument()
+    const dot = screen.getByTestId('sensor-status-dot').firstElementChild as HTMLElement
+    expect(dot.style.background).toBe('var(--color-muted)')
+  })
+
+  it('cabecalho da area mostra marcador de offline quando o warn e POR offline (nao por valor)', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const offlineLive = {
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start - 20 * 60_000, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={offlineLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.getByText('Perto do limite')).toBeInTheDocument()
+    expect(screen.getByLabelText('Sensor offline nesta área')).toBeInTheDocument()
+  })
+
+  it('cabecalho da area NAO mostra marcador de offline quando o warn e por valor (perto do limite)', () => {
+    const warnByValueLive = {
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: NOW_TS, value: 25.5, alarm_state: 'warn' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: NOW_TS, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={warnByValueLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.getByText('Perto do limite')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Sensor offline nesta área')).not.toBeInTheDocument()
+  })
+
+  it('avancar o now do sensor ATIVO cruza fresh -> stale -> offline sem nenhum LivePoint novo (tick, nao evento)', () => {
+    vi.useFakeTimers()
+    const start = 1_800_000_000_000
+    vi.setSystemTime(start)
+    const freshLive = {
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: start, value: 21, alarm_state: 'ok' as const },
+      'PRESS-EXP-01': { sensor_code: 'PRESS-EXP-01', ts: start, value: -3.6, alarm_state: 'ok' as const },
+    }
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={freshLive}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.queryByTestId('freshness-badge')).not.toBeInTheDocument()
+
+    // fresh -> stale: passa de 5min (staleMs), proximo tick de 30s estrito
+    // acima disso e 5min30s; 6min cobre com folga.
+    act(() => {
+      vi.advanceTimersByTime(6 * 60_000)
+    })
+    let badge = screen.getByTestId('freshness-badge')
+    expect(badge.style.color).toBe('var(--color-warn)')
+
+    // stale -> offline: passa de 15min (offlineMs) total desde o inicio;
+    // ja avancamos 6min, faltam >9min para estourar 15min com folga de tick.
+    act(() => {
+      vi.advanceTimersByTime(10 * 60_000)
+    })
+    badge = screen.getByTestId('freshness-badge')
+    expect(badge.style.color).toBe('var(--color-crit)')
   })
 
   it('carouselIntervalMs vindo por prop governa o intervalo (nao mais fixo em 3000)', () => {

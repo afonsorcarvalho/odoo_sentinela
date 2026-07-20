@@ -28,7 +28,7 @@ export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; o
   return (
     <div>
       <div className="mb-3 flex items-center gap-3">
-        <WidgetPalette onAdd={addWidget} onDragStartType={setDroppingType} />
+        <WidgetPalette onAdd={addWidget} onDragStartType={setDroppingType} onDragEnd={() => setDroppingType(null)} />
         <div className="ml-auto flex gap-2">
           <button
             type="button"

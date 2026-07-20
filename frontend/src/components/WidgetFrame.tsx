@@ -28,7 +28,8 @@ export function WidgetFrame({ widget, editing, onChange, onRemove }: {
       {editing && (
         <div className="absolute right-1 top-1 z-10 flex gap-1">
           <button ref={refs.setReference} type="button" onClick={() => setOpen((o) => !o)}
-                  aria-label="Configurar widget" className="rounded bg-black/40 px-1.5 text-xs text-white" {...getReferenceProps()}>⚙</button>
+                  aria-label="Configurar widget" aria-haspopup="dialog" aria-expanded={open}
+                  className="rounded bg-black/40 px-1.5 text-xs text-white" {...getReferenceProps()}>⚙</button>
           <button type="button" onClick={onRemove} aria-label="Remover widget"
                   className="rounded bg-black/40 px-1.5 text-xs text-white">✕</button>
         </div>
@@ -38,7 +39,8 @@ export function WidgetFrame({ widget, editing, onChange, onRemove }: {
       <div className="min-h-0 flex-1">{descriptor.render(widget)}</div>
       {editing && open && onChange && (
         <FloatingPortal>
-          <div ref={refs.setFloating} style={floatingStyles} className="z-50 w-60" {...getFloatingProps()}>
+          <div ref={refs.setFloating} style={floatingStyles} className="z-50 w-60"
+               role="dialog" aria-label="Configuração do widget" {...getFloatingProps()}>
             <WidgetConfigPopover widget={widget} onChange={onChange} onClose={() => setOpen(false)} />
           </div>
         </FloatingPortal>

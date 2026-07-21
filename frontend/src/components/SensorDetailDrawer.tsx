@@ -75,7 +75,7 @@ export function SensorDetailDrawer({
       <FloatingOverlay
         data-testid="sensor-detail-drawer-backdrop"
         lockScroll
-        className="z-40"
+        className="z-40 drawer-backdrop"
         style={{ background: 'rgb(0 0 0 / 0.5)' }}
       >
         <FloatingFocusManager context={context}>
@@ -84,8 +84,8 @@ export function SensorDetailDrawer({
             role="dialog"
             aria-modal="true"
             aria-label={`Detalhe do sensor ${sensor.name}`}
-            className="fixed right-0 top-0 z-50 flex h-screen flex-col"
-            style={{ width: 'min(560px, 100vw)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-menu)' }}
+            className="drawer-panel z-50 flex flex-col motion-reduce:animate-none"
+            style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-menu)' }}
             {...getFloatingProps()}
           >
             <div className="flex justify-end p-2">

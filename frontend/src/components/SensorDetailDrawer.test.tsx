@@ -81,4 +81,10 @@ describe('SensorDetailDrawer', () => {
     // setters de layout effect rodarem) -- precisa de um flush assincrono.
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
   })
+
+  it('painel usa classe responsiva de slide (drawer-panel)', () => {
+    setup()
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.className).toMatch(/drawer-panel/)
+  })
 })

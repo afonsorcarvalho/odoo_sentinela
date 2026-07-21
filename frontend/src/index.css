@@ -180,3 +180,41 @@ select option {
 @media (prefers-reduced-motion: reduce) {
   .alarm-enter { animation: none; }
 }
+
+/* Drawer de detalhe do sensor: desliza da direita no desktop; vira bottom
+   sheet (sobe de baixo) no mobile. Backdrop com fade. Só a entrada anima
+   (mount) — sem lib de exit. */
+.drawer-backdrop { animation: drawer-fade var(--dur-base) ease both; }
+@keyframes drawer-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.drawer-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  width: min(560px, 100vw);
+  animation: drawer-slide-right var(--dur-base) var(--ease-out-soft) both;
+}
+@keyframes drawer-slide-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+/* Mobile: bottom sheet */
+@media (max-width: 640px) {
+  .drawer-panel {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    height: 80vh;
+    animation: drawer-slide-up var(--dur-base) var(--ease-out-soft) both;
+  }
+  @keyframes drawer-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-backdrop, .drawer-panel { animation: none; }
+}

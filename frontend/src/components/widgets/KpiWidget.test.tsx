@@ -38,6 +38,23 @@ describe('KpiWidget', () => {
     expect(valor.style.color).toBe('var(--color-ink)')
   })
 
+  it('prefers-reduced-motion: nao aplica a animacao kpi-bump no span do valor', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        media: '(prefers-reduced-motion: reduce)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    )
+    mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok' } })
+    renderWithClient(<KpiWidget sensorCode="S1" />)
+    const valor = screen.getByText('10')
+    expect(valor.style.animation).toBe('')
+    vi.unstubAllGlobals()
+  })
+
   describe('sem override (limiteMin/limiteMax ausentes) — comportamento idêntico ao atual', () => {
     it('alarm_state ok -> --color-ink', () => {
       mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok' } })

@@ -37,11 +37,22 @@ command -v docker >/dev/null || die "docker não encontrado"
 docker compose version >/dev/null 2>&1 || die "plugin 'docker compose' não encontrado"
 
 # ---------------------------------------------------------------------------
+# 0. Submodules — hub/vendor/modbus-connector fornece o pacote `common`
+#    (hub/modbus_backend.py: from common.scaling import MapSpec). Sem init,
+#    a suíte `hub` quebra na coleta com ModuleNotFoundError: No module named 'common'.
+# ---------------------------------------------------------------------------
+if [[ -f .gitmodules ]]; then
+  log "Inicializando submodules (git submodule update --init)"
+  git submodule update --init --recursive || die "falha ao inicializar submodules"
+  ok "submodules prontos"
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Stack Docker
 # ---------------------------------------------------------------------------
 if [[ "${SKIP_STACK:-0}" != "1" ]]; then
   if [[ "${RESET_DB:-0}" == "1" ]]; then
-    log "RESET_DB=1 — derrubando stack e removendo volume Timescale"
+    log "RESET_DB=1 — derrubando stack e removendo volume Timescale (o db Odoo é dropado no passo 2)"
     docker compose down
     docker volume rm "${COMPOSE_PROJECT}_timescale-data" 2>/dev/null && ok "volume timescale removido" || warn "volume timescale não existia"
   fi
@@ -64,13 +75,18 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# valida schema (init.sql roda só no 1º boot do volume)
-if docker compose exec -T timescaledb psql -U sentinela -d sentinela -tAc \
-      "SELECT to_regclass('public.sensor_reading')" 2>/dev/null | grep -q sensor_reading; then
-  ok "schema Timescale presente (sensor_reading)"
-else
-  die "tabela sensor_reading ausente — volume antigo sem schema. Rode: RESET_DB=1 $0"
-fi
+# valida schema (init.sql roda só no 1º boot do volume — e leva alguns segundos:
+# pg_isready pode responder no server temporário de init antes de sensor_reading existir,
+# então fazemos poll em vez de checar uma vez só).
+schema_pronto=0
+for i in $(seq 1 30); do
+  if docker compose exec -T timescaledb psql -U sentinela -d sentinela -tAc \
+        "SELECT to_regclass('public.sensor_reading')" 2>/dev/null | grep -q sensor_reading; then
+    schema_pronto=1; ok "schema Timescale presente (sensor_reading)"; break
+  fi
+  sleep 1
+done
+[[ $schema_pronto -eq 1 ]] || die "tabela sensor_reading ausente após 30s. Volume antigo sem schema ou init.sql falhou — veja 'docker compose logs timescaledb'. Para recriar limpo: RESET_DB=1 $0"
 
 log "Aguardando Odoo ($ODOO_URL)"
 for i in $(seq 1 60); do
@@ -80,6 +96,22 @@ for i in $(seq 1 60); do
   [[ $i -eq 60 ]] && die "Odoo não respondeu (60s). Veja 'docker compose logs odoo'"
   sleep 1
 done
+
+# RESET_DB também dropa o db Odoo — `docker compose down` preserva o volume do
+# Postgres do Odoo, então sem isto o db 'sentinela' sobrevive e o clean-slate é falso
+# (bugs de isolamento de teste que só aparecem em db recém-provisionado ficam mascarados).
+if [[ "${RESET_DB:-0}" == "1" ]]; then
+  log "RESET_DB=1 — dropando db Odoo '$ODOO_DB' para recriação limpa"
+  docker compose stop odoo >/dev/null 2>&1 || true
+  docker compose exec -T db dropdb -U odoo --if-exists --force "$ODOO_DB" 2>/dev/null \
+    && ok "db Odoo '$ODOO_DB' removido" || warn "db Odoo '$ODOO_DB' não removido (talvez já não existisse)"
+  docker compose start odoo >/dev/null 2>&1 || true
+  for i in $(seq 1 60); do
+    curl -sf -o /dev/null "$ODOO_URL/web/database/selector" 2>/dev/null && break
+    [[ $i -eq 60 ]] && die "Odoo não voltou após reset do db"
+    sleep 1
+  done
+fi
 
 # db 'sentinela' existe? se não, cria + instala addon
 db_existe() {

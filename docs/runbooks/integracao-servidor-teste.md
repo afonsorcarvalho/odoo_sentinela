@@ -41,6 +41,13 @@ com diagnóstico por tipo de falha. Os passos manuais abaixo servem de referênc
 - Python 3.11+ com `venv`.
 - Portas livres no host: **5433** (Timescale), **8189** (Odoo), **2022/8190** (SFTPGo), 5432 interno.
 - Repositório `odoo_sentinela` clonado/atualizado neste servidor.
+- **Submodules inicializados** — o Hub depende de `hub/vendor/modbus-connector` (fornece o
+  pacote `common`, importado em `hub/modbus_backend.py`). Sem isso a suíte `hub` **nem coleta**:
+  falha com `ModuleNotFoundError: No module named 'common'`. Rode uma vez após o clone:
+  ```bash
+  git submodule update --init --recursive
+  ```
+  (O script `testar_integracao.sh` já faz isso automaticamente.)
 
 ## 1. Subir o stack Docker
 Na raiz do repo:

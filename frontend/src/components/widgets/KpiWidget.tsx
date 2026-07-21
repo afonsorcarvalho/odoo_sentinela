@@ -1,5 +1,7 @@
 import { useSensorMeta } from '../../lib/queries'
 import { useLiveTail } from '../../lib/useLiveTail'
+import { useCountUp } from '../../lib/useCountUp'
+import { usePrefersReducedMotion } from '../../lib/useSensorCarousel'
 import { statusTextColor } from '../statusVisuals'
 import type { StatusResult } from '../../lib/status'
 
@@ -45,6 +47,12 @@ export function KpiWidget({
   // Mesma convenção do AreaCard: ok/unknown usam --color-ink (contraste
   // padrão); apenas warn/crit usam o token de cor de estado.
   const cor = state === 'ok' || state === 'unknown' ? 'var(--color-ink)' : statusTextColor(state)
+  const rawValue = last?.value ?? null
+  const animated = useCountUp(rawValue)
+  const reducedMotion = usePrefersReducedMotion()
+  // Preserva as casas decimais do valor bruto durante a interpolação.
+  const casas = rawValue != null && !Number.isInteger(rawValue) ? (String(rawValue).split('.')[1]?.length ?? 1) : 0
+  const displayValue = animated != null ? animated.toFixed(casas) : '—'
 
   return (
     <div
@@ -60,8 +68,15 @@ export function KpiWidget({
       <div className="flex items-baseline gap-1">
         {/* Fonte fluida via container query: escala com a largura do card
             (WidgetFrame e @container), nao da viewport. */}
-        <span className="font-bold tabular-nums text-[clamp(1.25rem,8cqw,2.25rem)]" style={{ color: cor }}>
-          {last?.value ?? '—'}
+        <span
+          key={rawValue ?? 'none'}
+          className="font-bold tabular-nums text-[clamp(1.25rem,8cqw,2.25rem)] motion-reduce:animate-none"
+          style={{
+            color: cor,
+            animation: reducedMotion ? undefined : 'kpi-bump var(--dur-slow) var(--ease-overshoot)',
+          }}
+        >
+          {displayValue}
         </span>
         <span className="text-sm" style={{ color: 'var(--color-muted)' }}>
           {unidade}

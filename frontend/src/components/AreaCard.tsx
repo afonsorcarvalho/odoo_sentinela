@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { areaAggregateState, sensorDisplayState, worstAlarmState, type AreaGroup } from '../lib/aggregateStatus'
 import { DEFAULT_STALE_MS, freshness, type FreshnessTier } from '../lib/freshness'
 import { useNow } from '../lib/useNow'
-import { useSensorCarousel } from '../lib/useSensorCarousel'
+import { useSensorCarousel, usePrefersReducedMotion } from '../lib/useSensorCarousel'
 import { DisconnectIcon, FreshnessBadge } from './FreshnessBadge'
 import { StatusChip } from './StatusChip'
 import { StatusDot } from './StatusDot'
@@ -67,6 +67,7 @@ export function AreaCard({
   // offline -- areaAggregateState so escala p/ >= warn).
   const anyOffline = perSensor.some((p) => p.freshness === 'offline')
   const carousel = useSensorCarousel(group.sensors.length, carouselIntervalMs)
+  const reducedMotion = usePrefersReducedMotion()
   const activeSensor = group.sensors[carousel.activeIndex] ?? group.sensors[0]
   const activeState = sensorDisplayState(
     thresholdsByCode[activeSensor.sensor_code] ?? null,
@@ -135,35 +136,15 @@ export function AreaCard({
       {/* flex-1: preenche a altura restante do card para que áreas com 1
           sensor (sem carrossel) fiquem com a MESMA altura das de vários
           sensores — evita cards curtos e desalinhados do canto de resize.
-          justify-between mantém o valor no topo e os dots no rodapé. */}
-      <div className="mt-2 flex flex-1 flex-col justify-between">
-        <button
-          type="button"
-          onClick={() => onSelectSensor(activeSensor.sensor_code)}
-          className="flex w-full flex-col items-start gap-1 rounded-md px-2 py-2 text-left outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
-          style={{ background: activeSelected ? 'var(--color-panel)' : 'transparent' }}
-        >
-          <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--color-muted)' }}>
-            <span data-testid="sensor-status-dot">
-              <StatusDot state={dotState} />
-            </span>
-            {activeSensor.measurement_type.name}
-            {activeFreshness !== 'fresh' && <FreshnessBadge tier={activeFreshness} ageMs={activeAgeMs} />}
-          </span>
-          <span
-            className="font-mono text-3xl font-bold tabular-nums"
-            style={{
-              color: activeState === 'ok' || activeState === 'unknown' ? 'var(--color-ink)' : statusTextColor(activeState),
-              opacity: valueOpacity,
-            }}
-          >
-            {displayValue}{' '}
-            <span className="text-base font-medium">{activeSensor.unidade}</span>
-          </span>
-        </button>
-
+          items-center: dots (coluna vertical, à esquerda) e valor ficam
+          centralizados na mesma linha horizontal. */}
+      <div className="mt-2 flex flex-1 items-center gap-3">
         {group.sensors.length > 1 && (
-          <div className="mt-2 flex items-center justify-center gap-1.5" role="tablist" aria-label="Sensores da área">
+          <div
+            className="flex flex-col items-center justify-center gap-1.5"
+            role="tablist"
+            aria-label="Sensores da área"
+          >
             {group.sensors.map((s, i) => (
               <button
                 key={s.sensor_code}
@@ -172,12 +153,51 @@ export function AreaCard({
                 aria-selected={i === carousel.activeIndex}
                 aria-label={s.measurement_type.name}
                 onClick={() => carousel.setActiveIndex(i)}
-                className="size-1.5 rounded-full transition-colors duration-200 ease-out motion-reduce:transition-none"
-                style={{ background: i === carousel.activeIndex ? 'var(--color-ink)' : 'var(--color-line)' }}
+                className="size-1.5 rounded-full transition-[background,transform] duration-200 ease-out motion-reduce:transition-none"
+                style={{
+                  background: i === carousel.activeIndex ? 'var(--color-ink)' : 'var(--color-line)',
+                  transform: i === carousel.activeIndex ? 'scale(1.15)' : 'scale(1)',
+                }}
               />
             ))}
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => onSelectSensor(activeSensor.sensor_code)}
+          className="flex min-w-0 flex-1 flex-col items-start gap-1 rounded-md px-2 py-2 text-left outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
+          style={{ background: activeSelected ? 'var(--color-panel)' : 'transparent' }}
+        >
+          {/* key={activeSensor.sensor_code}: remonta o conteúdo a cada troca
+              de sensor, disparando a keyframe carousel-in (cross-fade +
+              subida). Animação condicionada ao hook (nao ao style inline
+              puro): style inline vence motion-reduce:animate-none por
+              specificity de CSS, entao sob prefers-reduced-motion a unica
+              forma de fato desligar a animacao e nao aplicar o style. */}
+          <span
+            key={activeSensor.sensor_code}
+            className="flex w-full flex-col items-start gap-1 motion-reduce:animate-none"
+            style={{ animation: reducedMotion ? undefined : 'carousel-in var(--dur-base) var(--ease-out-soft)' }}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--color-muted)' }}>
+              <span data-testid="sensor-status-dot">
+                <StatusDot state={dotState} />
+              </span>
+              {activeSensor.measurement_type.name}
+              {activeFreshness !== 'fresh' && <FreshnessBadge tier={activeFreshness} ageMs={activeAgeMs} />}
+            </span>
+            <span
+              className="font-mono text-3xl font-bold tabular-nums"
+              style={{
+                color: activeState === 'ok' || activeState === 'unknown' ? 'var(--color-ink)' : statusTextColor(activeState),
+                opacity: valueOpacity,
+              }}
+            >
+              {displayValue}{' '}
+              <span className="text-base font-medium">{activeSensor.unidade}</span>
+            </span>
+          </span>
+        </button>
       </div>
     </div>
   )

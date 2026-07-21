@@ -445,6 +445,39 @@ describe('AreaCard', () => {
     expect(badge.style.color).toBe('var(--color-crit)')
   })
 
+  it('dots do carrossel ficam em coluna vertical (tablist com flex-col)', () => {
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    const tablist = screen.getByRole('tablist', { name: /sensores da área/i })
+    expect(tablist.className).toMatch(/flex-col/)
+  })
+
+  it('prefers-reduced-motion: nao aplica a animacao carousel-in no span do valor do sensor ativo', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        media: '(prefers-reduced-motion: reduce)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    )
+    render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    const valor = screen.getByText(/21\.0/)
+    // valor e o span "font-mono text-3xl..."; o pai direto e o span animado
+    // (key={activeSensor.sensor_code}) que envolve rotulo + valor. Checa o
+    // style inline de animation, que e o que de fato controla a execucao (a
+    // classe motion-reduce:animate-none nao vence style inline).
+    const animatedSpan = valor.parentElement as HTMLElement
+    expect(animatedSpan.style.animation).toBe('')
+    vi.unstubAllGlobals()
+  })
+
   it('carouselIntervalMs vindo por prop governa o intervalo (nao mais fixo em 3000)', () => {
     vi.useFakeTimers()
     render(

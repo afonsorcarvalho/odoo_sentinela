@@ -16,6 +16,8 @@ def buscar_agregado(conn, sensor_code, tabela, desde, sites_permitidos):
     if tabela not in TABELAS_AGREGADO:
         raise ValueError(f"tabela agregada desconhecida: {tabela}")
     with conn.cursor() as cur:
+        # Seguro so' porque sensor_code tem unique() global (sensor.py) -- se isso
+        # virar unique por site/empresa no futuro, este LIMIT 1 vira vetor de leak cross-tenant.
         cur.execute("SELECT site_id FROM sensor_reading WHERE sensor_id = %s LIMIT 1", (sensor_code,))
         linha_site = cur.fetchone()
     if linha_site is None or linha_site[0] not in sites_permitidos:

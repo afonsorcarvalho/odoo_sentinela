@@ -2,12 +2,14 @@ import asyncio
 import json
 from datetime import datetime
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api import live
 from api.main import app
-from api.odoo import get_cliente_servico
+from api.odoo import ODOO_DB, ODOO_URL, get_cliente_servico
 from api.tests.tenant_fixtures import criar_tenant, remover_tenant
+from ingestao import odoo_cliente
 
 SENSOR_CODE = 'SNR-SIM-TEMP-01'
 
@@ -98,6 +100,31 @@ def test_live_global_recebe_evento_de_qualquer_sensor():
             await agen.aclose()
 
     asyncio.run(cenario())
+
+
+def test_live_global_nao_entrega_evento_de_outro_tenant():
+    tenant_a = criar_tenant('LIVE-GLOBAL-A')
+    tenant_b = criar_tenant('LIVE-GLOBAL-B')
+    try:
+        cliente_a = odoo_cliente.conectar(ODOO_URL, ODOO_DB, tenant_a['login'], tenant_a['senha'])
+
+        async def cenario():
+            resposta = await live.get_live_global(cliente=cliente_a)
+            agen = resposta.body_iterator
+            try:
+                live.publicar(tenant_b['sensor_code'], {
+                    'sensor_id': tenant_b['sensor_code'], 'site_id': tenant_b['site_code'],
+                    'time': 1700000000000, 'valor': 99.9,
+                })
+                with pytest.raises(asyncio.TimeoutError):
+                    await asyncio.wait_for(agen.__anext__(), timeout=0.5)
+            finally:
+                await agen.aclose()
+
+        asyncio.run(cenario())
+    finally:
+        remover_tenant(tenant_a)
+        remover_tenant(tenant_b)
 
 
 def test_live_sensor_de_outro_tenant_retorna_404():

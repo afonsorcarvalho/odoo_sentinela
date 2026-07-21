@@ -39,8 +39,18 @@ export function DashboardPage() {
   const alarmsQuery = useAlarms()
   const alarms = alarmsQuery.data ?? []
 
-  // Layout salvo (via /config) tem prioridade; se ausente ou invalido, cai no
-  // default derivado das areas (um card por area + painel de alarmes).
+  // Layout salvo (via /config) tem prioridade; se a config CARREGOU e nao ha
+  // layout salvo, cai no default derivado das areas (um card por area + painel
+  // de alarmes).
+  //
+  // IMPORTANTE (regressao "perda de layout no upgrade"): o default so pode
+  // aparecer quando a config carregou COM SUCESSO. Enquanto ela esta carregando
+  // ou falhou (ex.: o Odoo reinicia a cada `-u` de modulo, deixando o /config
+  // momentaneamente indisponivel), NAO renderizamos o default -- senao o
+  // operador ve o layout "resetado" (parece perdido, embora o real esteja
+  // intacto no DB) e, pior, poderia salva-lo por cima do layout real. Nesses
+  // estados mostramos loading/erro+retry e travamos o botao Editar.
+  const configReady = configQuery.isSuccess
   const layout = useMemo(
     () => parseLayout(configQuery.data?.layout) ?? defaultLayout(groups),
     [configQuery.data?.layout, groups],
@@ -76,7 +86,7 @@ export function DashboardPage() {
           <p className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
             Áreas monitoradas
           </p>
-          {isAdmin && !editing && (
+          {isAdmin && !editing && configReady && (
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -88,7 +98,30 @@ export function DashboardPage() {
           )}
         </div>
 
-        {editing ? (
+        {configQuery.isError ? (
+          // Config falhou (ex.: backend reiniciando pós-upgrade). Nao mostrar
+          // o default salvavel — oferecer retry; o layout real segue no DB.
+          <div
+            className="rounded-md border p-6 text-center"
+            style={{ borderColor: 'var(--color-line)', color: 'var(--color-muted)' }}
+          >
+            <p className="text-sm">
+              Não foi possível carregar o layout do dashboard. Seu layout salvo está preservado.
+            </p>
+            <button
+              type="button"
+              onClick={() => configQuery.refetch()}
+              className="mt-3 rounded px-3 py-1 text-sm font-bold text-white"
+              style={{ background: 'var(--color-primary)' }}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : !configReady ? (
+          <div className="p-6 text-center text-sm" style={{ color: 'var(--color-muted)' }}>
+            Carregando dashboard…
+          </div>
+        ) : editing ? (
           <DashboardEditor layout={layout} onExit={() => setEditing(false)} />
         ) : (
           // Provider só no ramo de view: em edição não há DrillDownContext,

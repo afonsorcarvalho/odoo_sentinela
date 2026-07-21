@@ -12,6 +12,7 @@ vi.mock('echarts', () => ({ init: () => ({ setOption: vi.fn(), dispose: vi.fn(),
 
 import { DashboardPage } from './DashboardPage'
 import { AuthProvider, TOKEN_STORAGE_KEY } from '../lib/useAuth'
+import { configApi } from '../lib/api'
 
 // AuthProvider necessario: Topbar -> LogoutButton usa useAuth(), que lanca
 // erro fora de um AuthProvider (o brief original nao incluia este wrapper).
@@ -116,6 +117,34 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /editar/i })).toBeNull()
+  })
+
+  it('config com erro: mostra erro/retry e NÃO cai no layout default (nem Editar)', async () => {
+    // Regressão da "perda de layout no upgrade": quando o /config falha
+    // (ex.: backend reiniciando logo após um upgrade de módulo), o frontend
+    // NÃO pode renderizar o layout default — que, se salvo, sobrescreveria o
+    // layout real (íntegro no DB, só não-carregado). Deve mostrar erro+retry.
+    setAdminToken()
+    const spy = vi.spyOn(configApi, 'getConfig').mockRejectedValue(new Error('backend indisponível'))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/']}>
+          <AuthProvider>
+            <DashboardPage />
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText(/não foi possível carregar/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /tentar novamente/i })).toBeInTheDocument()
+    // Não renderiza o grid default (sem painel de alarmes do default)...
+    expect(screen.queryByText('Alarmes')).toBeNull()
+    // ...e não oferece Editar (evita salvar um default sobre o layout real).
+    expect(screen.queryByRole('button', { name: /editar/i })).toBeNull()
+
+    spy.mockRestore()
   })
 
   describe('drill-down (D3)', () => {

@@ -157,4 +157,15 @@
         <field name="domain_force">[(1, '=', 1)]</field>
         <field name="groups" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
     </record>
+
+    <!-- O usuário admin (base.user_admin, id 2) é o operador interno do SaaS —
+         provisiona sites/hubs e roda o monitoramento. Em Odoo ele NÃO é o
+         superusuário (id 1), logo está sujeito às ACLs. Sem receber o grupo
+         Admin no install, uma instalação limpa deixa admin sem acesso a nenhum
+         modelo sensor_monitor (Fault 4 em toda chamada XML-RPC) — quebrando o
+         provisionamento e a suíte de integração. Concedido aqui para que
+         `-i afr_sentinela_sensor_monitor` já baste num banco novo. -->
+    <record id="base.user_admin" model="res.users">
+        <field name="groups_id" eval="[(4, ref('group_sensor_monitor_admin'))]"/>
+    </record>
 </odoo>

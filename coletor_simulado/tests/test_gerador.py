@@ -1,7 +1,8 @@
 import base64
 from datetime import date
 
-from coletor_simulado import gerador, identidade
+from coletor_simulado import gerador
+from contrato import identidade
 
 
 def test_gerar_dia_sem_alarme(tmp_path):

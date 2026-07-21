@@ -1,0 +1,3 @@
+[submodule "hub/vendor/modbus-connector"]
+	path = hub/vendor/modbus-connector
+	url = https://github.com/afonsorcarvalho/modbus-connector.git

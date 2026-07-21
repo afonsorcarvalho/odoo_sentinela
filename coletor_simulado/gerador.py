@@ -4,7 +4,7 @@ import random
 from datetime import date as date_cls, datetime, timedelta
 from pathlib import Path
 
-from . import formato, identidade
+from contrato import formato, identidade
 
 SENSORES = [
     {'sensor_id': 'SNR-SIM-TEMP-01', 'tipo_medida': 'temperatura', 'unidade': 'C'},

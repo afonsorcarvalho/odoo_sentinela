@@ -1,0 +1,27 @@
+hub_id: HUB-0001A2F3
+coletor_id: COL-RS485-BUS0        # "coletor lógico" deste barramento RS-485
+firmware_version: 0.1.0
+timezone_offset: "-03:00"
+intervalo_leitura_s: 60            # default; use 5 em teste
+caminho_chave: ~/sentinela-hub/chaves/coletor.pem
+caminho_dados: ~/sentinela-hub/dados
+mqtt:
+  host: localhost
+  port: 1883
+barramentos:
+  - porta: /dev/ttyUSB0
+    baud: 9600
+    paridade: N
+    stop_bits: 1
+    dispositivos:
+      - endereco: 1
+        driver: n4aib16
+        canais:
+          - ch: 1
+            sensor_id: SNR-EXP-TEMP-01
+            area_id: AREA-EXPURGO
+            tipo_medida: temperatura
+            unidade: C
+            protocolo_origem: 4-20ma
+            map: {in: [4, 20], out: [-50, 150]}   # mA -> °C
+            filtro: {tipo: ewma, alpha: 0.3}       # opcional

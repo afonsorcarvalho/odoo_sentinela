@@ -1,6 +1,6 @@
 import pytest
 
-from coletor_simulado import formato
+from contrato import formato
 
 
 def test_hash_seed_determinismo():

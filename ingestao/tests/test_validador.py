@@ -1,7 +1,7 @@
 from datetime import date
 
 from coletor_simulado import gerador as gerador_simulado
-from coletor_simulado import identidade as identidade_simulado
+from contrato import identidade as identidade_simulado
 from ingestao import registro_coletores, validador
 
 

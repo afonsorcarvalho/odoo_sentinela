@@ -1,7 +1,9 @@
 # Runbook — Transporte SFTP (lado-servidor) e teste cross-machine
 
-Passos executados **no servidor (LAN)**, onde roda o `docker-compose`. O Hub
-(Raspberry Pi) só precisa do IP do servidor e da sua chave SSH registrada.
+Passos executados **no VPS de produção `191.252.113.190` (`sistema.fitadigital.com.br`)**,
+onde roda o `docker-compose`. O Hub (Raspberry Pi) **já está na VPN** (`tun0=10.8.0.19`)
+e alcança o servidor em **`10.8.0.1`** — o SFTPGo deve escutar na interface da VPN, não
+publicamente. O cliente OpenVPN do Pi já é mantido pelo projeto `openvpn-config-updater`.
 
 ## 1. Subir o SFTPGo
 ```bash
@@ -45,8 +47,8 @@ No WebAdmin do SFTPGo → **Event Manager** → nova regra:
   `SENTINELA_ODOO_DB`, `SENTINELA_ODOO_USER`, `SENTINELA_ODOO_SENHA`.
 
 ## 4. Teste cross-machine
-No Pi, editar `~/sentinela-hub/config.yaml` com o bloco `sftp` apontando pro IP
-do servidor e rodar:
+No Pi, editar `~/sentinela-hub/config.yaml` com o bloco `sftp` apontando pra
+`host: 10.8.0.1` (o servidor pela VPN) e rodar:
 ```bash
 python -m hub.main --config ~/sentinela-hub/config.yaml   # Ctrl+C sela + envia
 ```

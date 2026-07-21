@@ -51,7 +51,7 @@ export function KpiWidget({
   const animated = useCountUp(rawValue)
   const reducedMotion = usePrefersReducedMotion()
   // Preserva as casas decimais do valor bruto durante a interpolação.
-  const casas = rawValue != null && !Number.isInteger(rawValue) ? (String(rawValue).split('.')[1]?.length ?? 1) : 0
+  const casas = rawValue != null && !Number.isInteger(rawValue) ? Math.min(String(rawValue).split('.')[1]?.length ?? 1, 3) : 0
   const displayValue = animated != null ? animated.toFixed(casas) : '—'
 
   return (

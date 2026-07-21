@@ -25,6 +25,31 @@ describe('AlarmPanel', () => {
     expect(screen.getByText('NÃO CONFORMIDADE')).toBeInTheDocument()
     expect(screen.getByText('Expurgo · PRESS-EXP-01')).toBeInTheDocument()
   })
+
+  it('primeiro render nao anima nenhum item, mesmo com alarmes ja presentes', () => {
+    render(<AlarmPanel alarms={[ABERTO]} areaNameByCode={AREA_NAMES} />)
+    for (const li of screen.getAllByRole('listitem')) {
+      expect(li.className).not.toMatch(/alarm-enter/)
+    }
+  })
+
+  it('alarme adicionado apos o primeiro render entra com alarm-enter; o preexistente nao', () => {
+    const OUTRO: AlarmEvent = { ...ABERTO, id: 2, sensor_code: 'PRESS-EXP-02', timestamp_deteccao: ABERTO.timestamp_deteccao + 60_000 }
+    const { rerender } = render(<AlarmPanel alarms={[ABERTO]} areaNameByCode={AREA_NAMES} />)
+    rerender(<AlarmPanel alarms={[OUTRO, ABERTO]} areaNameByCode={AREA_NAMES} />)
+
+    const preexistente = screen.getByText('Expurgo · PRESS-EXP-01').closest('li')!
+    const novo = screen.getByText('Expurgo · PRESS-EXP-02').closest('li')!
+    expect(preexistente.className).not.toMatch(/alarm-enter/)
+    expect(novo.className).toMatch(/alarm-enter/)
+  })
+
+  it('rerender sem mudanca nas chaves nao marca nada como novo', () => {
+    const { rerender } = render(<AlarmPanel alarms={[ABERTO]} areaNameByCode={AREA_NAMES} />)
+    rerender(<AlarmPanel alarms={[{ ...ABERTO }]} areaNameByCode={AREA_NAMES} />)
+    const li = screen.getByRole('listitem')
+    expect(li.className).not.toMatch(/alarm-enter/)
+  })
 })
 
 function makeAlarm(id: number): AlarmEvent {

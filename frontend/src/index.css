@@ -165,3 +165,18 @@ select option {
   .widget-enter:hover > * { transform: none; }
 }
 .dashboard-grid-editing .widget-enter:hover > * { transform: none; box-shadow: none; }
+
+/* Alarme recém-chegado: desliza do topo (rápido) + flash de destaque que
+   desvanece em 5s. O alarme PERMANECE na lista — o flash é só realce. */
+.alarm-enter {
+  animation:
+    alarm-in var(--dur-base) var(--ease-out-soft) both,
+    alarm-flash 5s ease-out both;
+}
+@keyframes alarm-flash {
+  from { background: var(--color-crit-soft); }
+  to   { background: var(--color-panel); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alarm-enter { animation: none; }
+}

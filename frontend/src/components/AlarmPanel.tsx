@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { AlarmItem } from './AlarmItem'
 import type { AlarmEvent } from '../lib/types'
 
@@ -27,6 +27,17 @@ export function AlarmPanel({
   const ativos = alarms.filter((a) => a.status !== 'resolvido').length
   const visiveis = alarms.slice(0, VISIBLE_LIMIT)
   const restantes = alarms.length - VISIBLE_LIMIT
+
+  const keyOf = (a: AlarmEvent) => `${a.sensor_code}-${a.timestamp_deteccao}`
+  const seenRef = useRef<Set<string> | null>(null)
+  const currentKeys = new Set(visiveis.map(keyOf))
+  // Primeiro render: nada é "novo" (não animar a lista inicial inteira).
+  const novos = seenRef.current === null
+    ? new Set<string>()
+    : new Set([...currentKeys].filter((k) => !seenRef.current!.has(k)))
+  useEffect(() => {
+    seenRef.current = currentKeys
+  })
 
   return (
     <aside
@@ -62,7 +73,12 @@ export function AlarmPanel({
         <>
           <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {visiveis.map((a) => (
-              <AlarmItem key={a.id} alarm={a} areaName={areaNameByCode[a.area_code] ?? a.area_code} />
+              <AlarmItem
+                key={keyOf(a)}
+                alarm={a}
+                areaName={areaNameByCode[a.area_code] ?? a.area_code}
+                isNew={novos.has(keyOf(a))}
+              />
             ))}
           </ul>
           {restantes > 0 && onVerMais && (

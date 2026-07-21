@@ -48,4 +48,16 @@ describe('AlarmItem', () => {
     render(<AlarmItem alarm={alarm} areaName="Expurgo" />)
     expect(screen.getByText('"Janela aberta por engano."')).toBeInTheDocument()
   })
+
+  it('sem isNew: não aplica animação de entrada', () => {
+    render(<AlarmItem alarm={makeAlarm()} areaName="Expurgo" />)
+    const li = screen.getByRole('listitem')
+    expect(li.className).not.toMatch(/alarm-enter/)
+  })
+
+  it('isNew: aplica classe de entrada/flash', () => {
+    render(<AlarmItem alarm={makeAlarm()} areaName="Expurgo" isNew />)
+    const li = screen.getByRole('listitem')
+    expect(li.className).toMatch(/alarm-enter/)
+  })
 })

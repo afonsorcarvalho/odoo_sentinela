@@ -23,10 +23,18 @@ function formatDataResolucao(ts: number): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-export function AlarmItem({ alarm, areaName }: { alarm: AlarmEvent; areaName: string }) {
+export function AlarmItem({
+  alarm,
+  areaName,
+  isNew,
+}: {
+  alarm: AlarmEvent
+  areaName: string
+  isNew?: boolean
+}) {
   return (
     <li
-      className="rounded-md p-3"
+      className={`rounded-md p-3${isNew ? ' alarm-enter motion-reduce:animate-none' : ''}`}
       style={{ background: 'var(--color-panel)', borderLeft: `3px solid ${BORDER_COLOR[alarm.status]}` }}
     >
       <div className="flex items-center justify-between gap-2 text-xs font-bold" style={{ color: BORDER_COLOR[alarm.status] }}>

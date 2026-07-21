@@ -32,6 +32,19 @@ def _site_id(cliente):
     )
 
 
+def _limpar_config(cliente, site_id):
+    """Remove config de dashboard do site (unique(site_id)) — evita colisão
+    com estado deixado por testes anteriores antes de um create direto."""
+    existentes = odoo_cliente.executar(
+        cliente, 'sensor_monitor.dashboard.config', 'search',
+        [('site_id', '=', site_id)],
+    )
+    if existentes:
+        odoo_cliente.executar(
+            cliente, 'sensor_monitor.dashboard.config', 'unlink', existentes,
+        )
+
+
 def test_config_sem_token_retorna_401():
     resposta = client.get('/config')
     assert resposta.status_code == 401
@@ -73,6 +86,7 @@ def test_config_sem_registro_retorna_default():
 def test_config_com_registro_retorna_valor_configurado():
     cliente = get_cliente_servico()
     site_id = _site_id(cliente)
+    _limpar_config(cliente, site_id)
     config_id = odoo_cliente.executar(
         cliente, 'sensor_monitor.dashboard.config', 'create',
         {'site_id': site_id, 'carousel_interval_ms': 7000, 'carousel_transition_ms': 600},
@@ -94,6 +108,7 @@ def test_config_retorna_layout_quando_salvo():
     site_id = _site_id(cliente)
     layout = {'version': 1, 'grid': {'cols': 12, 'rowHeight': 40, 'margin': [8, 8]}, 'widgets': []}
     import json as _json
+    _limpar_config(cliente, site_id)
     config_id = odoo_cliente.executar(
         cliente, 'sensor_monitor.dashboard.config', 'create',
         {'site_id': site_id, 'layout_json': _json.dumps(layout)},

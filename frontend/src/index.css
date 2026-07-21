@@ -224,3 +224,33 @@ select option {
   from { opacity: 0; transform: rotate(-30deg) scale(0.8); }
   to   { opacity: 1; transform: rotate(0) scale(1); }
 }
+
+/* Modo editor: grid overlay entra com fade; widgets balançam de leve para
+   sinalizar que são arrastáveis. Movimento contínuo é o mais sensível a
+   reduced-motion — desligado lá.
+   O wobble NÃO vai em `.widget-enter`: esse nó já carrega
+   `animation: widget-in ... both` (Task 4) e um `animationDelay` inline por
+   índice (DashboardGrid.tsx). Aplicar o wobble ali trocaria o
+   animation-name durante a edição e faria `widget-in` REPLAYAR ao sair
+   (troca de nome = animação nova p/ o browser, apesar do nó não remontar);
+   e qualquer animation-delay definido aqui seria sombreado pelo inline (que
+   sempre vence sobre seletor de classe). Por isso o wobble e seu stagger
+   vão no FILHO direto (`.widget-enter > *`, a raiz do WidgetFrame — mesmo
+   nó onde o hover-lift acima já opera): mantém `widget-in` intocado (sem
+   replay) e o animation-delay aqui não concorre com o inline da Task 4.
+   Stagger: `.widget-enter` é sempre :nth-child(1) do seu pai (único filho
+   do wrapper posicionado pelo react-grid-layout), então nth-child nele
+   nunca casa. O nó irmão real dos outros widgets é o `.react-grid-item`
+   que o react-grid-layout injeta; o nth-child fica nele. */
+.edit-grid-fade { animation: drawer-fade var(--dur-base) ease both; }
+
+.dashboard-grid-editing .widget-enter > * {
+  animation: editor-wobble 1.8s ease-in-out infinite;
+}
+.dashboard-grid-editing .react-grid-item:nth-child(2n) .widget-enter > * { animation-delay: 0.2s; }
+.dashboard-grid-editing .react-grid-item:nth-child(3n) .widget-enter > * { animation-delay: 0.4s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .edit-grid-fade { animation: none; }
+  .dashboard-grid-editing .widget-enter > * { animation: none; }
+}

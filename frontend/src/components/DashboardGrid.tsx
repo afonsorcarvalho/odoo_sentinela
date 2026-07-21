@@ -33,7 +33,7 @@ function EditGridOverlay({ grid, width }: {
   return (
     <div
       data-testid="edit-grid-overlay"
-      className="pointer-events-none absolute inset-0 rounded"
+      className="edit-grid-fade pointer-events-none absolute inset-0 rounded"
       style={style}
     />
   )

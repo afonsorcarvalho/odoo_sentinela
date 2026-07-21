@@ -77,6 +77,12 @@ describe('DashboardGrid', () => {
     expect(overlay.className).toContain('pointer-events-none')
   })
 
+  it('overlay de edicao tem classe de fade', () => {
+    renderWithClient(<DashboardGrid layout={layout} editing={true} />)
+    const overlay = screen.getByTestId('edit-grid-overlay')
+    expect(overlay.className).toMatch(/edit-grid-fade/)
+  })
+
   it('cada widget recebe a classe de entrada animada', () => {
     renderWithClient(<DashboardGrid layout={layout} editing={false} />)
     const frames = screen.getAllByTestId('widget-frame')

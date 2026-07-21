@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { AlarmPanel } from './AlarmPanel'
 import type { AlarmEvent } from '../lib/types'
 
@@ -49,6 +49,41 @@ describe('AlarmPanel', () => {
     rerender(<AlarmPanel alarms={[{ ...ABERTO }]} areaNameByCode={AREA_NAMES} />)
     const li = screen.getByRole('listitem')
     expect(li.className).not.toMatch(/alarm-enter/)
+  })
+
+  describe('flash de "novo" sobrevive a re-renders dentro dos 5s (sticky)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('re-render com as mesmas chaves (ex.: poll de 5s) NAO corta o flash antes do timer; timer remove apos ~5s', () => {
+      vi.useFakeTimers()
+      const OUTRO: AlarmEvent = { ...ABERTO, id: 2, sensor_code: 'PRESS-EXP-02', timestamp_deteccao: ABERTO.timestamp_deteccao + 60_000 }
+
+      const { rerender } = render(<AlarmPanel alarms={[ABERTO]} areaNameByCode={AREA_NAMES} />)
+
+      // Chega um alarme novo: marca isNew.
+      act(() => {
+        rerender(<AlarmPanel alarms={[OUTRO, ABERTO]} areaNameByCode={AREA_NAMES} />)
+      })
+      let novo = screen.getByText('Expurgo · PRESS-EXP-02').closest('li')!
+      expect(novo.className).toMatch(/alarm-enter/)
+
+      // Re-render com as MESMAS chaves (simula poll do useAlarms a cada 5s,
+      // ou qualquer outro re-render do pai) -- nao deve cortar a animacao.
+      act(() => {
+        rerender(<AlarmPanel alarms={[{ ...OUTRO }, { ...ABERTO }]} areaNameByCode={AREA_NAMES} />)
+      })
+      novo = screen.getByText('Expurgo · PRESS-EXP-02').closest('li')!
+      expect(novo.className).toMatch(/alarm-enter/)
+
+      // Passados os 5s (+ folga do timer), o flash termina.
+      act(() => {
+        vi.advanceTimersByTime(5300)
+      })
+      novo = screen.getByText('Expurgo · PRESS-EXP-02').closest('li')!
+      expect(novo.className).not.toMatch(/alarm-enter/)
+    })
   })
 })
 

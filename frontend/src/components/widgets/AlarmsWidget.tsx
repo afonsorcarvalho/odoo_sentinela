@@ -87,17 +87,16 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
     }
   }
 
-  // Chips ~50% menores no VISUAL, mas alvo de toque ~44px preservado (WCAG
-  // 2.5.5 / uso com luva). O peso visual (a mancha colorida) e o alvo tocavel
-  // sao elementos DIFERENTES: o <button> e transparente e so define a hit-area
-  // (min-h-11 = 44px, flex+centralizado); quem carrega a cor/fundo e um <span>
-  // interno menor (py-1, texto text-[11px]/font-medium) -- e esse span que fica
-  // ~metade da altura do pill anterior. Sem essa separacao, colorir o botao
-  // inteiro manteria a mancha visual do tamanho da hit-area de 44px (nao 50%
-  // menor). O foco (focus-visible) fica no botao, entao o anel de foco cobre
-  // a hit-area toda, nao so o pill pequeno.
+  // Chips ~50% menores no VISUAL, alvo de toque compacto (min-h-9 = 36px, acima
+  // do piso WCAG 2.5.8 = 24px; abaixo do ideal 44px de luva, trade-off aceito
+  // pelo usuario p/ aproximar as linhas quando o filtro quebra em varias). O
+  // peso visual (a mancha colorida) e o alvo tocavel sao elementos DIFERENTES:
+  // o <button> e transparente e so define a hit-area (min-h-9, min-w-11,
+  // flex+centralizado); quem carrega a cor/fundo e um <span> interno menor
+  // (py-1, texto text-[11px]/font-medium). O foco (focus-visible) fica no
+  // botao, entao o anel de foco cobre a hit-area toda, nao so o pill pequeno.
   const chipButtonClass =
-    'flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-transparent px-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]'
+    'flex min-h-9 min-w-11 shrink-0 items-center justify-center rounded-full bg-transparent px-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]'
   const chipPillClass =
     'rounded-full px-2 py-1 text-[11px] font-medium transition-colors duration-200 ease-out motion-reduce:transition-none'
 
@@ -120,7 +119,7 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
 
   const filtro =
     todasAreas.length > 0 ? (
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filtro de áreas">
+      <div className="flex flex-wrap gap-x-2 gap-y-1" role="group" aria-label="Filtro de áreas">
         <button type="button" aria-pressed={todasPressed} onClick={toggleTodas} className={chipButtonClass}>
           <span className={chipPillClass} style={pillStyle(todasPressed)}>
             Todas

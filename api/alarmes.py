@@ -5,8 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ingestao import odoo_cliente
 
-from .auth import verificar_token
-from .odoo import get_cliente_servico
+from .auth import get_cliente_usuario, verificar_token
 
 router = APIRouter()
 
@@ -104,7 +103,7 @@ def get_alarmes(
     area_code: Optional[str] = None,
     desde: Optional[datetime] = None,
     ate: Optional[datetime] = None,
-    cliente=Depends(get_cliente_servico),
+    cliente=Depends(get_cliente_usuario),
     _claims=Depends(verificar_token),
 ):
     try:

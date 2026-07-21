@@ -71,3 +71,39 @@ def test_threshold_sensor_com_limiar_retorna_valores():
 def test_threshold_sensor_inexistente_retorna_404():
     resposta = client.get('/sensores/SNR-NAO-EXISTE-XYZ/threshold', headers=_headers())
     assert resposta.status_code == 404
+
+
+from api.tests.tenant_fixtures import criar_tenant, remover_tenant
+
+
+def _headers_para(login, senha):
+    resposta = client.post('/auth/login', json={'usuario': login, 'senha': senha})
+    token = resposta.json()['access_token']
+    return {'Authorization': f'Bearer {token}'}
+
+
+def test_obter_sensor_de_outro_tenant_retorna_404():
+    tenant_a = criar_tenant('META-A')
+    tenant_b = criar_tenant('META-B')
+    try:
+        resposta = client.get(
+            f"/sensores/{tenant_b['sensor_code']}",
+            headers=_headers_para(tenant_a['login'], tenant_a['senha']),
+        )
+        assert resposta.status_code == 404
+    finally:
+        remover_tenant(tenant_a)
+        remover_tenant(tenant_b)
+
+
+def test_listar_sensores_nao_inclui_sensor_de_outro_tenant():
+    tenant_a = criar_tenant('META-LIST-A')
+    tenant_b = criar_tenant('META-LIST-B')
+    try:
+        resposta = client.get('/sensores', headers=_headers_para(tenant_a['login'], tenant_a['senha']))
+        codigos = [s['sensor_code'] for s in resposta.json()]
+        assert tenant_a['sensor_code'] in codigos
+        assert tenant_b['sensor_code'] not in codigos
+    finally:
+        remover_tenant(tenant_a)
+        remover_tenant(tenant_b)

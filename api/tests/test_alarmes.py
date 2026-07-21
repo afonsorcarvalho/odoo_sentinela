@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from api.main import app
 from api.odoo import get_cliente_servico
+from api.tests.tenant_fixtures import criar_tenant, remover_tenant
 from ingestao import odoo_cliente
 
 client = TestClient(app)
@@ -158,3 +159,20 @@ def test_listar_alarmes_campos_nulos_aparecem_como_null():
         assert evento['usuario_responsavel'] is None
     finally:
         _apagar(cliente, evento_id)
+
+
+def test_listar_alarmes_nao_inclui_evento_de_outro_tenant():
+    cliente_servico = get_cliente_servico()
+    tenant_a = criar_tenant('ALARM-A')
+    tenant_b = criar_tenant('ALARM-B')
+    evento_b_id = _criar_evento(cliente_servico, tenant_b['sensor_code'])
+    try:
+        resposta_login = client.post('/auth/login', json={'usuario': tenant_a['login'], 'senha': tenant_a['senha']})
+        token = resposta_login.json()['access_token']
+        resposta = client.get('/alarmes', headers={'Authorization': f'Bearer {token}'})
+        ids = {e['id'] for e in resposta.json()}
+        assert evento_b_id not in ids
+    finally:
+        _apagar(cliente_servico, evento_b_id)
+        remover_tenant(tenant_a)
+        remover_tenant(tenant_b)

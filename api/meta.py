@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ingestao import odoo_cliente
 
-from .auth import verificar_token
-from .odoo import get_cliente_servico
+from .auth import get_cliente_usuario, verificar_token
 
 router = APIRouter()
 
@@ -70,12 +69,12 @@ def obter_threshold(cliente, sensor_code):
 
 
 @router.get('/sensores')
-def get_sensores(cliente=Depends(get_cliente_servico), _claims=Depends(verificar_token)):
+def get_sensores(cliente=Depends(get_cliente_usuario), _claims=Depends(verificar_token)):
     return listar_sensores(cliente)
 
 
 @router.get('/sensores/{sensor_code}')
-def get_sensor(sensor_code: str, cliente=Depends(get_cliente_servico), _claims=Depends(verificar_token)):
+def get_sensor(sensor_code: str, cliente=Depends(get_cliente_usuario), _claims=Depends(verificar_token)):
     resultado = obter_sensor(cliente, sensor_code)
     if resultado is None:
         raise HTTPException(status_code=404, detail=f"sensor '{sensor_code}' não encontrado")
@@ -83,7 +82,7 @@ def get_sensor(sensor_code: str, cliente=Depends(get_cliente_servico), _claims=D
 
 
 @router.get('/sensores/{sensor_code}/threshold')
-def get_threshold(sensor_code: str, cliente=Depends(get_cliente_servico), _claims=Depends(verificar_token)):
+def get_threshold(sensor_code: str, cliente=Depends(get_cliente_usuario), _claims=Depends(verificar_token)):
     try:
         return obter_threshold(cliente, sensor_code)
     except ValueError as exc:

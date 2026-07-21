@@ -34,7 +34,25 @@ services:
       - ./timescale/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
 
+  sftpgo:
+    image: drakkan/sftpgo:v2
+    depends_on:
+      - timescaledb
+    ports:
+      - "2022:2022"          # SFTP (LAN no dev; restringir à VPN no T3)
+      - "8190:8080"          # WebAdmin do SFTPGo
+    environment:
+      SFTPGO_SFTPD__BINDINGS__0__PORT: 2022
+      SFTPGO_COMMON__UPLOAD_MODE: 2
+    volumes:
+      - sftpgo-data:/srv/sftpgo
+      - sftpgo-config:/var/lib/sftpgo
+      - ./ingestao:/opt/ingestao:ro     # receber_upload disponível ao Event Manager
+    restart: unless-stopped
+
 volumes:
   odoo-db-data:
   odoo-filestore:
   timescale-data:
+  sftpgo-data:
+  sftpgo-config:

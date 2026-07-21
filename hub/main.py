@@ -21,7 +21,7 @@ def _tz(offset):
     return timezone(sinal * timedelta(hours=horas, minutes=minutos))
 
 
-def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=None):
+def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=None, enviador=None):
     arquivo.recuperar_pendentes(agora_fn().date())
     publicador.conectar()
     ciclos = 0
@@ -32,11 +32,15 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
         for leitura in leitor.ler_todos(agora):
             arquivo.registrar(leitura)
             publicador.publicar(config.hub_id, config.coletor_id, leitura)
+        if enviador is not None:
+            enviador.varrer()
         ciclos += 1
         if max_ciclos is not None and ciclos >= max_ciclos:
             break
         parar.wait(config.intervalo_leitura_s)
     arquivo.selar(data_corrente)
+    if enviador is not None:
+        enviador.varrer()
     leitor.fechar()
     publicador.fechar()
 
@@ -52,11 +56,21 @@ def main(argv=None):
                             cfg.timezone_offset, cfg.caminho_dados, assinador)
     leitor = Leitor(cfg)
     publicador = PublicadorMqtt(cfg.mqtt_host, cfg.mqtt_port)
+    enviador = None
+    if cfg.sftp is not None:
+        from hub.enviador_sftp import EnviadorSftp, TransporteParamiko
+        from hub import identidade_ssh
+        identidade_ssh.carregar_ou_criar_chave_ssh(cfg.sftp.ssh_key_path)
+        transporte = TransporteParamiko(
+            cfg.sftp.host, cfg.sftp.port, cfg.sftp.username,
+            cfg.sftp.ssh_key_path, cfg.sftp.remote_dir,
+        )
+        enviador = EnviadorSftp(cfg.coletor_id, cfg.caminho_dados, transporte)
     parar = Event()
     signal.signal(signal.SIGTERM, lambda *_: parar.set())
     signal.signal(signal.SIGINT, lambda *_: parar.set())
     executar(cfg, leitor, arquivo, publicador,
-             agora_fn=lambda: datetime.now(tz), parar=parar)
+             agora_fn=lambda: datetime.now(tz), parar=parar, enviador=enviador)
 
 
 if __name__ == "__main__":

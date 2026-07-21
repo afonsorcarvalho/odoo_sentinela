@@ -1,6 +1,7 @@
 import json
+from unittest import mock
 
-from hub.enviador_sftp import EnviadorSftp
+from hub.enviador_sftp import EnviadorSftp, TransporteParamiko
 
 COLETOR = "COL-RS485-BUS0"
 
@@ -82,3 +83,24 @@ def test_estado_persiste_entre_instancias(tmp_path):
     # nova instância lê o estado e não reenvia
     env2 = EnviadorSftp(COLETOR, tmp_path / "dados", _TransporteFake())
     assert env2.varrer() == []
+
+
+def test_transporte_paramiko_conecta_autentica_e_poe(tmp_path):
+    from hub import identidade_ssh
+    chave_path = tmp_path / "ssh_hub"
+    identidade_ssh.carregar_ou_criar_chave_ssh(chave_path)
+
+    t = TransporteParamiko("192.168.0.10", 2022, "hub-1", str(chave_path), "/uploads")
+    with mock.patch("paramiko.SSHClient") as MockClient, \
+         mock.patch("paramiko.Ed25519Key") as MockKey:
+        cliente = MockClient.return_value
+        sftp = cliente.open_sftp.return_value
+        t.enviar("/local/2026-07-21_leituras.txt", "2026-07-21_leituras.txt")
+
+    MockKey.from_private_key_file.assert_called_once_with(str(chave_path))
+    _, kwargs = cliente.connect.call_args
+    assert kwargs["port"] == 2022
+    assert kwargs["username"] == "hub-1"
+    sftp.put.assert_called_once_with("/local/2026-07-21_leituras.txt",
+                                     "/uploads/2026-07-21_leituras.txt")
+    cliente.close.assert_called_once()

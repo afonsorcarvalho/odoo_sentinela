@@ -46,3 +46,26 @@ class EnviadorSftp:
             self._persistir()
             enviados_agora.append(nome)
         return enviados_agora
+
+
+class TransporteParamiko:
+    def __init__(self, host, port, username, ssh_key_path, remote_dir):
+        self._host = host
+        self._port = port
+        self._username = username
+        self._ssh_key_path = str(Path(ssh_key_path).expanduser())
+        self._remote_dir = remote_dir.rstrip("/")
+
+    def enviar(self, caminho_local, nome_remoto):
+        import paramiko
+        chave = paramiko.Ed25519Key.from_private_key_file(self._ssh_key_path)
+        cliente = paramiko.SSHClient()
+        cliente.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        cliente.connect(self._host, port=self._port, username=self._username,
+                        pkey=chave, look_for_keys=False, allow_agent=False)
+        try:
+            sftp = cliente.open_sftp()
+            sftp.put(caminho_local, f"{self._remote_dir}/{nome_remoto}")
+            sftp.close()
+        finally:
+            cliente.close()

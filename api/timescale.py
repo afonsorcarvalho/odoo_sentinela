@@ -18,7 +18,7 @@ def buscar_agregado(conn, sensor_code, tabela, desde, sites_permitidos):
     with conn.cursor() as cur:
         cur.execute("SELECT site_id FROM sensor_reading WHERE sensor_id = %s LIMIT 1", (sensor_code,))
         linha_site = cur.fetchone()
-    if linha_site is not None and linha_site[0] not in sites_permitidos:
+    if linha_site is None or linha_site[0] not in sites_permitidos:
         return []
     with conn.cursor() as cur:
         cur.execute(

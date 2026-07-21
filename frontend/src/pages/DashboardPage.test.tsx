@@ -81,6 +81,12 @@ describe('DashboardPage', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(within(expurgoCard).getByText('Pressão diferencial')).toBeInTheDocument()
+    // Empurrão vertical (push): o sensor que sai coexiste com o que entra
+    // durante carousel_transition_ms (mock = 500ms). Após a transição, o
+    // readout antigo é removido.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500)
+    })
     expect(within(expurgoCard).queryByText('Temperatura')).not.toBeInTheDocument()
   })
 

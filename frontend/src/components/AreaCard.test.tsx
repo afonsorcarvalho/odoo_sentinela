@@ -44,18 +44,20 @@ describe('AreaCard', () => {
     expect(screen.getByText(/21\.0/)).toBeInTheDocument()
   })
 
-  it('usa carouselTransitionMs na duração da animação de troca de sensor', () => {
+  it('troca de sensor usa carouselTransitionMs na duração do empurrão (push)', () => {
     const { container } = render(
       <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
         selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false}
         carouselIntervalMs={3000} carouselTransitionMs={800} />,
     )
-    // O wrapper do conteúdo do sensor (key=sensor_code) carrega a animação
-    // carousel-in; a duração deve refletir o prop (config global), não o
-    // token fixo de antes.
-    const wrapper = container.querySelector('[style*="carousel-in"]') as HTMLElement
-    expect(wrapper).not.toBeNull()
-    expect(wrapper.style.animation).toContain('800ms')
+    // Dispara a troca clicando no 2º dot (setActiveIndex(1)). Durante a
+    // transição, o readout que ENTRA desliza de baixo (push-enter) e o que SAI
+    // sobe (push-leave), ambos com a duração vinda do prop (config global).
+    fireEvent.click(screen.getAllByRole('tab')[1])
+    const entering = container.querySelector('[style*="push-enter"]') as HTMLElement
+    expect(entering).not.toBeNull()
+    expect(entering.style.animation).toContain('800ms')
+    expect(container.querySelector('[style*="push-leave"]')).not.toBeNull()
   })
 
   it('clicar no valor do sensor ativo chama onSelectSensor com o codigo certo', () => {
@@ -108,7 +110,13 @@ describe('AreaCard', () => {
     act(() => {
       vi.advanceTimersByTime(3000)
     })
+    // Durante o empurrão os dois coexistem (Pressão entrando, Temperatura
+    // saindo). O sensor que entra já aparece de imediato.
     expect(screen.getByText('Pressão')).toBeInTheDocument()
+    // Após a duração da transição (default 300ms) o readout que saiu é removido.
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
     expect(screen.queryByText('Temperatura')).not.toBeInTheDocument()
   })
 

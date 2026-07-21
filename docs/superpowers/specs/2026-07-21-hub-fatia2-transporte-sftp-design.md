@@ -50,7 +50,7 @@ Ack de validação de volta ao Hub via MQTT (T2), bridge MQTT local→central (T
 | `hub/config.py` (modificar) | Adiciona o bloco `sftp` (host/port/username/ssh_key_path/remote_dir). |
 | `hub/main.py` (modificar) | Constrói o enviador; chama `enviador.varrer()` a cada ciclo e no encerramento. |
 
-**Fronteira de teste:** `EnviadorSftp` recebe um `Transporte` injetável (Protocol com `enviar(caminho_local, nome_remoto)`). A lógica é testada com um transporte fake; `TransporteParamiko` ganha um teste de integração contra um servidor SFTP paramiko in-process.
+**Fronteira de teste:** `EnviadorSftp` recebe um `Transporte` injetável (Protocol com `enviar(caminho_local, nome_remoto)`). A lógica é testada com um transporte fake; `TransporteParamiko` (wrapper fino sobre paramiko) é testado dirigindo um `SFTPClient` **mockado** — confirma que carrega a chave ed25519, conecta em host/port, autentica pela chave e chama `put(local, remote)`. **A validação SFTP real fica no runbook cross-machine** contra o SFTPGo de verdade (paramiko não traz um `SFTPServerInterface` pronto; um servidor in-process seria pesado e frágil, e o valor real está no teste contra o SFTPGo).
 
 ### 3.2 Estado de envio
 `dados/{coletor_id}/_enviados.json` — `{ "2026-07-21_leituras.txt": {"enviado_em": "2026-07-21T04:50:00-03:00"} }`. `varrer()`:
@@ -85,7 +85,7 @@ Ausência do bloco `sftp` → o enviador fica desligado (a Fatia 1 continua func
 - **Pi (TDD, roda aqui):**
   - `identidade_ssh`: gera par ed25519, pubkey em formato OpenSSH, idempotência (recarrega a mesma chave).
   - `EnviadorSftp` com **transporte fake**: envia selado não-enviado; ignora não-selado; não reenvia o que está no índice; falha do transporte deixa pendente (retry no próximo `varrer`); estado persiste entre instâncias.
-  - `TransporteParamiko`: **integração** contra servidor SFTP paramiko in-process (sobe um `paramiko.Transport` servidor num socket local, autentica por chave, recebe o arquivo, confere bytes).
+  - `TransporteParamiko`: dirige um `SFTPClient` **mockado** — carrega a chave ed25519, conecta em host/port, autentica pela chave, chama `put(local, remote)` e fecha. (SFTP real → runbook cross-machine.)
   - `config`: parse/validação do bloco `sftp`; ausência → desligado.
 - **Servidor (runbook, Afonso roda):** subir sftpgo no compose, registrar as duas chaves, enviar um arquivo real do Hub → confirmar linha no Timescale + entrada no `file.ledger` do Odoo.
 - **Cross-machine (conjunto):** apontar o `sftp.host` do Hub para o IP do servidor, rodar `hub.main`, e verificar a ingestão no servidor.

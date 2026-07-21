@@ -12,6 +12,9 @@ class DashboardConfig(models.Model):
     carousel_interval_ms = fields.Integer(
         default=3000, required=True, string='Intervalo do carrossel (ms)',
     )
+    carousel_transition_ms = fields.Integer(
+        default=300, required=True, string='Duração da transição do carrossel (ms)',
+    )
     layout_json = fields.Text(string='Layout do dashboard (JSON)')
     layout_version = fields.Integer(string='Versão do schema de layout', default=1)
 
@@ -25,6 +28,14 @@ class DashboardConfig(models.Model):
             if config.carousel_interval_ms < 1000:
                 raise ValidationError(
                     'carousel_interval_ms não pode ser menor que 1000 (piso de legibilidade).'
+                )
+
+    @api.constrains('carousel_transition_ms')
+    def _check_carousel_transition_range(self):
+        for config in self:
+            if config.carousel_transition_ms < 0 or config.carousel_transition_ms > 2000:
+                raise ValidationError(
+                    'carousel_transition_ms deve estar entre 0 e 2000 ms.'
                 )
 
     @api.constrains('layout_json')

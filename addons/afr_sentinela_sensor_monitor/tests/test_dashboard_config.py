@@ -26,6 +26,31 @@ class TestDashboardConfig(TransactionCase):
         config = self.env['sensor_monitor.dashboard.config'].create({'site_id': self.site.id})
         self.assertEqual(config.carousel_interval_ms, 3000)
 
+    def test_default_carousel_transition_ms_e_300(self):
+        config = self.env['sensor_monitor.dashboard.config'].create({'site_id': self.site.id})
+        self.assertEqual(config.carousel_transition_ms, 300)
+
+    def test_cria_config_com_carousel_transition_ms(self):
+        config = self.env['sensor_monitor.dashboard.config'].create({
+            'site_id': self.site.id,
+            'carousel_transition_ms': 600,
+        })
+        self.assertEqual(config.carousel_transition_ms, 600)
+
+    def test_carousel_transition_ms_acima_do_teto_falha(self):
+        with self.assertRaises(ValidationError):
+            self.env['sensor_monitor.dashboard.config'].create({
+                'site_id': self.site.id,
+                'carousel_transition_ms': 3000,
+            })
+
+    def test_carousel_transition_ms_negativo_falha(self):
+        with self.assertRaises(ValidationError):
+            self.env['sensor_monitor.dashboard.config'].create({
+                'site_id': self.site.id,
+                'carousel_transition_ms': -10,
+            })
+
     def test_site_id_unico_impede_segunda_config_no_mesmo_site(self):
         self.env['sensor_monitor.dashboard.config'].create({'site_id': self.site.id})
         with self.assertRaises(Exception):

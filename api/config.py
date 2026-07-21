@@ -11,6 +11,7 @@ from .odoo import SITE_CODE, get_cliente_servico
 router = APIRouter()
 
 _DEFAULT_CAROUSEL_INTERVAL_MS = 3000
+_DEFAULT_CAROUSEL_TRANSITION_MS = 300
 
 
 class LayoutBody(BaseModel):
@@ -25,21 +26,34 @@ def _site_id_do_code(cliente):
     return sites[0]['id'] if sites else None
 
 
+def _default_config():
+    return {
+        'carousel_interval_ms': _DEFAULT_CAROUSEL_INTERVAL_MS,
+        'carousel_transition_ms': _DEFAULT_CAROUSEL_TRANSITION_MS,
+        'layout': None,
+    }
+
+
 def obter_config(cliente):
     site_id = _site_id_do_code(cliente)
     if site_id is None:
-        return {'carousel_interval_ms': _DEFAULT_CAROUSEL_INTERVAL_MS, 'layout': None}
+        return _default_config()
 
     configs = odoo_cliente.executar(
         cliente, 'sensor_monitor.dashboard.config', 'search_read',
-        [('site_id', '=', site_id)], fields=['carousel_interval_ms', 'layout_json'],
+        [('site_id', '=', site_id)],
+        fields=['carousel_interval_ms', 'carousel_transition_ms', 'layout_json'],
     )
     if not configs:
-        return {'carousel_interval_ms': _DEFAULT_CAROUSEL_INTERVAL_MS, 'layout': None}
+        return _default_config()
 
     cfg = configs[0]
     layout = json.loads(cfg['layout_json']) if cfg.get('layout_json') else None
-    return {'carousel_interval_ms': cfg['carousel_interval_ms'], 'layout': layout}
+    return {
+        'carousel_interval_ms': cfg['carousel_interval_ms'],
+        'carousel_transition_ms': cfg['carousel_transition_ms'],
+        'layout': layout,
+    }
 
 
 @router.get('/config')

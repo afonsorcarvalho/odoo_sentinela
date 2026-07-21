@@ -44,6 +44,20 @@ describe('AreaCard', () => {
     expect(screen.getByText(/21\.0/)).toBeInTheDocument()
   })
 
+  it('usa carouselTransitionMs na duração da animação de troca de sensor', () => {
+    const { container } = render(
+      <AreaCard group={group} thresholdsByCode={thresholdsByCode} liveByCode={liveByCode}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false}
+        carouselIntervalMs={3000} carouselTransitionMs={800} />,
+    )
+    // O wrapper do conteúdo do sensor (key=sensor_code) carrega a animação
+    // carousel-in; a duração deve refletir o prop (config global), não o
+    // token fixo de antes.
+    const wrapper = container.querySelector('[style*="carousel-in"]') as HTMLElement
+    expect(wrapper).not.toBeNull()
+    expect(wrapper.style.animation).toContain('800ms')
+  })
+
   it('clicar no valor do sensor ativo chama onSelectSensor com o codigo certo', () => {
     const onSelectSensor = vi.fn()
     render(

@@ -20,6 +20,7 @@ export type Threshold = {
 
 export type DashboardConfig = {
   carousel_interval_ms: number
+  carousel_transition_ms: number
   layout?: DashboardLayout | null
 }
 

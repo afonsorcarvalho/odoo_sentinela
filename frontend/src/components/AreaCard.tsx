@@ -36,6 +36,7 @@ export function AreaCard({
   onSelectSensor,
   hadAlarmToday,
   carouselIntervalMs,
+  carouselTransitionMs = 300,
 }: {
   group: AreaGroup
   thresholdsByCode: Record<string, Threshold | null | undefined>
@@ -44,6 +45,10 @@ export function AreaCard({
   onSelectSensor: (code: string) => void
   hadAlarmToday: boolean
   carouselIntervalMs: number
+  // Duração (ms) da animação de cross-fade na troca de sensor do carrossel.
+  // Config global (config.carousel_transition_ms via AreaWidget); default 300
+  // espelha o token --dur-base usado antes de ser configurável.
+  carouselTransitionMs?: number
 }) {
   // mountedAtRef: referencia de "desde quando este AreaCard observa estes
   // sensores", usada so para escalar 'never' -> 'offline' apos a janela de
@@ -195,7 +200,11 @@ export function AreaCard({
           <span
             key={activeSensor.sensor_code}
             className="flex h-full w-full min-h-0 flex-col gap-0.5 motion-reduce:animate-none"
-            style={{ animation: reducedMotion ? undefined : 'carousel-in var(--dur-base) var(--ease-out-soft)' }}
+            style={{
+              animation: reducedMotion
+                ? undefined
+                : `carousel-in ${carouselTransitionMs}ms var(--ease-out-soft)`,
+            }}
           >
             {/* Nome do sensor: escala com o card via container-query (cqmin,
                 relativo ao @container do AreaCard). O status dot e o badge de

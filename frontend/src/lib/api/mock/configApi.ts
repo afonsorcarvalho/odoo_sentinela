@@ -10,7 +10,7 @@ export const mockConfigApi: ConfigApi = {
     // DashboardPage.tsx e do default do AreaCard: prova que o valor flui
     // do mock/API ate o componente renderizado, e nao e uma coincidencia
     // mascarada pelo `?? 3000`.
-    return { carousel_interval_ms: 4000, layout: _layout }
+    return { carousel_interval_ms: 4000, carousel_transition_ms: 500, layout: _layout }
   },
   async saveLayout(layout: DashboardLayout) {
     _layout = layout

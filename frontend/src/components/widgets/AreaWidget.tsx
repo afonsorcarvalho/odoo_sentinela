@@ -35,6 +35,7 @@ export function AreaWidget({ areaCode }: { areaCode: string }) {
       onSelectSensor={drill ? drill.open : () => {}}
       hadAlarmToday={false}
       carouselIntervalMs={config.data?.carousel_interval_ms ?? 3000}
+      carouselTransitionMs={config.data?.carousel_transition_ms ?? 300}
     />
   )
 }

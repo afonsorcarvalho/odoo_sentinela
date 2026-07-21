@@ -54,7 +54,11 @@ def test_config_sem_registro_retorna_default():
         resposta = client.get('/config', headers=_headers())
 
         assert resposta.status_code == 200
-        assert resposta.json() == {'carousel_interval_ms': 3000, 'layout': None}
+        assert resposta.json() == {
+            'carousel_interval_ms': 3000,
+            'carousel_transition_ms': 300,
+            'layout': None,
+        }
     finally:
         for c in configs_existentes:
             odoo_cliente.executar(
@@ -71,12 +75,16 @@ def test_config_com_registro_retorna_valor_configurado():
     site_id = _site_id(cliente)
     config_id = odoo_cliente.executar(
         cliente, 'sensor_monitor.dashboard.config', 'create',
-        {'site_id': site_id, 'carousel_interval_ms': 7000},
+        {'site_id': site_id, 'carousel_interval_ms': 7000, 'carousel_transition_ms': 600},
     )
     try:
         resposta = client.get('/config', headers=_headers())
         assert resposta.status_code == 200
-        assert resposta.json() == {'carousel_interval_ms': 7000, 'layout': None}
+        assert resposta.json() == {
+            'carousel_interval_ms': 7000,
+            'carousel_transition_ms': 600,
+            'layout': None,
+        }
     finally:
         odoo_cliente.executar(cliente, 'sensor_monitor.dashboard.config', 'unlink', [config_id])
 

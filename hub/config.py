@@ -37,6 +37,15 @@ class BarramentoConfig:
 
 
 @dataclass
+class SftpConfig:
+    host: str
+    port: int
+    username: str
+    ssh_key_path: str
+    remote_dir: str
+
+
+@dataclass
 class HubConfig:
     hub_id: str
     coletor_id: str
@@ -48,6 +57,7 @@ class HubConfig:
     mqtt_host: str
     mqtt_port: int
     barramentos: list = field(default_factory=list)
+    sftp: object = None
 
 
 def _par(lista, nome):
@@ -92,6 +102,17 @@ def carregar_config(caminho):
             paridade=bus.get("paridade", "N"), stop_bits=int(bus.get("stop_bits", 1)),
             dispositivos=dispositivos,
         ))
+    sftp = None
+    bloco_sftp = dados.get("sftp")
+    if bloco_sftp:
+        for campo in ("host", "username", "ssh_key_path"):
+            if not bloco_sftp.get(campo):
+                raise ValueError(f"sftp.{campo} é obrigatório quando 'sftp' está presente")
+        sftp = SftpConfig(
+            host=bloco_sftp["host"], port=int(bloco_sftp.get("port", 22)),
+            username=bloco_sftp["username"], ssh_key_path=bloco_sftp["ssh_key_path"],
+            remote_dir=bloco_sftp.get("remote_dir", "/uploads"),
+        )
     mqtt = dados.get("mqtt", {})
     return HubConfig(
         hub_id=dados["hub_id"], coletor_id=dados["coletor_id"],
@@ -99,5 +120,5 @@ def carregar_config(caminho):
         intervalo_leitura_s=int(dados["intervalo_leitura_s"]),
         caminho_chave=dados["caminho_chave"], caminho_dados=dados["caminho_dados"],
         mqtt_host=mqtt.get("host", "localhost"), mqtt_port=int(mqtt.get("port", 1883)),
-        barramentos=barramentos,
+        barramentos=barramentos, sftp=sftp,
     )

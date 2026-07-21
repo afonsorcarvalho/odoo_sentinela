@@ -59,3 +59,32 @@ def test_rejeita_map_com_tamanho_errado(tmp_path):
     ruim = VALIDA.replace("out: [-50, 150]", "out: [-50, 150, 9]")
     with pytest.raises(ValueError):
         config.carregar_config(_escrever(tmp_path, ruim))
+
+
+SFTP_BLOCO = """
+    sftp:
+      host: 192.168.0.10
+      port: 2022
+      username: hub-0001A2F3
+      ssh_key_path: /tmp/ssh_hub
+      remote_dir: /uploads
+"""
+
+
+def test_sem_sftp_fica_none(tmp_path):
+    cfg = config.carregar_config(_escrever(tmp_path, VALIDA))
+    assert cfg.sftp is None
+
+
+def test_com_sftp_carrega(tmp_path):
+    cfg = config.carregar_config(_escrever(tmp_path, VALIDA + SFTP_BLOCO))
+    assert cfg.sftp.host == "192.168.0.10"
+    assert cfg.sftp.port == 2022
+    assert cfg.sftp.username == "hub-0001A2F3"
+    assert cfg.sftp.remote_dir == "/uploads"
+
+
+def test_sftp_sem_host_falha(tmp_path):
+    ruim = VALIDA + SFTP_BLOCO.replace("host: 192.168.0.10", "port: 2022")
+    with pytest.raises(ValueError):
+        config.carregar_config(_escrever(tmp_path, ruim))

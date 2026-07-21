@@ -25,3 +25,10 @@ barramentos:
             protocolo_origem: 4-20ma
             map: {in: [4, 20], out: [-50, 150]}   # mA -> °C
             filtro: {tipo: ewma, alpha: 0.3}       # opcional
+
+sftp:                                # opcional — sem este bloco, o envio fica desligado
+  host: 192.168.0.10                 # IP do servidor no LAN
+  port: 2022
+  username: hub-0001A2F3
+  ssh_key_path: ~/sentinela-hub/chaves/ssh_hub
+  remote_dir: /uploads

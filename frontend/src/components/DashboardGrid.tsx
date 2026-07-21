@@ -143,7 +143,7 @@ export function DashboardGrid({
           // transform) fica num wrapper interno, nao posicionado pelo RGL.
           <div key={w.id}>
             <div
-              className="widget-enter motion-reduce:animate-none"
+              className="widget-enter h-full w-full motion-reduce:animate-none"
               style={{ animationDelay: `${i * 70}ms` }}
             >
               <WidgetFrame

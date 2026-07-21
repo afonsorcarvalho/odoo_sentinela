@@ -59,6 +59,28 @@ class _PubFake:
         pass
 
 
+class _EnviadorFake:
+    def __init__(self):
+        self.varreduras = 0
+    def varrer(self):
+        self.varreduras += 1
+        return []
+
+
+def test_executar_chama_varrer_quando_ha_enviador(tmp_path):
+    p = tmp_path / "c.yaml"
+    p.write_text(textwrap.dedent(CFG).format(chave=tmp_path / "k.pem", dados=tmp_path / "dados"))
+    cfg = config.carregar_config(p)
+    arq = ArquivoDiario(cfg.coletor_id, cfg.hub_id, cfg.firmware_version,
+                        cfg.timezone_offset, cfg.caminho_dados, AssinadorSoftware(cfg.caminho_chave))
+    envio = _EnviadorFake()
+    agora = datetime(2026, 7, 21, 0, 1, tzinfo=TZ)
+    hub_main.executar(cfg, _LeitorFake(), arq, _PubFake(), agora_fn=lambda: agora,
+                      parar=Event(), max_ciclos=2, enviador=envio)
+    # 2 ciclos + 1 varredura final no encerramento
+    assert envio.varreduras == 3
+
+
 def test_executar_grava_e_publica_e_sela_no_fim(tmp_path):
     p = tmp_path / "c.yaml"
     p.write_text(textwrap.dedent(CFG).format(chave=tmp_path / "k.pem", dados=tmp_path / "dados"))

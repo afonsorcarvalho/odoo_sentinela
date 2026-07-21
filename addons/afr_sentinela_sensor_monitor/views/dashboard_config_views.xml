@@ -6,6 +6,7 @@
             <list>
                 <field name="site_id"/>
                 <field name="carousel_interval_ms"/>
+                <field name="carousel_transition_ms"/>
             </list>
         </field>
     </record>
@@ -18,6 +19,7 @@
                     <group>
                         <field name="site_id"/>
                         <field name="carousel_interval_ms"/>
+                        <field name="carousel_transition_ms"/>
                     </group>
                 </sheet>
             </form>

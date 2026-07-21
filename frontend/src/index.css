@@ -32,6 +32,15 @@
   --color-crit:             #c2241a;
   --color-crit-soft:        #fbe2df;
   --shadow-menu:            0 8px 24px rgb(16 24 32 / 0.10), 0 0 0 1px var(--color-line);
+  /* ---------- Motion (polish "equilibrado") ---------- */
+  /* Durações/easings centralizados: um só ponto de ajuste. Não dependem de
+     cor, então valem igual no tema claro e no .theme-control. */
+  --ease-out-soft:  cubic-bezier(.22, .61, .36, 1);
+  --ease-in-soft:   cubic-bezier(.55, .06, .68, .19);
+  --ease-overshoot: cubic-bezier(.34, 1.5, .64, 1);
+  --dur-fast: 180ms;
+  --dur-base: 300ms;
+  --dur-slow: 400ms;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
@@ -112,4 +121,29 @@ select option {
 
 .dashboard-grid-editing .react-resizable-handle:hover::after {
   border-color: var(--color-primary);
+}
+
+/* ---------- Keyframes de motion (ver docs/superpowers/specs/2026-07-21-dashboard-animacoes-design.md) ----------
+   Todos os usos aplicam estes via classes que já trazem guarda de
+   prefers-reduced-motion (motion-reduce:animate-none) no componente. */
+@keyframes widget-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes carousel-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes alarm-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes kpi-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes editor-wobble {
+  0%, 100% { transform: rotate(-0.4deg); }
+  50%      { transform: rotate(0.4deg); }
 }

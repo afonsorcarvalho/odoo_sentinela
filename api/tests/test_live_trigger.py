@@ -53,6 +53,7 @@ def test_trigger_dispara_notify_no_insert():
         assert notificacao.channel == 'sensor_reading_new'
         payload = json.loads(notificacao.payload)
         assert payload['sensor_id'] == SENSOR_CODE_TESTE
+        assert payload['site_id'] == 'SITE-TEST'
         assert payload['valor'] == 23.4
     finally:
         _limpar()

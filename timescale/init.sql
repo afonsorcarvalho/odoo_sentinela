@@ -63,6 +63,7 @@ BEGIN
         'sensor_reading_new',
         json_build_object(
             'sensor_id', NEW.sensor_id,
+            'site_id', NEW.site_id,
             'time', extract(epoch from NEW.time) * 1000,
             'valor', NEW.valor
         )::text

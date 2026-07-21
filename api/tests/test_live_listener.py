@@ -21,7 +21,7 @@ def _limpar():
 def test_escutar_publica_no_registry_quando_trigger_dispara():
     async def cenario():
         _limpar()
-        fila = live.registrar(SENSOR_CODE_TESTE)
+        fila = live.registrar(SENSOR_CODE_TESTE, ['SITE-TEST'])
         task = asyncio.create_task(live_listener.escutar())
         try:
             await asyncio.sleep(0.5)  # da tempo do listener conectar e comecar a escutar
@@ -45,6 +45,7 @@ def test_escutar_publica_no_registry_quando_trigger_dispara():
 
             item = await asyncio.wait_for(fila.get(), timeout=3)
             assert item['sensor_id'] == SENSOR_CODE_TESTE
+            assert item['site_id'] == 'SITE-TEST'
             assert item['valor'] == 18.2
         finally:
             task.cancel()

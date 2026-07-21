@@ -1,11 +1,13 @@
 import asyncio
 import json
+from datetime import datetime
 
 from fastapi.testclient import TestClient
 
 from api import live
 from api.main import app
 from api.odoo import get_cliente_servico
+from api.tests.tenant_fixtures import criar_tenant, remover_tenant
 
 SENSOR_CODE = 'SNR-SIM-TEMP-01'
 
@@ -55,7 +57,7 @@ def test_live_recebe_ponto_publicado_no_registry():
         resposta = await live.get_live(SENSOR_CODE, cliente=cliente, _claims={})
         agen = resposta.body_iterator
         try:
-            live.publicar(SENSOR_CODE, {'sensor_id': SENSOR_CODE, 'time': 1700000000000, 'valor': 25.0})
+            live.publicar(SENSOR_CODE, {'sensor_id': SENSOR_CODE, 'site_id': 'SITE-SIM-0001', 'time': 1700000000000, 'valor': 25.0})
             linha = await asyncio.wait_for(agen.__anext__(), timeout=2)
             assert linha.startswith('data: ')
             payload = json.loads(linha[len('data: '):].strip())
@@ -83,10 +85,10 @@ def test_live_global_recebe_evento_de_qualquer_sensor():
     # coroutine da rota diretamente (não via ASGI transport), pelo mesmo motivo já
     # documentado (StreamingResponse infinito trava o ASGITransport do httpx).
     async def cenario():
-        resposta = await live.get_live_global(_claims={})
+        resposta = await live.get_live_global(cliente=get_cliente_servico(), _claims={})
         agen = resposta.body_iterator
         try:
-            live.publicar('QUALQUER-OUTRO-SENSOR', {'sensor_id': 'QUALQUER-OUTRO-SENSOR', 'time': 1700000000000, 'valor': 15.0})
+            live.publicar('QUALQUER-OUTRO-SENSOR', {'sensor_id': 'QUALQUER-OUTRO-SENSOR', 'site_id': 'SITE-SIM-0001', 'time': 1700000000000, 'valor': 15.0})
             linha = await asyncio.wait_for(agen.__anext__(), timeout=2)
             assert linha.startswith('data: ')
             payload = json.loads(linha[len('data: '):].strip())
@@ -96,3 +98,18 @@ def test_live_global_recebe_evento_de_qualquer_sensor():
             await agen.aclose()
 
     asyncio.run(cenario())
+
+
+def test_live_sensor_de_outro_tenant_retorna_404():
+    ts = datetime.now().isoformat().replace(':', '').replace('.', '')[:15]
+    tenant_a = criar_tenant(f'A-{ts}')
+    tenant_b = criar_tenant(f'B-{ts}')
+    try:
+        client = TestClient(app)
+        resposta_login = client.post('/auth/login', json={'usuario': tenant_a['login'], 'senha': tenant_a['senha']})
+        token = resposta_login.json()['access_token']
+        resposta = client.get(f"/sensores/{tenant_b['sensor_code']}/live", params={'token': token})
+        assert resposta.status_code == 404
+    finally:
+        remover_tenant(tenant_a)
+        remover_tenant(tenant_b)

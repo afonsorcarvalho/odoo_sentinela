@@ -163,16 +163,21 @@ def test_listar_alarmes_campos_nulos_aparecem_como_null():
 
 def test_listar_alarmes_nao_inclui_evento_de_outro_tenant():
     cliente_servico = get_cliente_servico()
-    tenant_a = criar_tenant('ALARM-A')
-    tenant_b = criar_tenant('ALARM-B')
-    evento_b_id = _criar_evento(cliente_servico, tenant_b['sensor_code'])
+    tenant_a = tenant_b = None
+    evento_b_id = None
     try:
+        tenant_a = criar_tenant('ALARM-A')
+        tenant_b = criar_tenant('ALARM-B')
+        evento_b_id = _criar_evento(cliente_servico, tenant_b['sensor_code'])
         resposta_login = client.post('/auth/login', json={'usuario': tenant_a['login'], 'senha': tenant_a['senha']})
         token = resposta_login.json()['access_token']
         resposta = client.get('/alarmes', headers={'Authorization': f'Bearer {token}'})
         ids = {e['id'] for e in resposta.json()}
         assert evento_b_id not in ids
     finally:
-        _apagar(cliente_servico, evento_b_id)
-        remover_tenant(tenant_a)
-        remover_tenant(tenant_b)
+        if evento_b_id is not None:
+            _apagar(cliente_servico, evento_b_id)
+        if tenant_a is not None:
+            remover_tenant(tenant_a)
+        if tenant_b is not None:
+            remover_tenant(tenant_b)

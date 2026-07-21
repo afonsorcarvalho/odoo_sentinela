@@ -83,27 +83,33 @@ def _headers_para(login, senha):
 
 
 def test_obter_sensor_de_outro_tenant_retorna_404():
-    tenant_a = criar_tenant('META-A')
-    tenant_b = criar_tenant('META-B')
+    tenant_a = tenant_b = None
     try:
+        tenant_a = criar_tenant('META-A')
+        tenant_b = criar_tenant('META-B')
         resposta = client.get(
             f"/sensores/{tenant_b['sensor_code']}",
             headers=_headers_para(tenant_a['login'], tenant_a['senha']),
         )
         assert resposta.status_code == 404
     finally:
-        remover_tenant(tenant_a)
-        remover_tenant(tenant_b)
+        if tenant_a is not None:
+            remover_tenant(tenant_a)
+        if tenant_b is not None:
+            remover_tenant(tenant_b)
 
 
 def test_listar_sensores_nao_inclui_sensor_de_outro_tenant():
-    tenant_a = criar_tenant('META-LIST-A')
-    tenant_b = criar_tenant('META-LIST-B')
+    tenant_a = tenant_b = None
     try:
+        tenant_a = criar_tenant('META-LIST-A')
+        tenant_b = criar_tenant('META-LIST-B')
         resposta = client.get('/sensores', headers=_headers_para(tenant_a['login'], tenant_a['senha']))
         codigos = [s['sensor_code'] for s in resposta.json()]
         assert tenant_a['sensor_code'] in codigos
         assert tenant_b['sensor_code'] not in codigos
     finally:
-        remover_tenant(tenant_a)
-        remover_tenant(tenant_b)
+        if tenant_a is not None:
+            remover_tenant(tenant_a)
+        if tenant_b is not None:
+            remover_tenant(tenant_b)

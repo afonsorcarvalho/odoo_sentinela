@@ -18,7 +18,7 @@ describe('useNow', () => {
 
   it('usa 1 unico setInterval compartilhado entre multiplos assinantes do mesmo intervalMs', () => {
     vi.useFakeTimers()
-    const setIntervalSpy = vi.spyOn(global, 'setInterval')
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
     const { unmount: unmountA } = renderHook(() => useNow(1000))
     const { unmount: unmountB } = renderHook(() => useNow(1000))
     expect(setIntervalSpy).toHaveBeenCalledTimes(1)
@@ -29,7 +29,7 @@ describe('useNow', () => {
 
   it('limpa o interval so quando o ULTIMO assinante desmonta', () => {
     vi.useFakeTimers()
-    const clearIntervalSpy = vi.spyOn(global, 'clearInterval')
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
     const { unmount: unmountA } = renderHook(() => useNow(2000))
     const { unmount: unmountB } = renderHook(() => useNow(2000))
     unmountA()

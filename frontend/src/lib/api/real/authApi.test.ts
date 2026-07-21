@@ -25,6 +25,11 @@ describe('realAuthApi', () => {
 
   it('resposta nao-ok (ex: 401) lanca erro', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }))
-    await expect(realAuthApi.login('admin', 'errada')).rejects.toThrow()
+    await expect(realAuthApi.login('admin', 'errada')).rejects.toThrow('credenciais inválidas')
+  })
+
+  it('fetch falhando (servidor fora do ar) lanca erro de rede, distinto de credencial invalida', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    await expect(realAuthApi.login('admin', 'admin')).rejects.toThrow('erro de rede')
   })
 })

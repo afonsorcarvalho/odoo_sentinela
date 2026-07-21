@@ -17,8 +17,12 @@ export function LoginPage() {
     try {
       await login(usuario, senha)
       navigate('/')
-    } catch {
-      setErro('Usuário ou senha inválidos.')
+    } catch (err) {
+      setErro(
+        err instanceof Error && err.message === 'erro de rede'
+          ? 'Não foi possível conectar ao servidor. Tente novamente em instantes.'
+          : 'Usuário ou senha inválidos.',
+      )
     } finally {
       setCarregando(false)
     }

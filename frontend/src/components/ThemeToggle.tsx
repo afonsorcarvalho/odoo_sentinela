@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePrefersReducedMotion } from '../lib/useSensorCarousel'
 
 function SunIcon() {
   return (
@@ -24,6 +25,7 @@ export function ThemeToggle() {
   // Control (escuro) e o tema padrao recomendado p/ monitoramento continuo —
   // nao segue mais prefers-color-scheme do SO.
   const [control, setControl] = useState(true)
+  const reducedMotion = usePrefersReducedMotion()
 
   useEffect(() => {
     document.documentElement.classList.toggle('theme-control', control)
@@ -38,7 +40,13 @@ export function ThemeToggle() {
       aria-pressed={control}
       aria-label={control ? 'Trocar para tema claro' : 'Trocar para tema escuro'}
     >
-      {control ? <SunIcon /> : <MoonIcon />}
+      <span
+        key={control ? 'sun' : 'moon'}
+        className="inline-flex motion-reduce:animate-none"
+        style={{ animation: reducedMotion ? undefined : 'icon-swap var(--dur-base) var(--ease-overshoot)' }}
+      >
+        {control ? <SunIcon /> : <MoonIcon />}
+      </span>
       <span>{control ? 'Claro' : 'Escuro'}</span>
     </button>
   )

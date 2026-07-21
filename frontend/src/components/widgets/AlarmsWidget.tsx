@@ -98,7 +98,7 @@ export function AlarmsWidget({ scope, areaCodes }: { scope: 'site' | 'area'; are
   const chipButtonClass =
     'flex min-h-9 min-w-11 shrink-0 items-center justify-center rounded-full bg-transparent px-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]'
   const chipPillClass =
-    'rounded-full px-2 py-1 text-[11px] font-medium transition-colors duration-200 ease-out motion-reduce:transition-none'
+    'rounded-full px-2 py-1 text-[11px] font-medium transition-[background-color,color,transform] duration-200 ease-out active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100'
 
   // Estilo do pill por estado -- 3 aparencias distintas (produto medico: um
   // subconjunto ativo ("mixed") nao pode parecer igual a "nenhuma selecionada"

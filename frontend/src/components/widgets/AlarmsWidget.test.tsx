@@ -396,6 +396,17 @@ describe('AlarmsWidget', () => {
     })
   })
 
+  describe('feedback de tap nos chips', () => {
+    it('pill dos chips tem feedback de tap (active:scale-95)', async () => {
+      const alarms = [alarme('SENSOR-A', 'a'), alarme('SENSOR-B', 'b')]
+      renderWithAlarms(alarms, { scope: 'site', areaCodes: [] })
+
+      const pill = await screen.findByText('Todas')
+      expect(pill.className).toMatch(/active:scale-95/)
+      expect(pill.className).toMatch(/motion-reduce:active:scale-100/)
+    })
+  })
+
   describe('alvo de toque mínimo dos chips (min-w)', () => {
     it('botão do chip "Todas" e de área têm min-w-11 (alvo tocável ≥44px mesmo com nome curto)', async () => {
       const alarms = [alarme('SENSOR-A', 'a')]

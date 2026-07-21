@@ -23,8 +23,9 @@ def test_conectar_falha_com_credenciais_erradas():
 
 
 def test_resolver_coletor_existente(cliente):
-    info = odoo_cliente.resolver_coletor(cliente, 'COL-01')
-    assert info['site_code'] == 'CMEOX-01'
+    provisionar_odoo_sim.provisionar(cliente)
+    info = odoo_cliente.resolver_coletor(cliente, provisionar_odoo_sim.COLETOR_CODE)
+    assert info['site_code'] == provisionar_odoo_sim.SITE_CODE
     assert info['id'] > 0
     assert info['hub_id'] > 0
     assert info['site_id'] > 0

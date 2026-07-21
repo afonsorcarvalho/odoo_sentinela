@@ -1,4 +1,4 @@
-from ingestao import odoo_cliente, seed_alarmes_demo
+from ingestao import odoo_cliente, provisionar_demo, seed_alarmes_demo
 
 DSN_ODOO = {'url': 'http://localhost:8189', 'db': 'sentinela', 'usuario': 'admin', 'senha': 'admin'}
 
@@ -9,6 +9,7 @@ def test_semear_cria_cenarios_com_status_variados_e_e_idempotente():
     # da demo, nao so validar a funcao. `semear` e idempotente (verificado
     # abaixo), entao rodar este teste de novo nao duplica nada.
     cliente = odoo_cliente.conectar(**DSN_ODOO)
+    provisionar_demo.provisionar(cliente)
     ids_primeira = seed_alarmes_demo.semear(cliente)
     assert len(ids_primeira) == len(seed_alarmes_demo.CENARIOS)
 

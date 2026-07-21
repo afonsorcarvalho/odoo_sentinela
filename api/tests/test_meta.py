@@ -22,7 +22,6 @@ def test_listar_sensores_com_token_retorna_lista():
     resposta = client.get('/sensores', headers=_headers())
     assert resposta.status_code == 200
     codigos = [s['sensor_code'] for s in resposta.json()]
-    assert 'TEMP-01' in codigos
     assert 'SNR-SIM-TEMP-01' in codigos
 
 

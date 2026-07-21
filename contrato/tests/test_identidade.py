@@ -2,7 +2,7 @@ import pytest
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from coletor_simulado import identidade
+from contrato import identidade
 
 
 def test_chave_persiste_entre_chamadas(tmp_path):

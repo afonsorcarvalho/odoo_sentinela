@@ -147,3 +147,21 @@ select option {
   0%, 100% { transform: rotate(-0.4deg); }
   50%      { transform: rotate(0.4deg); }
 }
+
+/* Entrada escalonada dos widgets no mount da grade + hover de elevação.
+   O hover fica no wrapper de grid (filho direto do react-grid-layout). */
+.widget-enter {
+  animation: widget-in var(--dur-slow) var(--ease-out-soft) both;
+}
+.widget-enter > * {
+  transition: transform var(--dur-fast) var(--ease-out-soft), box-shadow var(--dur-fast) ease;
+}
+.widget-enter:hover > * {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .widget-enter { animation: none; }
+  .widget-enter:hover > * { transform: none; }
+}
+.dashboard-grid-editing .widget-enter:hover > * { transform: none; box-shadow: none; }

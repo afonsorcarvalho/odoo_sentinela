@@ -133,14 +133,26 @@ export function DashboardGrid({
           if (item) onDropWidget?.({ x: item.x, y: item.y })
         }}
       >
-        {layout.widgets.map((w) => (
+        {layout.widgets.map((w, i) => (
+          // O div externo (chave do react-grid-layout) recebe do RGL um
+          // style inline com transform: translate(x,y) para posicionar o
+          // item na grade (useCSSTransforms). Uma animacao CSS de `transform`
+          // nesse MESMO no venceria a cascata sobre esse inline style (regra
+          // de animacoes) e, com fill-mode:both, prenderia o widget na
+          // origem apos o mount. Por isso a classe de entrada (que anima
+          // transform) fica num wrapper interno, nao posicionado pelo RGL.
           <div key={w.id}>
-            <WidgetFrame
-              widget={w}
-              editing={editing}
-              onChange={onWidgetChange}
-              onRemove={onRemove ? () => onRemove(w.id) : undefined}
-            />
+            <div
+              className="widget-enter motion-reduce:animate-none"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
+              <WidgetFrame
+                widget={w}
+                editing={editing}
+                onChange={onWidgetChange}
+                onRemove={onRemove ? () => onRemove(w.id) : undefined}
+              />
+            </div>
           </div>
         ))}
       </ResponsiveGridLayout>

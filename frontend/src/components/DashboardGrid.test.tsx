@@ -77,6 +77,16 @@ describe('DashboardGrid', () => {
     expect(overlay.className).toContain('pointer-events-none')
   })
 
+  it('cada widget recebe a classe de entrada animada', () => {
+    renderWithClient(<DashboardGrid layout={layout} editing={false} />)
+    const frames = screen.getAllByTestId('widget-frame')
+    // O wrapper de grid de cada widget carrega a classe de animação de entrada.
+    frames.forEach((f) => {
+      const wrapper = f.parentElement as HTMLElement
+      expect(wrapper.className).toMatch(/animate-widget-in|widget-enter/)
+    })
+  })
+
   it('handleChange mapeia de allLayouts.lg, nao do breakpoint ativo (regressao)', () => {
     // Reproduz o finding: RGL dispara onLayoutChange(current=xxs, allLayouts)
     // ao cruzar breakpoint durante a edicao. O callback exposto pelo

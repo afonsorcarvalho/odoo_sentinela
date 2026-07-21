@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 from api.main import app
+from api.tests.tenant_fixtures import criar_tenant, remover_tenant
 from ingestao.timescale import conectar
 
 client = TestClient(app)
@@ -107,3 +108,20 @@ def test_historico_window_invalida_retorna_422():
 def test_historico_sem_auth_retorna_401():
     resposta = client.get(f'/sensores/{SENSOR_CODE}/historico', params={'window': '1h'})
     assert resposta.status_code == 401
+
+
+def test_historico_sensor_de_outro_tenant_retorna_404():
+    tenant_a = criar_tenant('HIST-A')
+    tenant_b = criar_tenant('HIST-B')
+    try:
+        resposta_login = client.post('/auth/login', json={'usuario': tenant_a['login'], 'senha': tenant_a['senha']})
+        token = resposta_login.json()['access_token']
+        resposta = client.get(
+            f"/sensores/{tenant_b['sensor_code']}/historico",
+            params={'window': '1h'},
+            headers={'Authorization': f'Bearer {token}'},
+        )
+        assert resposta.status_code == 404
+    finally:
+        remover_tenant(tenant_a)
+        remover_tenant(tenant_b)

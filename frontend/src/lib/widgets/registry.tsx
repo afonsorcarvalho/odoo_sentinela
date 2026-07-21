@@ -18,8 +18,12 @@ export type WidgetDescriptor = {
 
 export const WIDGET_REGISTRY: Record<WidgetType, WidgetDescriptor> = {
   area: {
+    // minSize.h = 3: abaixo de 3 linhas (rowHeight 40 + margin 8 => h2 = 88px)
+    // o chrome fixo (padding + header + divisória + nome do sensor) não deixa
+    // altura para o valor, que fica clipado pelo overflow do WidgetFrame. 3
+    // linhas (136px) é o mínimo em que o valor aparece com respiro.
     type: 'area', label: 'Card de área', needs: 'area',
-    defaultSize: { w: 3, h: 3 }, minSize: { w: 2, h: 2 },
+    defaultSize: { w: 3, h: 3 }, minSize: { w: 2, h: 3 },
     render: (w) => w.binding.areaCode
       ? <AreaWidget areaCode={w.binding.areaCode} />
       : <WidgetPlaceholder texto="Configurar área" />,

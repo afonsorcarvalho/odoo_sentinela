@@ -5,22 +5,38 @@ import { usePrefersReducedMotion } from './useSensorCarousel'
 // easing cubic-out. Usado no KpiWidget para o "count-up" ao chegar novo valor
 // ao vivo. Sob prefers-reduced-motion, retorna o alvo imediatamente.
 // null passa direto (KPI sem leitura ainda).
-export function useCountUp(target: number | null, opts?: { durationMs?: number }): number | null {
+//
+// `resetKey`: quando muda, o hook SNAPA para o novo alvo sem animar (novo
+// baseline). Usado quando o número passa a representar OUTRA coisa e um
+// count-up entre os dois valores seria enganoso — ex.: o AreaCard troca de
+// sensor no carrossel; contar do valor do sensor A até o do sensor B não faz
+// sentido, então passamos resetKey=sensor_code para snapar na troca e só
+// animar entre leituras do MESMO sensor.
+export function useCountUp(
+  target: number | null,
+  opts?: { durationMs?: number; resetKey?: unknown },
+): number | null {
   const durationMs = opts?.durationMs ?? 550
+  const resetKey = opts?.resetKey
   const reduced = usePrefersReducedMotion()
   const [display, setDisplay] = useState<number | null>(target)
   const fromRef = useRef<number | null>(target)
   const lastValueRef = useRef<number | null>(target)
   const rafRef = useRef<number | null>(null)
+  const resetKeyRef = useRef(resetKey)
 
   useEffect(() => {
+    // Troca de resetKey: snapa para o novo alvo sem animar (novo baseline).
+    const resetKeyChanged = resetKeyRef.current !== resetKey
+    resetKeyRef.current = resetKey
+
     if (target === null) {
       setDisplay(null)
       fromRef.current = null
       lastValueRef.current = null
       return
     }
-    if (reduced || fromRef.current === null) {
+    if (reduced || fromRef.current === null || resetKeyChanged) {
       setDisplay(target)
       fromRef.current = target
       lastValueRef.current = target
@@ -51,7 +67,7 @@ export function useCountUp(target: number | null, opts?: { durationMs?: number }
       // (não no alvo desta animação, que pode nunca ter sido mostrado).
       fromRef.current = lastValueRef.current
     }
-  }, [target, reduced, durationMs])
+  }, [target, reduced, durationMs, resetKey])
 
   return display
 }

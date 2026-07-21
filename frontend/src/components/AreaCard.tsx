@@ -1,6 +1,8 @@
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { areaAggregateState, sensorDisplayState, worstAlarmState, type AreaGroup } from '../lib/aggregateStatus'
 import { DEFAULT_STALE_MS, freshness, type FreshnessTier } from '../lib/freshness'
+import { useCountUp } from '../lib/useCountUp'
+import { useFitText } from '../lib/useFitText'
 import { useNow } from '../lib/useNow'
 import { useSensorCarousel, usePrefersReducedMotion } from '../lib/useSensorCarousel'
 import { DisconnectIcon, FreshnessBadge } from './FreshnessBadge'
@@ -88,11 +90,27 @@ export function AreaCard({
   // substituido por '—' (opcao explicita da doc: "ou substituido por '—'")
   // pois nao deve mais ser lido como leitura atual.
   const valueOpacity = activeFreshness === 'stale' ? 0.55 : activeFreshness === 'offline' ? 0.4 : 1
-  const displayValue = activeFreshness === 'offline' ? '—' : activeLive ? activeLive.value.toFixed(1) : '—'
+  // Valor bruto animado: offline vira null (sem count-up; exibe '—'). resetKey
+  // = sensor ativo faz o count-up SNAPAR na troca do carrossel (não conta do
+  // valor de um sensor até o de outro); entre leituras do MESMO sensor, anima.
+  const rawValue = activeFreshness === 'offline' ? null : (activeLive?.value ?? null)
+  const animatedValue = useCountUp(rawValue, { resetKey: activeSensor.sensor_code })
+  const displayValue = animatedValue != null ? animatedValue.toFixed(1) : '—'
+  // O valor escala para preencher a caixa (largura e altura) via useFitText.
+  // A UNIDADE fica FORA do texto medido (rodapé do card) — assim o fit mede só
+  // o número e o tamanho do valor fica consistente entre sensores da mesma
+  // área (unidades de comprimentos diferentes, ex. "Pa" vs "%UR", não mudam
+  // mais o tamanho do número). min baixo garante que o número nunca é clipado
+  // em cards muito pequenos (2×2). Reajusta quando muda o comprimento do
+  // número ou a leitura bruta (key={rawValue} remonta o <span> para o bump).
+  const { boxRef, textRef, fit } = useFitText({ min: 9 })
+  useLayoutEffect(() => {
+    fit()
+  }, [fit, rawValue, displayValue.length])
 
   return (
     <div
-      className="flex h-full flex-col rounded-md p-4"
+      className="@container relative flex h-full flex-col rounded-md p-3"
       style={{
         background: 'var(--color-surface)',
         border: '1px solid var(--color-line)',
@@ -131,14 +149,14 @@ export function AreaCard({
         </div>
       </div>
 
-      <div className="mt-3 border-t" style={{ borderColor: 'var(--color-line)' }} />
+      <div className="mt-2 border-t" style={{ borderColor: 'var(--color-line)' }} />
 
       {/* flex-1: preenche a altura restante do card para que áreas com 1
           sensor (sem carrossel) fiquem com a MESMA altura das de vários
           sensores — evita cards curtos e desalinhados do canto de resize.
           items-center: dots (coluna vertical, à esquerda) e valor ficam
           centralizados na mesma linha horizontal. */}
-      <div className="mt-2 flex flex-1 items-center gap-3">
+      <div className="mt-1 flex min-h-0 flex-1 items-stretch gap-3">
         {group.sensors.length > 1 && (
           <div
             className="flex flex-col items-center justify-center gap-1.5"
@@ -165,7 +183,7 @@ export function AreaCard({
         <button
           type="button"
           onClick={() => onSelectSensor(activeSensor.sensor_code)}
-          className="flex min-w-0 flex-1 flex-col items-start gap-1 rounded-md px-2 py-2 text-left outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
+          className="flex min-h-0 min-w-0 flex-1 flex-col rounded-md px-2 py-1 text-left outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
           style={{ background: activeSelected ? 'var(--color-panel)' : 'transparent' }}
         >
           {/* key={activeSensor.sensor_code}: remonta o conteúdo a cada troca
@@ -176,29 +194,57 @@ export function AreaCard({
               forma de fato desligar a animacao e nao aplicar o style. */}
           <span
             key={activeSensor.sensor_code}
-            className="flex w-full flex-col items-start gap-1 motion-reduce:animate-none"
+            className="flex h-full w-full min-h-0 flex-col gap-0.5 motion-reduce:animate-none"
             style={{ animation: reducedMotion ? undefined : 'carousel-in var(--dur-base) var(--ease-out-soft)' }}
           >
-            <span className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--color-muted)' }}>
+            {/* Nome do sensor: escala com o card via container-query (cqmin,
+                relativo ao @container do AreaCard). O status dot e o badge de
+                freshness ficam com tamanho próprio (indicadores). */}
+            <span
+              className="flex items-center gap-2 font-medium text-[clamp(0.72rem,4.5cqmin,1.15rem)]"
+              style={{ color: 'var(--color-muted)' }}
+            >
               <span data-testid="sensor-status-dot">
                 <StatusDot state={dotState} />
               </span>
               {activeSensor.measurement_type.name}
               {activeFreshness !== 'fresh' && <FreshnessBadge tier={activeFreshness} ageMs={activeAgeMs} />}
             </span>
-            <span
-              className="font-mono text-3xl font-bold tabular-nums"
-              style={{
-                color: activeState === 'ok' || activeState === 'unknown' ? 'var(--color-ink)' : statusTextColor(activeState),
-                opacity: valueOpacity,
-              }}
-            >
-              {displayValue}{' '}
-              <span className="text-base font-medium">{activeSensor.unidade}</span>
-            </span>
+            {/* Caixa que ocupa a altura restante; o valor é escalado por
+                useFitText para preencher largura e altura (com respiro). O
+                <span> do valor tem key={rawValue} para reiniciar o bump a cada
+                nova leitura. */}
+            <div ref={boxRef} className="flex min-h-0 flex-1 items-center overflow-hidden">
+              <span
+                ref={textRef}
+                key={rawValue ?? 'none'}
+                className="inline-block whitespace-nowrap font-mono font-bold leading-none tabular-nums motion-reduce:animate-none"
+                style={{
+                  color: activeState === 'ok' || activeState === 'unknown' ? 'var(--color-ink)' : statusTextColor(activeState),
+                  opacity: valueOpacity,
+                  animation: reducedMotion ? undefined : 'kpi-bump var(--dur-slow) var(--ease-overshoot)',
+                }}
+              >
+                {displayValue}
+              </span>
+            </div>
           </span>
         </button>
       </div>
+
+      {/* Unidade no rodapé, canto inferior direito — FORA do valor medido pelo
+          fit (ver comentário do useFitText acima), tamanho fixo/modesto que
+          escala de leve com o card, sem competir com o número. Reflete o
+          sensor ativo do carrossel. pointer-events-none: é só rótulo, não
+          rouba o clique de seleção do sensor. */}
+      {activeSensor.unidade && (
+        <span
+          className="pointer-events-none absolute bottom-3 right-4 font-medium leading-none text-[clamp(0.7rem,3.2cqmin,1.05rem)]"
+          style={{ color: 'var(--color-muted)', opacity: valueOpacity }}
+        >
+          {activeSensor.unidade}
+        </span>
+      )}
     </div>
   )
 }

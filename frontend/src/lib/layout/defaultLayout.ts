@@ -17,6 +17,11 @@ export function defaultLayout(groups: AreaGroup[]): DashboardLayout {
       y: Math.floor(i / perRow) * AREA_H,
       w: AREA_W,
       h: AREA_H,
+      // minH 3: card de área precisa de >=3 linhas p/ o valor não ser clipado
+      // (ver WIDGET_REGISTRY.area.minSize). Os widgets do defaultLayout não
+      // herdavam min, então o usuário podia encolhê-los para dentro dessa zona.
+      minW: 2,
+      minH: 3,
     },
     binding: { areaCode: g.area.area_code },
     options: {},
@@ -25,7 +30,7 @@ export function defaultLayout(groups: AreaGroup[]): DashboardLayout {
   widgets.push({
     id: 'alarms-site',
     type: 'alarms',
-    layout: { x: COLS - AREA_W, y: 0, w: AREA_W, h: AREA_H * 2 },
+    layout: { x: COLS - AREA_W, y: 0, w: AREA_W, h: AREA_H * 2, minW: 2, minH: 3 },
     binding: {},
     options: { scope: 'site' },
   })

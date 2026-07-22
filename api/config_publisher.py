@@ -5,7 +5,40 @@ o subconjunto OPERACIONAL do config (Global Constraints §7): barramentos,
 dispositivos e canais com calibração/filtro. Não inclui identidade do hub
 nem credenciais (hub_id, coletor_id, chaves, sftp, mqtt).
 """
+import os
+
+import paramiko
+
 from ingestao import odoo_cliente
+
+_SFTP_BASE = '/config'
+
+
+def _sftp_conectar():
+    t = paramiko.Transport((os.environ['SFTP_HOST'], int(os.environ.get('SFTP_PORT', '2022'))))
+    t.connect(username=os.environ['SFTP_USER'],
+              pkey=paramiko.Ed25519Key.from_private_key_file(os.environ['SFTP_KEY_PATH']))
+    return t, paramiko.SFTPClient.from_transport(t)
+
+
+def escrever_config_sftp(hub_code, version, conteudo_yaml):
+    """Grava /config/<hub_code>/config-v<version>.yaml no SFTPGo via SFTP.
+
+    Cria o subdiretório do hub se ainda não existir. Devolve o caminho remoto.
+    """
+    t, sftp = _sftp_conectar()
+    try:
+        dir_hub = f'{_SFTP_BASE}/{hub_code}'
+        try:
+            sftp.stat(dir_hub)
+        except FileNotFoundError:
+            sftp.mkdir(dir_hub)
+        remoto = f'{dir_hub}/config-v{version}.yaml'
+        with sftp.open(remoto, 'w') as f:
+            f.write(conteudo_yaml)
+        return remoto
+    finally:
+        t.close()
 
 
 def serializar_config_hub(cliente, hub_code):

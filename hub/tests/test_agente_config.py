@@ -79,3 +79,43 @@ def test_estado_corrompido_carrega_zero(tmp_path):
     estado_path.write_text('isto nao e json valido {{{')
     ag = _agente(tmp_path, lambda *a, **k: None, lambda *a, **k: None)
     assert ag.aplicada == 0
+
+
+def test_apply_republica_status_com_versao_nova(tmp_path):
+    publicados = []
+    def publish(topico, payload, **k): publicados.append((topico, json.loads(payload), k))
+    def sftp_baixar(remoto, local):
+        Path(local).write_text(yaml.safe_dump(OPERACIONAL))
+    ag = _agente(tmp_path, publish, sftp_baixar)
+    ag.processar_notify({'version': 4})
+    status_pub = [p for t, p, k in publicados if t == 'sentinela/status/hub/HUB-EXP']
+    assert status_pub, 'status retido deveria ter sido republicado após applied:ok'
+    assert status_pub[-1]['config_version_aplicada'] == 4
+    # confere que foi publicado retido
+    status_kwargs = [k for t, p, k in publicados if t == 'sentinela/status/hub/HUB-EXP']
+    assert status_kwargs[-1].get('retain') is True
+
+
+def test_config_invalido_nao_avanca_nem_reporta_ok(tmp_path):
+    publicados = []
+    def publish(topico, payload, **k): publicados.append((topico, json.loads(payload)))
+    operacional_invalido = {
+        'version': 7, 'intervalo_leitura_s': 5,
+        'barramentos': [{'porta': '/dev/ttyUSB0', 'baud': 9600, 'paridade': 'N', 'stop_bits': 1,
+            'dispositivos': [{'endereco': 1, 'driver': 'n4aib16', 'canais': [
+                {'ch': 1, 'sensor_id': 'SNR-EXP-TEMP-01', 'area_id': 'AREA-EXPURGO',
+                 'tipo_medida': 'temperatura', 'unidade': 'C', 'protocolo_origem': '4-20ma'}
+                # falta 'map' -> carregar_config deve levantar (KeyError)
+            ]}]}],
+    }
+    def sftp_baixar(remoto, local):
+        Path(local).write_text(yaml.safe_dump(operacional_invalido))
+    ag = _agente(tmp_path, publish, sftp_baixar)
+    ag.processar_notify({'version': 7})
+    applied = [p for t, p in publicados if t.endswith('applied/hub/HUB-EXP')][-1]
+    assert applied['status'] == 'erro'
+    assert ag.aplicada == 0
+    assert not (tmp_path / 'config.yaml').exists()
+    # não deixa lixo residual
+    assert not (tmp_path / 'config.yaml.novo').exists()
+    assert not (tmp_path / 'config.yaml.baixando').exists()

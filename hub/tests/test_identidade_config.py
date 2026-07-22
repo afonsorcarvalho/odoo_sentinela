@@ -44,3 +44,11 @@ def test_carregar_identidade_le_yaml(tmp_path):
     p = tmp_path / 'identity.yaml'
     p.write_text(yaml.safe_dump(IDENTIDADE))
     assert carregar_identidade(str(p))['hub_id'] == 'HUB-0001A2F3'
+
+
+def test_escrever_config_efetivo_e_atomico_sem_lixo_residual(tmp_path):
+    merged = fundir(IDENTIDADE, OPERACIONAL)
+    caminho = tmp_path / 'config.yaml'
+    escrever_config_efetivo(merged, str(caminho))
+    assert caminho.exists()
+    assert not (tmp_path / 'config.yaml.tmp').exists()  # rename atômico, sem lixo

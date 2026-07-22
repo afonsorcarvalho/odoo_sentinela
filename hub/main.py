@@ -28,9 +28,19 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
 
     def _recarregar():
         nonlocal config, leitor, intervalo
+        # Constrói a config/leitor NOVOS antes de tocar no leitor antigo: se
+        # carregar_config/Leitor levantar (ex. serial /dev/ttyUSB0 ocupada),
+        # o leitor antigo continua aberto e funcionando (não vira brick).
+        try:
+            nova_config = config_mod.carregar_config(caminho_config)
+            novo_leitor = Leitor(nova_config)
+        except Exception as e:
+            print(f"[hub] falha ao recarregar config, mantendo leitor antigo: {e}")
+            reconfigurar.clear()
+            return
         leitor.fechar()
-        config = config_mod.carregar_config(caminho_config)
-        leitor = Leitor(config)
+        leitor = novo_leitor
+        config = nova_config
         intervalo = config.intervalo_leitura_s
         reconfigurar.clear()
 
@@ -82,6 +92,14 @@ def main(argv=None):
     reconfigurar = Event()
     agente = None
     if cfg.sftp is not None:
+        if not args.identity:
+            raise SystemExit("--identity é obrigatório quando 'sftp' está configurado")
+        from hub.identidade_config import carregar_identidade
+        identidade = carregar_identidade(args.identity)
+        hub_code = identidade.get('hub_code')
+        if not hub_code:
+            raise SystemExit("identity.yaml precisa de 'hub_code' == hub.hub_code do Odoo")
+
         from hub.enviador_sftp import EnviadorSftp, TransporteParamiko
         from hub import identidade_ssh
         identidade_ssh.carregar_ou_criar_chave_ssh(cfg.sftp.ssh_key_path)
@@ -92,10 +110,8 @@ def main(argv=None):
         enviador = EnviadorSftp(cfg.coletor_id, cfg.caminho_dados, transporte)
 
         from hub.agente_config import AgenteControle
-        from hub.identidade_config import carregar_identidade
-        identidade = carregar_identidade(args.identity)
         agente = AgenteControle(
-            hub_code=identidade.get('hub_code', cfg.hub_id),
+            hub_code=hub_code,
             identidade=identidade, sftp_baixar=transporte.baixar,
             reconfigurar=reconfigurar, caminho_config=args.config,
             estado_path=str(Path(cfg.caminho_dados).expanduser() / 'estado_config.json'),

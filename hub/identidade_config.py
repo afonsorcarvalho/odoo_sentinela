@@ -1,4 +1,5 @@
 """Split identidade local (identity.yaml) vs operacional baixado, e merge -> config.yaml efetivo."""
+import os
 from pathlib import Path
 
 import yaml
@@ -16,5 +17,7 @@ def fundir(identidade, operacional):
 
 
 def escrever_config_efetivo(merged, caminho):
-    Path(caminho).expanduser().write_text(
-        yaml.safe_dump(merged, sort_keys=False, allow_unicode=True))
+    caminho = Path(caminho).expanduser()
+    tmp = caminho.with_name(caminho.name + '.tmp')
+    tmp.write_text(yaml.safe_dump(merged, sort_keys=False, allow_unicode=True))
+    os.replace(tmp, caminho)

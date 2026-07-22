@@ -1,6 +1,10 @@
 import textwrap
 from datetime import datetime, timedelta, timezone
 from threading import Event
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
 
 from hub import config
 from hub.assinador import AssinadorSoftware
@@ -95,3 +99,35 @@ def test_executar_grava_e_publica_e_sela_no_fim(tmp_path):
     assert texto.count("SNR-EXP-TEMP-01|") == 2   # 2 varreduras gravadas
     assert "# assinatura: " in texto              # selado no encerramento
     assert pub.n == 2                             # 2 publicações
+
+
+def _cfg_com_sftp(tmp_path):
+    return SimpleNamespace(
+        timezone_offset='-03:00', caminho_chave=str(tmp_path / 'k.pem'), coletor_id='COL',
+        hub_id='HUB', firmware_version='0.1.0', caminho_dados=str(tmp_path / 'dados'),
+        mqtt_host='localhost', mqtt_port=1883, intervalo_leitura_s=5,
+        sftp=SimpleNamespace(host='10.8.0.1', port=22, username='u', ssh_key_path='k',
+                             remote_dir='/uploads'),
+    )
+
+
+def _monkeypatch_infra(monkeypatch, tmp_path):
+    monkeypatch.setattr(hub_main.config_mod, 'carregar_config', lambda p: _cfg_com_sftp(tmp_path))
+    monkeypatch.setattr(hub_main, 'AssinadorSoftware', lambda *a, **k: MagicMock())
+    monkeypatch.setattr(hub_main, 'ArquivoDiario', lambda *a, **k: MagicMock())
+    monkeypatch.setattr(hub_main, 'Leitor', lambda *a, **k: MagicMock())
+    monkeypatch.setattr(hub_main, 'PublicadorMqtt', lambda *a, **k: MagicMock())
+
+
+def test_main_com_sftp_sem_identity_levanta_systemexit(monkeypatch, tmp_path):
+    _monkeypatch_infra(monkeypatch, tmp_path)
+    with pytest.raises(SystemExit, match="identity"):
+        hub_main.main(['--config', 'c.yaml'])
+
+
+def test_main_com_sftp_identity_sem_hub_code_levanta_systemexit(monkeypatch, tmp_path):
+    _monkeypatch_infra(monkeypatch, tmp_path)
+    monkeypatch.setattr('hub.identidade_config.carregar_identidade',
+                        lambda p: {'hub_id': 'HUB-0001'})  # sem hub_code
+    with pytest.raises(SystemExit, match="hub_code"):
+        hub_main.main(['--config', 'c.yaml', '--identity', 'identity.yaml'])

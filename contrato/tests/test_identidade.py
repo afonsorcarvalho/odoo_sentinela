@@ -12,6 +12,16 @@ def test_chave_persiste_entre_chamadas(tmp_path):
     assert chave1.private_numbers().private_value == chave2.private_numbers().private_value
 
 
+def test_caminho_com_til_expande_para_home(tmp_path, monkeypatch):
+    # '~' na config deve resolver para o HOME real, e não criar uma pasta
+    # literal chamada '~' no diretório corrente.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    identidade.carregar_ou_criar_chave("~/chaves/coletor.pem")
+    assert (tmp_path / "chaves" / "coletor.pem").exists()
+    assert not (tmp_path / "~").exists()
+
+
 def test_fingerprint_deterministico(tmp_path):
     caminho = tmp_path / "chave.pem"
     chave = identidade.carregar_ou_criar_chave(caminho)

@@ -1,6 +1,5 @@
 import json
 import os
-import threading
 
 import paho.mqtt.client as mqtt
 
@@ -12,9 +11,13 @@ _KEEPALIVE = 30
 def publicar(topico, payload, retain=False):
     c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     c.connect(MQTT_HOST, MQTT_PORT, _KEEPALIVE)
-    info = c.publish(topico, json.dumps(payload), qos=1, retain=retain)
-    info.wait_for_publish(timeout=5)
-    c.disconnect()
+    c.loop_start()
+    try:
+        info = c.publish(topico, json.dumps(payload), qos=1, retain=retain)
+        info.wait_for_publish(timeout=5)
+    finally:
+        c.loop_stop()
+        c.disconnect()
 
 
 class OuvinteMqtt:

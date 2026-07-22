@@ -73,3 +73,43 @@ def test_recarregar_com_config_invalida_mantem_leitor_antigo_sem_matar_loop(monk
     assert leitor_criado == []                 # Leitor novo nunca foi construído (falhou antes)
     assert not reconfig.is_set()               # Event limpo mesmo em erro (não fica em retry-loop)
     assert leitor_velho.ler_todos.called       # loop seguiu usando o leitor antigo
+
+
+def test_recarregar_com_leitor_falho_mantem_leitor_antigo_sem_matar_loop(monkeypatch):
+    """Cenário motivador do fix: config.yaml carrega OK, mas Leitor(cfg) é que
+    falha (ex. serial /dev/ttyUSB0 ocupada). O leitor antigo NÃO pode já ter
+    sido fechado quando isso acontece — senão o hub vira um brick."""
+    parar = Event()
+    reconfig = Event()
+    reconfig.set()  # já sinalizado → deve tentar recarregar no 1º ciclo
+
+    leitor_velho = MagicMock()
+    leitor_velho.ler_todos.return_value = []
+
+    cfg = MagicMock(); cfg.intervalo_leitura_s = 0; cfg.hub_id = 'H'; cfg.coletor_id = 'C'
+    cfg_novo = MagicMock(); cfg_novo.intervalo_leitura_s = 0
+
+    monkeypatch.setattr(hub_main.config_mod, 'carregar_config', lambda p: cfg_novo)
+
+    def leitor_que_falha(c):
+        raise OSError("serial /dev/ttyUSB0 ocupada")
+    monkeypatch.setattr(hub_main, 'Leitor', leitor_que_falha)
+
+    arquivo = MagicMock(); publicador = MagicMock()
+
+    def agora():
+        parar.set()
+        import datetime
+        return datetime.datetime(2026, 7, 22, tzinfo=datetime.timezone.utc)
+
+    # não deve levantar (Leitor() falhando não pode matar o loop)
+    hub_main.executar(cfg, leitor_velho, arquivo, publicador, agora_fn=agora,
+                      parar=parar, max_ciclos=1, reconfigurar=reconfig,
+                      caminho_config='config.yaml')
+
+    # o leitor antigo só é fechado 1x, no encerramento normal do loop —
+    # NÃO durante o _recarregar (senão teria sido fechado antes do Leitor()
+    # falhar, e o loop teria seguido sem nenhum leitor funcional).
+    leitor_velho.fechar.assert_called_once()
+    assert not reconfig.is_set()               # Event limpo mesmo em erro (não fica em retry-loop)
+    assert leitor_velho.ler_todos.called       # loop seguiu usando o leitor antigo (não brickou)

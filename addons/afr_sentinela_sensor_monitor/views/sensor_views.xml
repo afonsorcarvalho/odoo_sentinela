@@ -29,6 +29,13 @@
                         <field name="unidade"/>
                         <field name="ativo"/>
                         <field name="modbus_register_id" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="modbus_channel" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="ma_in_min" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="ma_in_max" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="eng_out_min" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="eng_out_max" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="filtro_tipo" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="filtro_alpha" invisible="protocolo_origem != 'rs485' or filtro_tipo == 'none'"/>
                     </group>
                 </sheet>
             </form>

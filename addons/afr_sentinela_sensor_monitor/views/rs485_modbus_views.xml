@@ -39,6 +39,7 @@
                         <field name="name"/>
                         <field name="fabricante"/>
                         <field name="modelo"/>
+                        <field name="driver"/>
                     </group>
                     <field name="register_ids">
                         <list editable="bottom">

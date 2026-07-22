@@ -14,6 +14,7 @@ from hub.arquivo_diario import _esta_selado
 
 class Transporte(Protocol):
     def enviar(self, caminho_local: str, nome_remoto: str) -> None: ...
+    def baixar(self, caminho_remoto: str, caminho_local: str) -> None: ...
 
 
 class EnviadorSftp:
@@ -66,6 +67,20 @@ class TransporteParamiko:
         try:
             sftp = cliente.open_sftp()
             sftp.put(caminho_local, f"{self._remote_dir}/{nome_remoto}")
+            sftp.close()
+        finally:
+            cliente.close()
+
+    def baixar(self, caminho_remoto, caminho_local):
+        import paramiko
+        chave = paramiko.Ed25519Key.from_private_key_file(self._ssh_key_path)
+        cliente = paramiko.SSHClient()
+        cliente.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        cliente.connect(self._host, port=self._port, username=self._username,
+                        pkey=chave, look_for_keys=False, allow_agent=False)
+        try:
+            sftp = cliente.open_sftp()
+            sftp.get(caminho_remoto, caminho_local)
             sftp.close()
         finally:
             cliente.close()

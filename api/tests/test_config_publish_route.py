@@ -21,16 +21,39 @@ def test_publicar_config_sem_secret_401():
     assert r.status_code == 401
 
 
+def test_publicar_config_secret_errado_401():
+    r = client.post(f'/internal/hub/{HUB_CODE}/publicar-config',
+                    headers={'X-Config-Secret': 'errado'})
+    assert r.status_code == 401
+
+
 def test_publicar_config_grava_e_notifica_retido():
     # garante hub provisionado (reusa o fixture da Task 4)
     from api.tests.test_config_serializer import _prov_hub_modbus
     _prov_hub_modbus(get_cliente_servico())
 
+    topico = f'sentinela/config/notify/hub/{HUB_CODE}'
+
+    # Limpa o retido do tópico ANTES de assinar: o broker (mosquitto.conf
+    # persistence true) guarda o retido entre execuções de teste, então sem
+    # essa limpeza o assert abaixo poderia passar com uma mensagem STALE de
+    # uma execução anterior, sem o router ter publicado nada agora.
+    limpador = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    limpador.connect(MQTT_HOST, MQTT_PORT, 30)
+    limpador.publish(topico, payload='', qos=1, retain=True)
+    limpador.disconnect()
+    time.sleep(0.3)
+
     got = []
+
+    def _on_message(c, u, m):
+        if m.payload:  # ignora o payload vazio usado para limpar o retido
+            got.append(json.loads(m.payload))
+
     sub = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    sub.on_message = lambda c, u, m: got.append(json.loads(m.payload))
+    sub.on_message = _on_message
     sub.connect(MQTT_HOST, MQTT_PORT, 30)
-    sub.subscribe(f'sentinela/config/notify/hub/{HUB_CODE}', qos=1)
+    sub.subscribe(topico, qos=1)
     sub.loop_start()
     time.sleep(0.3)
 

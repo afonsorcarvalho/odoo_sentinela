@@ -10,6 +10,11 @@ def _formatar_datetime_odoo(valor_iso):
     # '2026-07-22T10:00:00+00:00') no campo Datetime — o Odoo guarda Datetime
     # em UTC "naive", então normaliza para UTC antes de tirar o tzinfo
     # (mesmo padrão de ingestao.odoo_cliente._timestamp_arquivo_para_utc).
+    # NOTA (Plano B): neste venv (Python 3.9) datetime.fromisoformat não
+    # aceita sufixo 'Z' (só passou a aceitar no 3.11) — se o config-agent
+    # real do Hub emitir 'aplicado_em' com 'Z' em vez de '+00:00', isto
+    # levanta ValueError. Sem normalização de 'Z' aqui porque está fora do
+    # escopo desta task (payload de teste usa '+00:00').
     if not valor_iso:
         return False
     dt = datetime.fromisoformat(valor_iso)

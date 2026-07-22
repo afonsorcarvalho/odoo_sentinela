@@ -59,3 +59,33 @@ def test_applied_fecha_drift_no_odoo():
         # populado.
         reportada = ex('sensor_monitor.hub', 'read', [hub[0]], fields=['config_version_reportada_em'])[0]['config_version_reportada_em']
         assert reportada
+
+
+def test_applied_status_erro_nao_grava_versao():
+    # Cobre a guarda explícita do brief ("status:'erro' não grava a
+    # versão") — o teste feliz acima não prova esse branch.
+    cliente = get_cliente_servico()
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    site = ex('sensor_monitor.site', 'search', [('site_code', '=', 'SITE-RPT-01')]) or [
+        ex('sensor_monitor.site', 'create', {
+            'name': 'S', 'partner_id': ex('res.partner', 'search', [], limit=1)[0],
+            'site_code': 'SITE-RPT-01', 'vertical': 'cme_hospitalar'})]
+    hub = ex('sensor_monitor.hub', 'search', [('hub_code', '=', 'HUB-RPT-02')]) or [
+        ex('sensor_monitor.hub', 'create', {'name': 'H2', 'site_id': site[0], 'hub_code': 'HUB-RPT-02'})]
+    ex('sensor_monitor.hub', 'write', [hub[0]], {'config_version_desejada': 5, 'config_version_aplicada': 3})
+
+    with TestClient(app) as client:
+        time.sleep(1.0)
+
+        c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        c.connect(MQTT_HOST, MQTT_PORT, 30)
+        c.publish('sentinela/config/applied/hub/HUB-RPT-02',
+                  json.dumps({'version': 5, 'aplicado_em': '2026-07-22T10:00:00+00:00', 'status': 'erro'}),
+                  qos=1)
+        c.disconnect()
+
+        # sem sucesso a esperar/pollar: só damos tempo suficiente pro
+        # subscriber processar (se fosse gravar) e conferimos que não gravou.
+        time.sleep(2.0)
+        aplicada = ex('sensor_monitor.hub', 'read', [hub[0]], fields=['config_version_aplicada'])[0]['config_version_aplicada']
+        assert aplicada == 3

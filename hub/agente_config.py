@@ -1,5 +1,6 @@
 """AgenteControle: cliente MQTT do control-plane (LWT + heartbeat) + notify->download->apply->report."""
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,12 +37,17 @@ class AgenteControle:
 
     def _carregar_estado(self):
         if self._estado_path.exists():
-            return int(json.loads(self._estado_path.read_text()).get('config_version_aplicada', 0))
+            try:
+                return int(json.loads(self._estado_path.read_text()).get('config_version_aplicada', 0))
+            except (json.JSONDecodeError, ValueError, OSError):
+                return 0
         return 0
 
     def _persistir_estado(self):
         self._estado_path.parent.mkdir(parents=True, exist_ok=True)
-        self._estado_path.write_text(json.dumps({'config_version_aplicada': self.aplicada}))
+        tmp = self._estado_path.with_name(self._estado_path.name + '.tmp')
+        tmp.write_text(json.dumps({'config_version_aplicada': self.aplicada}))
+        os.replace(tmp, self._estado_path)
 
     def _publicar(self, sufixo, payload, retain=False):
         self._client.publish(f'sentinela/config/{sufixo}/hub/{self._code}',
@@ -52,6 +58,8 @@ class AgenteControle:
                 'fw': self._fw, 'config_version_aplicada': self.aplicada}
 
     def processar_notify(self, dados):
+        if not isinstance(dados, dict):
+            return
         versao = dados.get('version')
         if versao is None or versao <= self.aplicada:
             return
@@ -81,7 +89,7 @@ class AgenteControle:
     def _on_message(self, client, userdata, msg):
         try:
             self.processar_notify(json.loads(msg.payload) if msg.payload else {})
-        except json.JSONDecodeError:
+        except Exception:
             pass
 
     def iniciar(self):

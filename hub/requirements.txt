@@ -1,6 +1,6 @@
 cryptography>=42
 PyYAML>=6
-paho-mqtt>=1.6
+paho-mqtt>=2.0
 pyserial>=3.5
 paramiko>=3
 pytest>=8

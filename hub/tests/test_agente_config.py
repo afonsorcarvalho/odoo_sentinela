@@ -64,3 +64,18 @@ def test_heartbeat_inclui_versao_aplicada(tmp_path):
     ag.aplicada = 6
     hb = ag.heartbeat_payload()
     assert hb['estado'] == 'online' and hb['config_version_aplicada'] == 6 and 'heartbeat_ts' in hb
+
+
+def test_notify_payload_nao_dict_e_ignorado(tmp_path):
+    ag = _agente(tmp_path, lambda *a, **k: None, lambda *a, **k: None)
+    ag.processar_notify(42)
+    ag.processar_notify(None)
+    ag.processar_notify([1, 2])
+    assert ag.aplicada == 0
+
+
+def test_estado_corrompido_carrega_zero(tmp_path):
+    estado_path = tmp_path / 'estado.json'
+    estado_path.write_text('isto nao e json valido {{{')
+    ag = _agente(tmp_path, lambda *a, **k: None, lambda *a, **k: None)
+    assert ag.aplicada == 0

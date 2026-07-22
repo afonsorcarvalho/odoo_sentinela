@@ -3,7 +3,7 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import alarmes, auth, config, config_publish_router, historico, live, live_listener, meta
+from . import alarmes, auth, config, config_publish_router, historico, live, live_listener, meta, presenca
 
 app = FastAPI(title='Sentinela API')
 
@@ -34,6 +34,11 @@ async def _iniciar_live_listener():
     # listener de NOTIFY silenciosamente (confirmado na verificação real:
     # "Task was destroyed but it is pending!" logo após o startup).
     app.state.live_listener_task = asyncio.create_task(live_listener.escutar())
+
+
+@app.on_event('startup')
+async def _iniciar_presenca():
+    presenca.RASTREADOR.iniciar()
 
 
 @app.get('/health')

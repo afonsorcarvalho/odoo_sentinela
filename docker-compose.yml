@@ -50,9 +50,19 @@ services:
       - ./ingestao:/opt/ingestao:ro     # receber_upload disponível ao Event Manager
     restart: unless-stopped
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"          # MQTT (LAN no dev; restringir à VPN em prod)
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    restart: unless-stopped
+
 volumes:
   odoo-db-data:
   odoo-filestore:
   timescale-data:
   sftpgo-data:
   sftpgo-config:
+  mosquitto-data:

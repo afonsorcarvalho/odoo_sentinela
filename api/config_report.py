@@ -23,6 +23,18 @@ def _formatar_datetime_odoo(valor_iso):
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 
+def registrar_versao_aplicada(cliente, hub_code, versao, quando):
+    hubs = odoo_cliente.executar(cliente, 'sensor_monitor.hub', 'search_read',
+                                  [('hub_code', '=', hub_code)],
+                                  fields=['id', 'config_version_aplicada'])
+    if not hubs or versao <= (hubs[0]['config_version_aplicada'] or 0):
+        return
+    odoo_cliente.executar(cliente, 'sensor_monitor.hub', 'write', [hubs[0]['id']], {
+        'config_version_aplicada': versao,
+        'config_version_reportada_em': _formatar_datetime_odoo(quando),
+    })
+
+
 class OuvinteReport:
     def __init__(self):
         self._ouvinte = None
@@ -35,14 +47,7 @@ class OuvinteReport:
         if versao is None:
             return
         cliente = get_cliente_servico()
-        hubs = odoo_cliente.executar(cliente, 'sensor_monitor.hub', 'search',
-                                      [('hub_code', '=', code)])
-        if not hubs:
-            return
-        odoo_cliente.executar(cliente, 'sensor_monitor.hub', 'write', [hubs[0]], {
-            'config_version_aplicada': versao,
-            'config_version_reportada_em': _formatar_datetime_odoo(dados.get('aplicado_em')),
-        })
+        registrar_versao_aplicada(cliente, code, versao, dados.get('aplicado_em'))
 
     def iniciar(self):
         self._ouvinte = OuvinteMqtt(self._on)

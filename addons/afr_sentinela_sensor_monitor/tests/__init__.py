@@ -7,3 +7,4 @@ from . import test_rs485_modbus
 from . import test_security_rules
 from . import test_dashboard_config
 from . import test_config_fields
+from . import test_publicar_config

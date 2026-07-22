@@ -17,6 +17,9 @@
         <field name="model">sensor_monitor.hub</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="action_publicar_config" type="object" string="Publicar configuração" class="btn-primary"/>
+                </header>
                 <sheet>
                     <group>
                         <field name="name"/>
@@ -32,7 +35,14 @@
                         <field name="possui_secure_element"/>
                         <field name="secure_element_pubkey_fingerprint"/>
                     </group>
+                    <group string="Configuração">
+                        <field name="config_version_desejada"/>
+                        <field name="config_version_aplicada"/>
+                        <field name="config_version_reportada_em"/>
+                        <field name="config_em_drift"/>
+                    </group>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>

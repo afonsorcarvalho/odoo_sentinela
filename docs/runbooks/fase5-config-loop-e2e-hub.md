@@ -109,15 +109,40 @@ sftp: { host: <IP-do-servidor>, port: 2022, username: <conta-hub>,
 
 ---
 
-## Execução (2026-07-22)
+## Execução (2026-07-22) — ✅ SUCESSO
 
-- ✅ **Passo 1 (deploy):** Pi sincronizado em `master` (`da8a838`), submodule ok, `hub/`
-  novo presente. Fix `expanduser` cherry-picked p/ master.
-- ⛔ **Passos 2–6 BLOQUEADOS por rede:** o Pi não alcança o stack Fase 5 no WSL2 (NAT).
-  Pendente escolher o caminho (A) port-forward do Windows ou (B) deploy no VPS `10.8.0.1`.
-  O código do Hub (B-T1..B-T5) está completo, revisado (task + whole-branch) e testado
-  (hub+contrato **102 passed**, api **89 passed**); só falta a rede para a prova em
-  hardware.
+Rede destravada pelo caminho (A): `netsh portproxy` no Windows (`192.168.0.204`) →
+WSL2 (`172.24.97.65`) para 1883/2022. Pi confirmou alcance às duas portas.
+
+- ✅ **Deploy:** Pi em `master` (`da8a838`), submodule ok, `hub/` novo. Fix `expanduser`
+  em master.
+- ✅ **Provisionamento:** `scripts/provisionar_e2e_hub.py` → hub `HUB-E2E-01` + bus
+  `/dev/ttyUSB0` + device N4AIB16 addr 1 + sensor `SNR-E2E-CH1` (ch1, map [4,20]→[-50,150]).
+- ✅ **Conta SFTP do Pi:** pubkey `ssh_hub` do Pi adicionada à conta `sentinela-config-svc`
+  (home compartilhado, lê `/config`).
+- ✅ **`identity.yaml`** no Pi (`hub_code=HUB-E2E-01`, hosts `192.168.0.204`).
+- ✅ **Publicar:** `POST /internal/hub/HUB-E2E-01/publicar-config` → `config-v1.yaml` no
+  SFTP + notify retido v1.
+- ✅ **Rodar:** `python -m hub.main --config config.yaml --identity identity.yaml` no Pi.
+  (Gap descoberto: `main()` faz `carregar_config` no boot antes do 1º notify → precisou de
+  um `config.yaml` bootstrap com `barramentos: []`; o agente sobrescreveu no 1º notify.
+  Follow-up: `main()` deveria bootstrapar da identidade quando `config.yaml` ausente.)
+- ✅ **Laço fechou:** Odoo `HUB-E2E-01` → `config_version_desejada=1`,
+  `config_version_aplicada=1`, `config_em_drift=False`, `reportada_em=19:20:20`.
+- ✅ **Leitura real do CH1:** `config.yaml` efetivo com o barramento real; hub lê o
+  N4AIB16 (`/dev/ttyUSB0` CH1 ≈ 18,4 mA) → `SNR-E2E-CH1 | AREA-EXPURGO | temperatura |
+  130.6 | 4-20ma | ok | <hash>` — valor de engenharia via `map` [4,20]→[-50,150]
+  (18,4mA→130), assinado, 1 leitura a cada 5 s.
+
+**Critério de sucesso atingido: drift fechado E o N4AIB16 real lido com a config
+publicada pelo Odoo.** Grau M2 (hardware no laço).
+
+### Não exercitado (stretch, fora do core do Plano B)
+- **Leitura → dashboard:** o arquivo diário assinado é gravado localmente no Pi, mas o
+  envio SFTP→ingestão→Timescale→dashboard não foi ligado (requer o Event Manager do
+  SFTPGo + registro da pubkey EC do coletor em `ingestao/coletores_conhecidos.json` —
+  ver `transporte-sftp-servidor.md`). O valor real do CH1 está provado no arquivo
+  assinado do Hub; falta só o transporte já especificado na fatia de transporte.
 
 ## Referências
 - Spec: `docs/superpowers/specs/2026-07-22-fase5-config-loop-hub-planoB-design.md`

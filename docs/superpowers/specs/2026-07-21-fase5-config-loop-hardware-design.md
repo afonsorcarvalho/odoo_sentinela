@@ -103,7 +103,7 @@ SERVIDOR (Docker)                               HUB REAL (Pi 192.168.0.211, cód
 **config-agent (novo módulo `hub/config_agent.py` + entrada no `main.py`)**
 - **Presença**: conecta ao broker com **LWT** retido em `sentinela/status/hub/<code>` = `{estado:"offline"}`; ao conectar publica `{estado:"online", heartbeat_ts, fw}` retido; heartbeat periódico atualiza `heartbeat_ts`. Reusa `publicador_mqtt.py`.
 - **Escuta** `sentinela/config/notify/hub/<code>` (retido): ao ver `version > versão_local_aplicada`, dispara o ciclo de aplicação.
-- **SFTP download (novo, `hub/receptor_sftp.py`)**: espelha `enviador_sftp.py` mas baixa `/config/<hub_code>/config-v<N>.yaml`. Reusa `identidade_ssh.py` (chave já existente).
+- **SFTP download**: **estende o cliente SFTP existente** (`TransporteParamiko` em `hub/enviador_sftp.py`) com um método `baixar(nome_remoto, caminho_local)` (GET) — não um módulo novo. Um único cliente SFTP no Hub, put+get, contra o **mesmo e único SFTPGo** do servidor (não há segundo servidor/protocolo). Baixa `/config/<hub_code>/config-v<N>.yaml`; reusa `identidade_ssh.py` (chave já existente). O `Protocol` `Transporte` ganha `baixar` junto de `enviar`.
 - **Aplicação**: funde o operacional recebido com o `identity` local (§6) → grava o `config.yaml` efetivo → recarrega o `leitor` (novo ciclo de leitura passa a usar a config nova). Idempotente: reaplicar a mesma versão não faz nada.
 - **Report**: publica `ack` ao receber o notify e `applied` ao concluir a aplicação (§5.1).
 

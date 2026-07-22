@@ -3,7 +3,7 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import alarmes, auth, config, config_publish_router, historico, live, live_listener, meta, presenca
+from . import alarmes, auth, config, config_publish_router, config_report, historico, live, live_listener, meta, presenca
 
 app = FastAPI(title='Sentinela API')
 
@@ -39,6 +39,11 @@ async def _iniciar_live_listener():
 @app.on_event('startup')
 async def _iniciar_presenca():
     presenca.RASTREADOR.iniciar()
+
+
+@app.on_event('startup')
+async def _iniciar_report():
+    config_report.OUVINTE_REPORT.iniciar()
 
 
 @app.get('/health')

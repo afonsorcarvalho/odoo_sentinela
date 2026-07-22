@@ -38,6 +38,11 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
     publicador.conectar()
     ciclos = 0
     data_corrente = None
+    # do-while (checa `parar` no fim, não no topo): garante >=1 ciclo mesmo se
+    # `parar` já estiver setado ao entrar, para que `data_corrente` seja definido
+    # antes do `selar()` (evita deixar o arquivo do dia sem selagem num shutdown
+    # que chega durante recuperar_pendentes/conectar). Custo: 1 leitura extra no
+    # shutdown. O reload in-loop é checado ANTES do ler_todos.
     while True:
         if reconfigurar is not None and reconfigurar.is_set():
             _recarregar()

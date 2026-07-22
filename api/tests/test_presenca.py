@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 import json
@@ -15,7 +16,7 @@ def test_status_reflete_presenca_publicada():
     c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     c.connect(MQTT_HOST, MQTT_PORT, 30)
     c.publish('sentinela/status/hub/HUB-PRES-01',
-              json.dumps({'estado': 'online', 'heartbeat_ts': time.time()}),
+              json.dumps({'estado': 'online', 'heartbeat_ts': datetime.now(timezone.utc).isoformat()}),
               qos=1, retain=True)
     c.disconnect()
 

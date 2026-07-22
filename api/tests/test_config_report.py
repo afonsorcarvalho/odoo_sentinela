@@ -89,3 +89,24 @@ def test_applied_status_erro_nao_grava_versao():
         time.sleep(2.0)
         aplicada = ex('sensor_monitor.hub', 'read', [hub[0]], fields=['config_version_aplicada'])[0]['config_version_aplicada']
         assert aplicada == 3
+
+
+def test_registrar_versao_aplicada_nao_retrocede():
+    # rec do review: um heartbeat/applied atrasado (fora de ordem) não pode
+    # fazer a versão aplicada retroceder no Odoo.
+    from api.config_report import registrar_versao_aplicada
+
+    cliente = get_cliente_servico()
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    site = ex('sensor_monitor.site', 'search', [('site_code', '=', 'SITE-RPT-01')]) or [
+        ex('sensor_monitor.site', 'create', {
+            'name': 'S', 'partner_id': ex('res.partner', 'search', [], limit=1)[0],
+            'site_code': 'SITE-RPT-01', 'vertical': 'cme_hospitalar'})]
+    hub = ex('sensor_monitor.hub', 'search', [('hub_code', '=', 'HUB-REGR-01')]) or [
+        ex('sensor_monitor.hub', 'create', {'name': 'HR', 'site_id': site[0], 'hub_code': 'HUB-REGR-01'})]
+    ex('sensor_monitor.hub', 'write', [hub[0]], {'config_version_aplicada': 9})
+
+    registrar_versao_aplicada(get_cliente_servico(), 'HUB-REGR-01', 5, '2026-07-22T10:00:00+00:00')
+
+    aplicada = ex('sensor_monitor.hub', 'read', [hub[0]], fields=['config_version_aplicada'])[0]['config_version_aplicada']
+    assert aplicada == 9

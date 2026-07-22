@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 
 from .mqtt import OuvinteMqtt
 
@@ -31,7 +31,11 @@ class Rastreador:
         d = self._estado.get(hub_code)
         if not d:
             return None
-        idade = time.time() - d.get('heartbeat_ts', 0)
+        hb = d.get('heartbeat_ts')
+        try:
+            idade = (datetime.now(timezone.utc) - datetime.fromisoformat(hb)).total_seconds()
+        except (TypeError, ValueError):
+            idade = float('inf')  # heartbeat ausente/ilegível → tratado como stale
         return {'estado': d.get('estado'), 'idade_s': idade, 'stale': idade > _STALE_S}
 
     def iniciar(self):

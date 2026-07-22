@@ -74,6 +74,7 @@ def test_serializar_hub_produz_yaml_operacional():
     assert canal['ch'] == 1
     assert canal['area_id'] == 'AREA-EXPURGO'
     assert canal['tipo_medida'] == 'temperatura'
+    assert canal['protocolo_origem'] == '4-20ma'
     assert canal['map'] == {'in': [4.0, 20.0], 'out': [-50.0, 150.0]}
     assert canal['filtro'] == {'tipo': 'ewma', 'alpha': 0.3}
 

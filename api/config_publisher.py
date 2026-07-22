@@ -60,7 +60,9 @@ def serializar_config_hub(cliente, hub_code):
                     'area_id': areas_por_id.get(s['area_id'][0]) if s.get('area_id') else None,
                     'tipo_medida': tipos_por_id.get(s['measurement_type_id'][0]) if s.get('measurement_type_id') else None,
                     'unidade': s.get('unidade') or '',
-                    'protocolo_origem': s['protocolo_origem'],
+                    # Fixo '4-20ma': rs485 é só o transporte físico do N4AIB16;
+                    # o Hub espera o tipo de sinal do canal (spec §5.3/§7).
+                    'protocolo_origem': '4-20ma',
                     'map': {'in': [s['ma_in_min'], s['ma_in_max']],
                             'out': [s['eng_out_min'], s['eng_out_max']]},
                 }

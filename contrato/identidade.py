@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 
 def carregar_ou_criar_chave(caminho):
-    caminho = Path(caminho)
+    caminho = Path(caminho).expanduser()
     if caminho.exists():
         return serialization.load_pem_private_key(caminho.read_bytes(), password=None)
     chave = ec.generate_private_key(ec.SECP256R1())

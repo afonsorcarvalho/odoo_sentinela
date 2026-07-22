@@ -16,3 +16,4 @@ ingestao/coletores_conhecidos.json
 
 # Referências externas (não versionar)
 exemplos/
+.sftp-config-svc/

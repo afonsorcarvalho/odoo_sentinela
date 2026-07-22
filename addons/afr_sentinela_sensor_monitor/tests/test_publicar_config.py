@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
 
@@ -12,6 +13,11 @@ class TestPublicarConfig(TransactionCase):
             'name': 'H', 'site_id': site.id, 'hub_code': 'HUB-PUB-01'})
 
     def test_publicar_incrementa_versao_e_chama_api(self):
+        # Prova do fix C1: a versão é calculada e mandada explicitamente no
+        # body ANTES do POST (nova = desejada + 1), e config_version_desejada
+        # só é gravada DEPOIS da API confirmar 200 — nunca antes, senão a API
+        # (sessão XML-RPC separada) leria uma versão que ainda não foi
+        # confirmada como publicada.
         self.env['ir.config_parameter'].sudo().set_param('sentinela.api_url', 'http://api:8000')
         self.env['ir.config_parameter'].sudo().set_param('sentinela.config_publish_secret', 's3cr3t')
         hub = self._hub()
@@ -19,10 +25,25 @@ class TestPublicarConfig(TransactionCase):
         with patch('requests.post') as mock_post:
             mock_post.return_value.status_code = 200
             hub.action_publicar_config()
-            assert hub.config_version_desejada == v0 + 1
             args, kwargs = mock_post.call_args
             assert 'HUB-PUB-01/publicar-config' in args[0]
             assert kwargs['headers']['X-Config-Secret'] == 's3cr3t'
+            # a versão enviada no body é a nova (v0 + 1) — explícita, não lida
+            # de volta de config_version_desejada numa sessão separada.
+            assert kwargs['json']['version'] == v0 + 1
+            # só é persistida em config_version_desejada após o 200 confirmado.
+            assert hub.config_version_desejada == v0 + 1
+
+    def test_publicar_nao_incrementa_versao_em_falha(self):
+        self.env['ir.config_parameter'].sudo().set_param('sentinela.api_url', 'http://api:8000')
+        self.env['ir.config_parameter'].sudo().set_param('sentinela.config_publish_secret', 's3cr3t')
+        hub = self._hub()
+        v0 = hub.config_version_desejada
+        with patch('requests.post') as mock_post:
+            mock_post.return_value.status_code = 500
+            with self.assertRaises(UserError):
+                hub.action_publicar_config()
+            assert hub.config_version_desejada == v0
 
     def test_drift_computado(self):
         hub = self._hub()

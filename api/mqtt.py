@@ -23,8 +23,10 @@ def publicar(topico, payload, retain=False):
 class OuvinteMqtt:
     def __init__(self, on_mensagem):
         self._on = on_mensagem
+        self._topicos = []
         self._c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self._c.on_message = self._despachar
+        self._c.on_connect = self._on_connect
 
     def _despachar(self, cliente, userdata, msg):
         try:
@@ -33,10 +35,17 @@ class OuvinteMqtt:
             return
         self._on(msg.topic, dados)
 
+    def _on_connect(self, client, userdata, flags, rc, properties=None):
+        # re-assina em toda (re)conexão — inclusive após o broker cair e voltar,
+        # quando a assinatura anterior se perde.
+        for t in self._topicos:
+            client.subscribe(t, qos=1)
+
     def iniciar(self, topicos):
-        self._c.connect(MQTT_HOST, MQTT_PORT, _KEEPALIVE)
-        for t in topicos:
-            self._c.subscribe(t, qos=1)
+        self._topicos = topicos
+        # connect_async + loop_start: não bloqueia o boot da API se o broker
+        # estiver indisponível; a reconexão automática assina via on_connect.
+        self._c.connect_async(MQTT_HOST, MQTT_PORT, _KEEPALIVE)
         self._c.loop_start()
 
     def parar(self):

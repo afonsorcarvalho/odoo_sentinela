@@ -64,7 +64,7 @@ def test_serializar_hub_produz_yaml_operacional():
 
     bus = next(b for b in cfg['barramentos'] if b['porta'] == '/dev/ttyUSB0')
     assert bus['baud'] == 9600
-    assert bus['paridade'] == 'none'
+    assert bus['paridade'] == 'N'
     assert bus['stop_bits'] == 1
 
     disp = next(d for d in bus['dispositivos'] if d['endereco'] == 1)

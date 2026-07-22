@@ -51,11 +51,13 @@ class Hub(models.Model):
         params = self.env['ir.config_parameter'].sudo()
         api_url = params.get_param('sentinela.api_url')
         secret = params.get_param('sentinela.config_publish_secret')
-        self.config_version_desejada += 1
+        nova = self.config_version_desejada + 1
         resp = requests.post(
             f'{api_url}/internal/hub/{self.hub_code}/publicar-config',
+            json={'version': nova},
             headers={'X-Config-Secret': secret}, timeout=15)
         if resp.status_code != 200:
             self.message_post(body=f'Falha ao publicar config: HTTP {resp.status_code}')
             raise UserError('Falha ao publicar configuração (ver chatter).')
+        self.config_version_desejada = nova
         self.message_post(body=f'Configuração v{self.config_version_desejada} publicada.')

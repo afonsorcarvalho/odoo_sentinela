@@ -13,6 +13,9 @@ from ingestao import odoo_cliente
 
 _SFTP_BASE = '/config'
 
+# Hub espera 'N'/'E'/'O'; o Selection do Odoo é 'none'/'even'/'odd'.
+_PARIDADE_MAP = {'none': 'N', 'even': 'E', 'odd': 'O'}
+
 
 def _sftp_conectar():
     t = paramiko.Transport((os.environ['SFTP_HOST'], int(os.environ.get('SFTP_PORT', '2022'))))
@@ -41,7 +44,7 @@ def escrever_config_sftp(hub_code, version, conteudo_yaml):
         t.close()
 
 
-def serializar_config_hub(cliente, hub_code):
+def serializar_config_hub(cliente, hub_code, version=None):
     ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
 
     hubs = ex('sensor_monitor.hub', 'search_read', [('hub_code', '=', hub_code)],
@@ -107,12 +110,13 @@ def serializar_config_hub(cliente, hub_code):
 
         barramentos.append({
             'porta': bus['serial_port'], 'baud': bus['baud_rate'],
-            'paridade': bus['parity'], 'stop_bits': int(bus['stop_bits']),
+            'paridade': _PARIDADE_MAP.get(bus['parity'], bus['parity']),
+            'stop_bits': int(bus['stop_bits']),
             'dispositivos': dispositivos,
         })
 
     return {
-        'version': hub['config_version_desejada'],
+        'version': version if version is not None else hub['config_version_desejada'],
         'intervalo_leitura_s': 5,
         'barramentos': barramentos,
     }

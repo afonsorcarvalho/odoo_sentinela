@@ -81,10 +81,27 @@ class TransporteParamiko:
                         pkey=chave, look_for_keys=False, allow_agent=False)
         try:
             sftp = cliente.open_sftp()
-            sftp.put(caminho_local, f"{self._remote_dir}/{nome_remoto}")
+            destino = f"{self._remote_dir}/{nome_remoto}"
+            self._mkdir_p(sftp, destino.rsplit("/", 1)[0])
+            sftp.put(caminho_local, destino)
             sftp.close()
         finally:
             cliente.close()
+
+    def _mkdir_p(self, sftp, diretorio):
+        # diretorio já inclui self._remote_dir como prefixo; o remote_dir em
+        # si é assumido pré-existente (mesma premissa de `baixar`), então só
+        # os níveis abaixo dele são criados.
+        sub = diretorio[len(self._remote_dir):].strip("/")
+        if not sub:
+            return
+        atual = self._remote_dir
+        for parte in sub.split("/"):
+            atual = f"{atual}/{parte}"
+            try:
+                sftp.mkdir(atual)
+            except IOError:
+                pass  # já existe
 
     def baixar(self, caminho_remoto, caminho_local):
         import paramiko

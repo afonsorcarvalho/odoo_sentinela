@@ -128,3 +128,29 @@ def test_transporte_paramiko_conecta_autentica_e_poe(tmp_path):
     sftp.put.assert_called_once_with("/local/2026-07-21_leituras.txt",
                                      "/uploads/2026-07-21_leituras.txt")
     cliente.close.assert_called_once()
+
+
+def test_transporte_cria_diretorios_antes_do_put():
+    sftp = mock.Mock()
+    existentes = set()
+    def mkdir(p):
+        if p in existentes:
+            raise IOError("existe")
+        existentes.add(p)
+    sftp.mkdir.side_effect = mkdir
+    cliente = mock.Mock()
+    cliente.open_sftp.return_value = sftp
+    with mock.patch("paramiko.SSHClient", return_value=cliente), \
+         mock.patch("paramiko.Ed25519Key.from_private_key_file"):
+        t = TransporteParamiko("h", 22, "u", "/dev/null", "/uploads")
+        t.enviar("/local/x.txt", "CLI-1/2026/07/21/SITE-1/HUB-0001/COL/x.txt")
+    # criou cada nível do pai sob /uploads, em ordem, antes do put
+    criados = [c.args[0] for c in sftp.mkdir.call_args_list]
+    assert criados == [
+        "/uploads/CLI-1", "/uploads/CLI-1/2026", "/uploads/CLI-1/2026/07",
+        "/uploads/CLI-1/2026/07/21", "/uploads/CLI-1/2026/07/21/SITE-1",
+        "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001",
+        "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL",
+    ]
+    sftp.put.assert_called_once_with(
+        "/local/x.txt", "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL/x.txt")

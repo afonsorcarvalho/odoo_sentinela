@@ -1,4 +1,5 @@
 import base64
+import binascii
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -102,8 +103,11 @@ def parse_linha_alarme(linha):
 
 
 def _verificar_sig(chave_publica, sig_b64, hash_hex):
-    chave_publica.verify(base64.b64decode(sig_b64), hash_hex.encode(),
-                         ec.ECDSA(hashes.SHA256()))
+    try:
+        assinatura = base64.b64decode(sig_b64)
+    except (binascii.Error, TypeError, ValueError) as exc:
+        raise InvalidSignature('assinatura base64 inválida ou ausente') from exc
+    chave_publica.verify(assinatura, hash_hex.encode(), ec.ECDSA(hashes.SHA256()))
 
 
 def validar_arquivo(caminho, registro_path):

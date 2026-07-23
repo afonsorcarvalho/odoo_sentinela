@@ -149,3 +149,13 @@ def test_hdr_sig_adulterado_rejeita(tmp_path):
     r = validador.validar_arquivo(str(caminho), registro)
     assert r.status_validacao == 'invalido'
     assert 'header' in (r.motivo_rejeicao or '').lower()
+
+
+def test_assinatura_footer_corrompida_e_invalido_nao_exception(tmp_path):
+    caminho, registro = _preparar(tmp_path, selar=True)
+    linhas = caminho.read_text().split('\n')
+    i = next(i for i, l in enumerate(linhas) if l.startswith('# assinatura:'))
+    linhas[i] = '# assinatura: !!!notbase64!!!'  # base64 malformado, não ausente
+    caminho.write_text('\n'.join(linhas))
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == 'invalido'

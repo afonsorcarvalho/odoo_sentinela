@@ -30,6 +30,7 @@ class ResultadoValidacao:
     cliente_id: str = None
     site_id: str = None
     pubkey_fingerprint: str = None
+    timezone_offset: str = None
     leituras: list = field(default_factory=list)
     eventos: list = field(default_factory=list)
 
@@ -126,7 +127,8 @@ def validar_arquivo(caminho, registro_path):
             hash_final=hash_final_declarado, assinatura=assinatura_declarada,
             tipo_arquivo=tipo_arquivo, cliente_id=metadados_cab.get('cliente_id'),
             site_id=metadados_cab.get('site_id'),
-            pubkey_fingerprint=metadados_cab.get('coletor_pubkey_fingerprint'))
+            pubkey_fingerprint=metadados_cab.get('coletor_pubkey_fingerprint'),
+            timezone_offset=metadados_cab.get('timezone_offset'))
         if leituras is not None:
             if tipo_arquivo == 'alarmes':
                 r.eventos = leituras

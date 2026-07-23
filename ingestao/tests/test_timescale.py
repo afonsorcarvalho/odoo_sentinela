@@ -80,3 +80,28 @@ def test_inserir_leituras_duplicadas_nao_duplica_linha():
     finally:
         conn.close()
         _limpar(site_id)
+
+
+def test_buscar_leituras_para_confronto_indexa_por_sensor_e_ts():
+    from datetime import datetime, timezone
+    from ingestao import timescale
+    conn = timescale.conectar(DSN)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sensor_reading WHERE coletor_id = 'COL-CONF'")
+        t = datetime(2026, 7, 16, 3, 1, 0, tzinfo=timezone.utc)
+        timescale.inserir_leituras(
+            conn, 'SITE-1', 'COL-CONF',
+            [{'timestamp': t, 'sensor_id': 'SNR-1', 'area_id': 'EXPURGO',
+              'tipo_medida': 'temperatura', 'valor': 96.83, 'unidade': 'C',
+              'protocolo_origem': '4-20ma', 'status_leitura': 'ok'}])
+        mapa = timescale.buscar_leituras_para_confronto(
+            conn, 'COL-CONF',
+            datetime(2026, 7, 16, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 7, 17, 0, 0, tzinfo=timezone.utc))
+        assert mapa[('SNR-1', '2026-07-16T03:01:00+00:00')] == 96.83
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sensor_reading WHERE coletor_id = 'COL-CONF'")
+        conn.commit()
+        conn.close()

@@ -1,3 +1,5 @@
+from datetime import timezone
+
 import psycopg2
 from psycopg2.extras import execute_values
 
@@ -33,3 +35,23 @@ def inserir_leituras(conn, site_id, coletor_id, leituras,
         )
     conn.commit()
     return len(valores)
+
+
+def buscar_leituras_para_confronto(conn, coletor_id, ts_inicio, ts_fim):
+    """Devolve {(sensor_id, ts_utc_iso): valor} das leituras de um coletor no
+    intervalo [ts_inicio, ts_fim). A chave usa o timestamp em UTC ISO para casar
+    com o timestamp do arquivo convertido para UTC."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT sensor_id, time, valor
+            FROM sensor_reading
+            WHERE coletor_id = %s AND time >= %s AND time < %s
+            """,
+            (coletor_id, ts_inicio, ts_fim),
+        )
+        linhas = cur.fetchall()
+    return {
+        (sensor_id, time.astimezone(timezone.utc).replace(microsecond=0).isoformat()): valor
+        for sensor_id, time, valor in linhas
+    }

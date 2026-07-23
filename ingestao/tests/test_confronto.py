@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 from hub.arquivo_diario import ArquivoDiario
 from hub.assinador import AssinadorSoftware
@@ -290,6 +291,46 @@ def test_confronto_dia_vazio_com_injecao_em_fronteira_de_fuso_detecta(tmp_path):
         r = confronto.confrontar_arquivo(str(caminho), registro, conn)
         assert r.assinaturas_ok is True
         assert r.valores_ok is False
+        assert len(r.injetadas_timescale) == 1
+        assert r.injetadas_timescale[0]['sensor_id'] == 'SNR-9'
+    finally:
+        _limpar(conn)
+        conn.close()
+
+
+def test_confronto_dia_vazio_com_offset_vazio_nao_fail_open(tmp_path):
+    """FIX C-re-review (fail-open): timezone_offset vazio ('') no header é falsy
+    em Python — o guard antigo `rv.timezone_offset` (sem checar data_referencia
+    isoladamente) pulava o count-match inteiro e devolvia valores_ok=True mesmo
+    com injeção real no Timescale. Um hub mal configurado (offset vazio) não pode
+    desligar o gate de auditoria. Header com offset vazio ('# timezone_offset: ')
+    é uma construção legítima (validar_identificador não valida esse campo) —
+    fromisoformat aceita 'T00:00:00' + '' cai no fallback UTC do fix."""
+    assinador = AssinadorSoftware(str(tmp_path / "k.pem"))
+    arq = ArquivoDiario('COL-CONF', 'HUB-1', '2.3.1', '', str(tmp_path / "d"),
+                        assinador, cliente_id='CLI-1', site_id='SITE-1')
+    arq._abrir('2026-07-16')
+    arq.selar('2026-07-16')
+    registro = str(tmp_path / "reg.json")
+    registro_coletores.registrar_coletor(registro, 'COL-CONF', assinador.chave_publica_pem())
+    caminho = arq.caminho('2026-07-16')
+
+    # confere que o header realmente saiu com offset vazio (pré-condição do teste)
+    texto = Path(caminho).read_text()
+    assert '# timezone_offset: \n' in texto or texto.split('\n')[8] == '# timezone_offset:'
+
+    conn = timescale.conectar(DSN)
+    try:
+        _limpar(conn)
+        timescale.inserir_leituras(
+            conn, 'SITE-1', 'COL-CONF',
+            [{'timestamp': datetime(2026, 7, 16, 12, 0, 0, tzinfo=timezone.utc),
+              'sensor_id': 'SNR-9', 'area_id': 'EXPURGO', 'tipo_medida': 'temperatura',
+              'valor': 12.34, 'unidade': 'C', 'protocolo_origem': '4-20ma',
+              'status_leitura': 'ok'}])  # fabricada, dentro do dia UTC [00:00Z, 24:00Z)
+        r = confronto.confrontar_arquivo(str(caminho), registro, conn)
+        assert r.assinaturas_ok is True
+        assert r.valores_ok is False  # ANTES do fix: True (fail-open)
         assert len(r.injetadas_timescale) == 1
         assert r.injetadas_timescale[0]['sensor_id'] == 'SNR-9'
     finally:

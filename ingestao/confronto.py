@@ -65,16 +65,24 @@ def confrontar_arquivo(caminho, registro_path, conn, coletor_esperado=None, data
     # Parte 2: value-match contra o Timescale
     linhas = rv.leituras
     if not linhas:
-        injetadas = []
-        if conn is not None and rv.data_referencia and rv.timezone_offset:
+        if conn is not None and rv.data_referencia:
             # Dia assinado sem nenhuma leitura: mesmo sem chaves de arquivo pra
             # comparar, qualquer row no Timescale pro dia é fabricada. Janela é o
             # dia LOCAL do coletor (data_referencia + timezone_offset do header),
             # não o dia UTC ingênuo — coletores rodam em fuso local (ex.: -03:00),
             # e um dia UTC ingênuo erra a fronteira: uma leitura injetada perto da
             # meia-noite local cai fora da janela e escapa do count-match.
+            #
+            # timezone_offset vazio/ausente NÃO pode desligar o count-match (isso
+            # seria fail-open: um hub mal configurado que grava offset vazio
+            # deixaria dias vazios sem nenhuma checagem). Cai pra UTC ('+00:00')
+            # como fallback seguro — pior caso é uma fronteira de dia levemente
+            # errada perto da meia-noite, não a ausência total de detecção. Um
+            # offset presente porém malformado (ex.: '-0300' sem ':') faz
+            # fromisoformat levantar — falha ALTA e ruidosa, não silenciosa.
+            offset = rv.timezone_offset if (rv.timezone_offset and rv.timezone_offset.strip()) else '+00:00'
             ts_inicio = datetime.fromisoformat(
-                rv.data_referencia + 'T00:00:00' + rv.timezone_offset)
+                rv.data_referencia + 'T00:00:00' + offset)
             ts_fim = ts_inicio + timedelta(days=1)
             mapa_vazio = timescale.buscar_leituras_para_confronto(
                 conn, rv.coletor_id, ts_inicio, ts_fim)
@@ -83,19 +91,17 @@ def confrontar_arquivo(caminho, registro_path, conn, coletor_esperado=None, data
                 coletor_id=rv.coletor_id, data_referencia=rv.data_referencia,
                 assinaturas_ok=True, valores_ok=(not injetadas),
                 arquivo_nao_fechado=arquivo_nao_fechado, injetadas_timescale=injetadas)
-        # Sem conexão ou sem data_referencia/timezone_offset no header: não dá pra
-        # montar a janela local com segurança — não fazemos count-match (em vez de
-        # arriscar uma janela errada, ex.: UTC ingênuo). Isso não é uma brecha de
-        # ataque: timezone_offset está sob hdr_sig (assinatura do header, já
-        # verificada em assinaturas_ok acima), então um atacante não pode omiti-lo
-        # sem invalidar a assinatura — o header v2 sempre grava o offset em
-        # arquivos legitimamente selados. `valores_ok=True` aqui reflete "não deu
-        # pra checar" apenas para headers pré-v2/malformados que nem chegariam a
-        # passar por assinaturas_ok em produção.
+        # Sem conexão ou sem data_referencia no header: não dá pra montar a janela
+        # (nem sequer o fallback UTC) com segurança — não fazemos count-match.
+        # Não é brecha de ataque: data_referencia está sob hdr_sig (assinatura do
+        # header, já verificada em assinaturas_ok acima). `valores_ok=True` aqui
+        # reflete "não deu pra checar" apenas para o caso sem conexão (conn=None,
+        # ex.: chamador sem acesso ao Timescale) ou headers pré-v2/malformados que
+        # nem chegariam a passar por assinaturas_ok em produção.
         return ResultadoConfronto(
             coletor_id=rv.coletor_id, data_referencia=rv.data_referencia,
             assinaturas_ok=True, valores_ok=True,
-            arquivo_nao_fechado=arquivo_nao_fechado, injetadas_timescale=injetadas)
+            arquivo_nao_fechado=arquivo_nao_fechado, injetadas_timescale=[])
 
     ts_chaves = [_ts_utc_iso(l['timestamp']) for l in linhas]
     ts_inicio = min(datetime.fromisoformat(k) for k in ts_chaves)

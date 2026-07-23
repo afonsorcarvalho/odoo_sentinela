@@ -5,12 +5,21 @@ retry natural em falha). O transporte concreto é injetado (Protocol),
 permitindo testar a lógica sem rede. TransporteParamiko é a impl real.
 """
 import json
+import stat as stat_mod
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 
 from hub.arquivo_diario import _esta_selado
 from contrato.formato import validar_segmento_path
+
+
+def _e_diretorio(sftp, caminho):
+    """True só se `caminho` existe no servidor E é um diretório."""
+    try:
+        return stat_mod.S_ISDIR(sftp.stat(caminho).st_mode)
+    except IOError:
+        return False
 
 
 class Transporte(Protocol):
@@ -56,7 +65,12 @@ class EnviadorSftp:
             remoto = self._caminho_remoto(nome)
             try:
                 self._transporte.enviar(str(caminho), remoto)
-            except Exception:
+            except Exception as erro:
+                # Sem este log, uma falha permanente (ex.: permissão negada no
+                # mkdir remoto) vira retry infinito MUDO: o arquivo nunca sobe e
+                # nada no Hub registra por quê.
+                print(f"[hub] falha ao enviar {nome} -> {remoto}: "
+                      f"{type(erro).__name__}: {erro}")
                 continue  # falha não-fatal; retry no próximo varrer
             self._enviados[nome] = {"enviado_em": datetime.now(timezone.utc).isoformat()}
             self._persistir()
@@ -100,8 +114,14 @@ class TransporteParamiko:
             atual = f"{atual}/{parte}"
             try:
                 sftp.mkdir(atual)
-            except IOError:
-                pass  # já existe
+            except IOError as erro:
+                # Paramiko levanta IOError tanto para "já existe" quanto para
+                # "permission denied". Engolir os dois transformava uma conta SFTP
+                # sem `create_dirs` (perfeitamente plausível em produção, onde o
+                # operador dá só upload/list/download) em retry infinito mudo.
+                # Só seguimos se o caminho existe E é diretório.
+                if not _e_diretorio(sftp, atual):
+                    raise erro
 
     def baixar(self, caminho_remoto, caminho_local):
         import paramiko

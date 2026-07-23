@@ -47,6 +47,11 @@ class ArquivoDiario:
         self._seq = 1
 
     def caminho(self, data_referencia):
+        # O segmento {hub}-{coletor} do nome é redundância LEGÍVEL (conveniência
+        # de operador ao olhar um diretório), não metadado: hub_id e coletor_id
+        # podem conter '-', então o nome não é reversível sem ambiguidade. O
+        # cabeçalho interno, assinado, é a única verdade — não escreva parser
+        # reverso em cima deste segmento.
         nome = f"{data_referencia}_{self._hub_id}-{self._coletor_id}_leituras.txt"
         return self._dir / nome
 
@@ -86,11 +91,17 @@ class ArquivoDiario:
             fh.write(linha + "|" + sig + "\n")
         self._seq += 1
 
-    def selar(self, data_referencia=None):
+    def selar(self, data_referencia=None, caminho=None):
+        # `caminho` explícito: quem JÁ localizou o arquivo em disco (ex.
+        # recuperar_pendentes, que faz glob) passa o caminho real. Reconstruir
+        # via self.caminho() descartaria essa informação e erraria o alvo em
+        # qualquer arquivo cujo nome não seja o formato corrente (acervo legado),
+        # selando nada e em silêncio. Sem `caminho`, mantém o comportamento
+        # anterior (dia corrente / virada de dia / shutdown).
         data_referencia = data_referencia or self._data_atual
         if data_referencia is None:
             return
-        caminho = self.caminho(data_referencia)
+        caminho = Path(caminho) if caminho is not None else self.caminho(data_referencia)
         if _esta_selado(caminho) or not caminho.exists():
             return
         hash_final, proximo_seq = reconstruir_estado(caminho.read_text())
@@ -103,4 +114,4 @@ class ArquivoDiario:
         for nome in glob.glob(str(self._dir / "*_leituras.txt")):
             data_str = os.path.basename(nome)[:10]
             if date.fromisoformat(data_str) < hoje and not _esta_selado(Path(nome)):
-                self.selar(data_str)
+                self.selar(data_str, caminho=Path(nome))

@@ -74,15 +74,28 @@ def test_caminho_tem_nome_auto_descritivo(tmp_path):
     assert caminho.name == "2026-07-21_HUB-0001-COL-RS485-BUS0_leituras.txt"
 
 
-def test_recuperar_pendentes_sela_dia_passado_com_nome_novo(tmp_path):
-    arq, _ = _fazer(tmp_path)
-    ontem = datetime(2026, 7, 20, 8, 0, tzinfo=TZ)
-    arq.registrar(_leitura(ontem))
-    # simula crash antes de selar: fecha sem selar, reabre em novo dia
-    arq_novo, _ = _fazer(tmp_path, ass=arq._assinador)
-    arq_novo.recuperar_pendentes(date(2026, 7, 21))
-    texto = arq_novo.caminho("2026-07-20").read_text()
-    assert "# assinatura: " in texto
+def test_recuperar_pendentes_sela_arquivo_com_nome_legado(tmp_path):
+    """FIX C2: recuperar_pendentes acha o arquivo pelo nome REAL em disco, mas
+    selar reconstruía o caminho via self.caminho(data) — que gera o nome NOVO.
+    Num arquivo em campo com o nome legado ({data}_leituras.txt), caminho.exists()
+    era falso e selar dava `return` silencioso: o arquivo nunca é selado, nunca
+    passa no _esta_selado do EnviadorSftp e nunca sobe — perda muda de dados
+    assinados, exatamente no cenário (crash/kill -9) para o qual
+    recuperar_pendentes existe."""
+    arq, ass = _fazer(tmp_path)
+    arq.registrar(_leitura(datetime(2026, 7, 22, 8, 0, tzinfo=TZ)))
+    # renomeia para o formato legado: simula arquivo gravado por versão anterior
+    # que ficou sem rodapé (crash antes de selar).
+    novo = arq.caminho("2026-07-22")
+    legado = novo.parent / "2026-07-22_leituras.txt"
+    novo.rename(legado)
+    assert "# assinatura:" not in legado.read_text()
+
+    arq2, _ = _fazer(tmp_path, ass=ass)
+    arq2.recuperar_pendentes(date(2026, 7, 23))
+
+    assert "# assinatura:" in legado.read_text()   # o arquivo ACHADO foi selado
+    assert not novo.exists()                       # e nada foi criado no nome novo
 
 
 def test_arquivo_v2_tem_hdr_sig_e_sig_por_linha(tmp_path, assinador):

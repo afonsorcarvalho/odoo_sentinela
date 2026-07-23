@@ -54,22 +54,26 @@ def ingerir_arquivo(caminho, registro_path, dsn, cliente_odoo):
             total_gravado=0,
         )
 
-    # F: o tenant do header tem que casar com o cadastro do coletor.
-    if (resultado_validacao.site_id != info_coletor['site_code']
-            or resultado_validacao.cliente_id != info_coletor['cliente_id']):
-        return ResultadoIngestao(
-            status_validacao='invalido',
-            motivo_rejeicao=(f"tenant do header diverge do cadastro: header="
-                             f"({resultado_validacao.cliente_id}/{resultado_validacao.site_id}) "
-                             f"cadastro=({info_coletor['cliente_id']}/{info_coletor['site_code']})"),
-            total_linhas=resultado_validacao.total_linhas, total_gravado=0)
-
     status_validacao = resultado_validacao.status_validacao
     motivo_rejeicao = resultado_validacao.motivo_rejeicao
     total_gravado = 0
     eventos_orfaos = 0
     if status_validacao in ('valido', 'incompleto'):
-        if resultado_validacao.tipo_arquivo == 'alarmes':
+        # F: o tenant do header tem que casar com o cadastro do coletor. Só faz sentido
+        # checar depois que o crypto-gate passou (senão um cliente_id de header adulterado
+        # mascara o motivo real de rejeição, que é a assinatura inválida).
+        # NOTA (I3): trocar o `ref` do partner no Odoo depois de arquivos publicados invalida
+        # em cadeia todos os arquivos em trânsito desse tenant — o header carrega o `ref`
+        # congelado no momento da publicação, e a ingestão recalcula a partir do cadastro
+        # atual. Isso é fail-closed por desenho; operadores devem republicar os arquivos ou
+        # evitar alterar `ref` de tenants com coletores ativos.
+        if (resultado_validacao.site_id != info_coletor['site_code']
+                or resultado_validacao.cliente_id != info_coletor['cliente_id']):
+            status_validacao = 'invalido'
+            motivo_rejeicao = (f"tenant do header diverge do cadastro: header="
+                               f"({resultado_validacao.cliente_id}/{resultado_validacao.site_id}) "
+                               f"cadastro=({info_coletor['cliente_id']}/{info_coletor['site_code']})")
+        elif resultado_validacao.tipo_arquivo == 'alarmes':
             try:
                 eventos_orfaos = _processar_alarmes(cliente_odoo, info_coletor, resultado_validacao)
                 total_gravado = len(resultado_validacao.eventos)

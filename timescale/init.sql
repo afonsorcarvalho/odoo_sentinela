@@ -12,7 +12,11 @@ CREATE TABLE sensor_reading (
     cliente_id      TEXT,
     pubkey_fingerprint TEXT,
     file_hash       TEXT,
-    ts_ingestao     TIMESTAMPTZ
+    ts_ingestao     TIMESTAMPTZ,
+    -- I2: dedup de replay (ex.: arquivo incompleto→valido reingerido). Precisa incluir AMBAS
+    -- as colunas de particionamento do hypertable (time e site_id) — Timescale exige isso em
+    -- qualquer índice único sobre uma hypertable particionada por range+hash.
+    UNIQUE (sensor_id, "time", site_id)
 );
 
 SELECT create_hypertable('sensor_reading', by_range('time'));

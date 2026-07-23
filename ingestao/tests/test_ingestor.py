@@ -300,3 +300,32 @@ def test_rejeita_quando_tenant_do_header_diverge_do_cadastro(monkeypatch, tmp_pa
     r = ingestor.ingerir_arquivo('x', 'reg', 'dsn', object())
     assert r.status_validacao == 'invalido'
     assert 'tenant' in r.motivo_rejeicao.lower()
+    assert r.total_gravado == 0
+    # F: rejeição de tenant precisa deixar rastro no ledger (não é early-return silencioso)
+    assert 'args' in escritos, "escrever_ledger deve ser chamado mesmo em rejeição de tenant"
+    args_ledger = escritos['args']
+    assert args_ledger[4] == 'invalido'
+    assert 'tenant' in args_ledger[5].lower()
+
+
+def test_rejeita_por_crypto_nao_e_mascarado_por_tenant_mismatch(monkeypatch):
+    """Arquivo com hdr_sig inválida (crypto) não deve virar motivo de tenant,
+    mesmo que o cliente_id do header também esteja mutado."""
+    from ingestao import ingestor, validador
+    res_val = validador.ResultadoValidacao(
+        status_validacao='invalido', motivo_rejeicao='hdr_sig inválida', total_linhas=1,
+        coletor_id='COL-1', data_referencia='2026-07-16', tipo_arquivo='leituras',
+        cliente_id='CLI-INTRUSO', site_id='SITE-1', leituras=[])
+    monkeypatch.setattr(validador, 'validar_arquivo', lambda *a, **k: res_val)
+    monkeypatch.setattr(ingestor.odoo_cliente, 'resolver_coletor',
+                        lambda c, cid: {'id': 1, 'site_code': 'SITE-1', 'cliente_id': 'CLI-1'})
+    escritos = {}
+    monkeypatch.setattr(ingestor.odoo_cliente, 'escrever_ledger',
+                        lambda *a, **k: escritos.setdefault('args', a))
+    r = ingestor.ingerir_arquivo('x', 'reg', 'dsn', object())
+    assert r.status_validacao == 'invalido'
+    assert r.motivo_rejeicao == 'hdr_sig inválida'
+    assert 'tenant' not in r.motivo_rejeicao.lower()
+    assert 'args' in escritos
+    assert escritos['args'][4] == 'invalido'
+    assert escritos['args'][5] == 'hdr_sig inválida'

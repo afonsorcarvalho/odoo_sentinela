@@ -27,6 +27,7 @@ def inserir_leituras(conn, site_id, coletor_id, leituras,
                 (time, site_id, coletor_id, sensor_id, area_id, tipo_medida, valor, unidade,
                  protocolo_origem, status_leitura, cliente_id, pubkey_fingerprint, file_hash, ts_ingestao)
             VALUES %s
+            ON CONFLICT (sensor_id, "time", site_id) DO NOTHING
             """,
             valores,
         )

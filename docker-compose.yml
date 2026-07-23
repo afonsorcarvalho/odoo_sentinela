@@ -59,6 +59,40 @@ services:
       - mosquitto-data:/mosquitto/data
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    depends_on:
+      - odoo
+      - timescaledb
+      - sftpgo
+      - mosquitto
+    ports:
+      - "8000:8000"          # rota de config-publish (Odoo → http://api:8000) + histórico
+    environment:
+      # Secret DEV — trocar em produção (deve == ir.config_parameter sentinela.config_publish_secret no Odoo)
+      CONFIG_PUBLISH_SECRET: e2e-cfg-secret
+      API_JWT_SECRET: dev-local-nao-usar-em-producao-troque-isso
+      SFTP_HOST: sftpgo
+      SFTP_PORT: "2022"
+      SFTP_USER: sentinela-config-svc
+      SFTP_KEY_PATH: /keys/id_ed25519
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      TIMESCALE_DSN: postgresql://sentinela:sentinela@timescaledb:5432/sentinela
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: sentinela
+      ODOO_USUARIO_SERVICO: admin
+      ODOO_SENHA_SERVICO: admin
+      SENTINELA_SITE_CODE: SITE-DEMO-01
+    volumes:
+      - ./api:/app/api:ro
+      - ./ingestao:/app/ingestao:ro
+      - ./contrato:/app/contrato:ro
+      - ./.sftp-config-svc:/keys:ro
+    restart: unless-stopped
+
 volumes:
   odoo-db-data:
   odoo-filestore:

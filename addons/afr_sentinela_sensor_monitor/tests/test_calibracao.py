@@ -77,3 +77,34 @@ class TestCalibracao(TransactionCase):
         assert sensor.calibracao_vigente_id  # casa
         sensor.conversor_tipo = '485_pt100'  # troca o conversor
         assert not sensor.calibracao_vigente_id  # cert antigo deixa de valer
+
+    def test_versao_duplicada_para_mesma_malha_levanta(self):
+        sensor = self._sensor()
+        hoje = date.today()
+        self.env['sensor_monitor.calibracao'].create({
+            'sensor_id': sensor.id, 'cert_numero': 'v1', 'versao': 1,
+            'cal_ganho': 1.0, 'cal_offset': 0.0,
+            'validade_de': hoje - timedelta(days=1), 'validade_ate': hoje + timedelta(days=365),
+            'conversor_tipo_snapshot': 'nenhum'})
+        with self.assertRaises(Exception):
+            self.env['sensor_monitor.calibracao'].create({
+                'sensor_id': sensor.id, 'cert_numero': 'v1-dup', 'versao': 1,
+                'cal_ganho': 1.0, 'cal_offset': 0.0,
+                'validade_de': hoje - timedelta(days=1), 'validade_ate': hoje + timedelta(days=365),
+                'conversor_tipo_snapshot': 'nenhum'})
+
+    def test_vigente_vazio_sem_certificado(self):
+        sensor = self._sensor()
+        assert not sensor.calibracao_vigente_id
+
+    def test_vigente_vazio_com_certificado_expirado(self):
+        sensor = self._sensor()
+        sensor.conversor_tipo = 'nenhum'
+        hoje = date.today()
+        self.env['sensor_monitor.calibracao'].create({
+            'sensor_id': sensor.id, 'cert_numero': 'v1', 'versao': 1,
+            'cal_ganho': 1.0, 'cal_offset': 0.0,
+            'validade_de': hoje - timedelta(days=400),
+            'validade_ate': hoje - timedelta(days=35),
+            'conversor_tipo_snapshot': 'nenhum'})
+        assert not sensor.calibracao_vigente_id

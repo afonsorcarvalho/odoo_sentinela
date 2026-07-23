@@ -12,6 +12,12 @@ class Calibracao(models.Model):
     _name = 'sensor_monitor.calibracao'
     _description = 'Certificado de Calibração da Malha'
     _order = 'sensor_id, versao desc'
+    _rec_name = 'cert_numero'
+
+    _sql_constraints = [
+        ('versao_por_malha_unica', 'unique(sensor_id, versao)',
+         'Já existe um certificado com esta versão para esta malha.'),
+    ]
 
     sensor_id = fields.Many2one(
         'sensor_monitor.sensor', required=True, ondelete='cascade',

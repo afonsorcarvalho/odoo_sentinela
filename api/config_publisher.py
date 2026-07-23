@@ -72,7 +72,7 @@ def serializar_config_hub(cliente, hub_code, version=None):
                           fields=['sensor_code', 'modbus_channel', 'ma_in_min', 'ma_in_max',
                                   'eng_out_min', 'eng_out_max', 'filtro_tipo', 'filtro_alpha',
                                   'unidade', 'protocolo_origem', 'area_id', 'measurement_type_id',
-                                  'conversor_tipo', 'calibracao_vigente_id'])
+                                  'calibracao_vigente_id'])
 
             # area_id/measurement_type_id vêm como (id, display_name) via search_read;
             # o Hub espera os CÓDIGOS (area_code / measurement_type.code), não o nome

@@ -98,12 +98,16 @@ def test_canal_carrega_calibracao_vigente():
 
     sensor_id = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
     ex('sensor_monitor.sensor', 'write', [sensor_id], {'conversor_tipo': 'nenhum'})
-    # cert vigente casando o conversor 'nenhum'
-    ex('sensor_monitor.calibracao', 'create', {
-        'sensor_id': sensor_id, 'cert_numero': 'CERT-CFG', 'versao': 7,
-        'cal_ganho': 0.965, 'cal_offset': 0.33,
-        'validade_de': '2020-01-01', 'validade_ate': '2099-12-31',
-        'conversor_tipo_snapshot': 'nenhum'})
+    # cert vigente casando o conversor 'nenhum' — idempotente por (sensor_id, versao):
+    # reaproveita o cert de execuções anteriores em vez de recriar (unique constraint).
+    cert_existente = ex('sensor_monitor.calibracao', 'search',
+                         [('sensor_id', '=', sensor_id), ('versao', '=', 7)])
+    if not cert_existente:
+        ex('sensor_monitor.calibracao', 'create', {
+            'sensor_id': sensor_id, 'cert_numero': 'CERT-CFG', 'versao': 7,
+            'cal_ganho': 0.965, 'cal_offset': 0.33,
+            'validade_de': '2020-01-01', 'validade_ate': '2099-12-31',
+            'conversor_tipo_snapshot': 'nenhum'})
 
     cfg = serializar_config_hub(cliente, hub_code)
     bus = next(b for b in cfg['barramentos'] if b['porta'] == '/dev/ttyUSB0')

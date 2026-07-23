@@ -12,7 +12,10 @@ app = FastAPI(title='Sentinela API')
 # se ocupada); ajustar/restringir quando houver deploy real.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[f'http://localhost:{p}' for p in range(5173, 5180)],
+    # DEV: Vite tenta 5173+ e pode subir p/ 5199; o browser pode acessar por
+    # localhost OU pelo IP do host (WSL2). Regex cobre qualquer host nessas
+    # portas de dev. RESTRINGIR a origens explícitas em produção.
+    allow_origin_regex=r'http://[\w.-]+:(517[0-9]|518[0-9]|519[0-9])',
     allow_methods=['*'],
     allow_headers=['*'],
 )

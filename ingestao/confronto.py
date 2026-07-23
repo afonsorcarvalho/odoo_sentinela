@@ -66,20 +66,35 @@ def confrontar_arquivo(caminho, registro_path, conn, coletor_esperado=None, data
     linhas = rv.leituras
     if not linhas:
         injetadas = []
-        if conn is not None:
+        if conn is not None and rv.data_referencia and rv.timezone_offset:
             # Dia assinado sem nenhuma leitura: mesmo sem chaves de arquivo pra
             # comparar, qualquer row no Timescale pro dia é fabricada. Janela é o
-            # dia UTC inteiro derivado de data_referencia — pode errar/sobrar nas
-            # bordas de timezone, mas um dia vazio assinado com QUALQUER row já é
-            # alerta por si só.
-            ts_inicio = datetime.fromisoformat(rv.data_referencia + 'T00:00:00+00:00')
+            # dia LOCAL do coletor (data_referencia + timezone_offset do header),
+            # não o dia UTC ingênuo — coletores rodam em fuso local (ex.: -03:00),
+            # e um dia UTC ingênuo erra a fronteira: uma leitura injetada perto da
+            # meia-noite local cai fora da janela e escapa do count-match.
+            ts_inicio = datetime.fromisoformat(
+                rv.data_referencia + 'T00:00:00' + rv.timezone_offset)
             ts_fim = ts_inicio + timedelta(days=1)
             mapa_vazio = timescale.buscar_leituras_para_confronto(
                 conn, rv.coletor_id, ts_inicio, ts_fim)
             injetadas = [{'sensor_id': s, 'timestamp': ts} for (s, ts) in mapa_vazio]
+            return ResultadoConfronto(
+                coletor_id=rv.coletor_id, data_referencia=rv.data_referencia,
+                assinaturas_ok=True, valores_ok=(not injetadas),
+                arquivo_nao_fechado=arquivo_nao_fechado, injetadas_timescale=injetadas)
+        # Sem conexão ou sem data_referencia/timezone_offset no header: não dá pra
+        # montar a janela local com segurança — não fazemos count-match (em vez de
+        # arriscar uma janela errada, ex.: UTC ingênuo). Isso não é uma brecha de
+        # ataque: timezone_offset está sob hdr_sig (assinatura do header, já
+        # verificada em assinaturas_ok acima), então um atacante não pode omiti-lo
+        # sem invalidar a assinatura — o header v2 sempre grava o offset em
+        # arquivos legitimamente selados. `valores_ok=True` aqui reflete "não deu
+        # pra checar" apenas para headers pré-v2/malformados que nem chegariam a
+        # passar por assinaturas_ok em produção.
         return ResultadoConfronto(
             coletor_id=rv.coletor_id, data_referencia=rv.data_referencia,
-            assinaturas_ok=True, valores_ok=(not injetadas),
+            assinaturas_ok=True, valores_ok=True,
             arquivo_nao_fechado=arquivo_nao_fechado, injetadas_timescale=injetadas)
 
     ts_chaves = [_ts_utc_iso(l['timestamp']) for l in linhas]

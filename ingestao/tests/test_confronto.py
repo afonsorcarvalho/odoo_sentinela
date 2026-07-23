@@ -261,6 +261,42 @@ def test_confronto_dia_vazio_com_injecao_detecta(tmp_path):
         conn.close()
 
 
+def test_confronto_dia_vazio_com_injecao_em_fronteira_de_fuso_detecta(tmp_path):
+    """FIX residual (re-review C): a janela do dia-vazio (I1) tem que ser o dia
+    LOCAL do coletor, não o dia UTC ingênuo. Coletor em -03:00 (Brasil); dia
+    assinado 2026-07-16 vazio → dia local real é [2026-07-16T03:00Z, 2026-07-17T03:00Z).
+    Uma leitura injetada em 2026-07-17T01:00:00+00:00 (= 22:00 local de 07-16,
+    legitimamente dentro do dia assinado) cai FORA da janela UTC ingênua
+    [2026-07-16T00:00Z, 2026-07-17T00:00Z) e escaparia do count-match — false
+    all-clear. Com a janela local correta, ela é pega."""
+    assinador = AssinadorSoftware(str(tmp_path / "k.pem"))
+    arq = ArquivoDiario('COL-CONF', 'HUB-1', '2.3.1', '-03:00', str(tmp_path / "d"),
+                        assinador, cliente_id='CLI-1', site_id='SITE-1')
+    arq._abrir('2026-07-16')
+    arq.selar('2026-07-16')
+    registro = str(tmp_path / "reg.json")
+    registro_coletores.registrar_coletor(registro, 'COL-CONF', assinador.chave_publica_pem())
+    caminho = arq.caminho('2026-07-16')
+
+    conn = timescale.conectar(DSN)
+    try:
+        _limpar(conn)
+        timescale.inserir_leituras(
+            conn, 'SITE-1', 'COL-CONF',
+            [{'timestamp': datetime(2026, 7, 17, 1, 0, 0, tzinfo=timezone.utc),
+              'sensor_id': 'SNR-9', 'area_id': 'EXPURGO', 'tipo_medida': 'temperatura',
+              'valor': 12.34, 'unidade': 'C', 'protocolo_origem': '4-20ma',
+              'status_leitura': 'ok'}])  # fabricada, dentro do dia LOCAL 07-16 (-03:00)
+        r = confronto.confrontar_arquivo(str(caminho), registro, conn)
+        assert r.assinaturas_ok is True
+        assert r.valores_ok is False
+        assert len(r.injetadas_timescale) == 1
+        assert r.injetadas_timescale[0]['sensor_id'] == 'SNR-9'
+    finally:
+        _limpar(conn)
+        conn.close()
+
+
 def test_main_retorna_2_quando_periodo_vazio_ou_invertido(tmp_path):
     """FIX M1: --de posterior a --ate produz range vazio; um gate de auditoria
     legal não pode dar exit 0 (all-clear) sobre nenhum dia confrontado."""

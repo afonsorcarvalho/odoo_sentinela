@@ -61,6 +61,14 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
       expect(onChange).toHaveBeenLastCalledWith({ ...kpiWidget, options: { ...kpiWidget.options, limiteMax: 9 } })
     })
 
+    it('editar casas decimais grava em options', async () => {
+      const onChange = vi.fn()
+      render(<WidgetConfigPopover widget={kpiWidget} onChange={onChange} onClose={vi.fn()} />)
+
+      await userEvent.type(screen.getByLabelText('Casas decimais'), '2')
+      expect(onChange).toHaveBeenLastCalledWith({ ...kpiWidget, options: { ...kpiWidget.options, casasDecimais: 2 } })
+    })
+
     it('placeholder dos limites indica que vazio usa o cadastro do sensor (sem threshold herdado)', () => {
       render(<WidgetConfigPopover widget={kpiWidget} onChange={vi.fn()} onClose={vi.fn()} />)
       expect(screen.getByLabelText('Limite mín.')).toHaveAttribute('placeholder', 'cadastro do sensor')

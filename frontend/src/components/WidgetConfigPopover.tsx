@@ -187,6 +187,30 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
                   onChange={(e) => setOption({ limiteMax: e.target.value === '' ? undefined : Number(e.target.value) })}
                 />
               </label>
+              <label className="block text-xs">Dígitos inteiros (mín.)
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  placeholder="auto"
+                  className={selectClass}
+                  style={inputStyle}
+                  value={(widget.options?.digitosInteiros as number | undefined) ?? ''}
+                  onChange={(e) => setOption({ digitosInteiros: e.target.value === '' ? undefined : Number(e.target.value) })}
+                />
+              </label>
+              <label className="block text-xs">Casas decimais
+                <input
+                  type="number"
+                  min={0}
+                  max={6}
+                  placeholder="auto"
+                  className={selectClass}
+                  style={inputStyle}
+                  value={(widget.options?.casasDecimais as number | undefined) ?? ''}
+                  onChange={(e) => setOption({ casasDecimais: e.target.value === '' ? undefined : Number(e.target.value) })}
+                />
+              </label>
               {limitesInvalidos && (
                 <p id={limitesErroId} role="alert" className="text-xs" style={{ color: statusTextColor('crit') }}>
                   Limite mín. deve ser ≤ limite máx.

@@ -114,7 +114,9 @@ def main(argv=None):
             cfg.sftp.host, cfg.sftp.port, cfg.sftp.username,
             cfg.sftp.ssh_key_path, cfg.sftp.remote_dir,
         )
-        enviador = EnviadorSftp(cfg.coletor_id, cfg.caminho_dados, transporte)
+        enviador = EnviadorSftp(cfg.coletor_id, cfg.caminho_dados, transporte,
+                                cliente_id=cfg.cliente_id, site_id=cfg.site_id,
+                                hub_id=cfg.hub_id)
 
         from hub.agente_config import AgenteControle
         agente = AgenteControle(

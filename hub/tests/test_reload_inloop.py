@@ -176,6 +176,6 @@ def test_recarregar_reconstroi_arquivo_com_tenant_da_config_nova(monkeypatch, tm
                       parar=parar, max_ciclos=1, reconfigurar=reconfig,
                       caminho_config='config.yaml', arquivo_factory=_novo_arquivo)
 
-    texto = (tmp_path / 'dados' / 'COL' / '2026-07-22_leituras.txt').read_text()
+    texto = (tmp_path / 'dados' / 'COL' / '2026-07-22_HUB-COL_leituras.txt').read_text()
     assert "# cliente_id: CLI-43" in texto
     assert "# site_id: SITE-01" in texto

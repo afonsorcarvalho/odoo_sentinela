@@ -41,12 +41,17 @@ def resolver_coletor(cliente, coletor_code):
     hub_id = coletor['hub_id'][0]
     hubs = executar(cliente, 'sensor_monitor.hub', 'read', [hub_id], fields=['site_id'])
     site_id = hubs[0]['site_id'][0]
-    sites = executar(cliente, 'sensor_monitor.site', 'read', [site_id], fields=['site_code'])
+    sites = executar(cliente, 'sensor_monitor.site', 'read', [site_id],
+                     fields=['site_code', 'partner_id'])
+    partner_id = sites[0]['partner_id'][0]
+    partner = executar(cliente, 'res.partner', 'read', [partner_id], fields=['ref'])[0]
+    cliente_id = partner.get('ref') or f"CLI-{partner_id}"
     return {
         'id': coletor['id'],
         'hub_id': hub_id,
         'site_id': site_id,
         'site_code': sites[0]['site_code'],
+        'cliente_id': cliente_id,
     }
 
 

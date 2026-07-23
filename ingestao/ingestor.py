@@ -1,5 +1,6 @@
 import argparse
 from dataclasses import dataclass
+from datetime import datetime
 
 from . import odoo_cliente, timescale, validador
 
@@ -13,12 +14,13 @@ class ResultadoIngestao:
     eventos_orfaos: int = 0
 
 
-def _processar_leituras(dsn, info_coletor, resultado_validacao):
+def _processar_leituras(dsn, info_coletor, rv, pubkey_fp, ts_ingestao):
     conn = timescale.conectar(dsn)
     try:
         return timescale.inserir_leituras(
-            conn, info_coletor['site_code'], resultado_validacao.coletor_id, resultado_validacao.leituras,
-        )
+            conn, info_coletor['site_code'], rv.coletor_id, rv.leituras,
+            cliente_id=rv.cliente_id, pubkey_fingerprint=pubkey_fp,
+            file_hash=rv.hash_final, ts_ingestao=ts_ingestao)
     finally:
         conn.close()
 
@@ -52,11 +54,21 @@ def ingerir_arquivo(caminho, registro_path, dsn, cliente_odoo):
             total_gravado=0,
         )
 
+    # F: o tenant do header tem que casar com o cadastro do coletor.
+    if (resultado_validacao.site_id != info_coletor['site_code']
+            or resultado_validacao.cliente_id != info_coletor['cliente_id']):
+        return ResultadoIngestao(
+            status_validacao='invalido',
+            motivo_rejeicao=(f"tenant do header diverge do cadastro: header="
+                             f"({resultado_validacao.cliente_id}/{resultado_validacao.site_id}) "
+                             f"cadastro=({info_coletor['cliente_id']}/{info_coletor['site_code']})"),
+            total_linhas=resultado_validacao.total_linhas, total_gravado=0)
+
     status_validacao = resultado_validacao.status_validacao
     motivo_rejeicao = resultado_validacao.motivo_rejeicao
     total_gravado = 0
     eventos_orfaos = 0
-    if status_validacao == 'valido':
+    if status_validacao in ('valido', 'incompleto'):
         if resultado_validacao.tipo_arquivo == 'alarmes':
             try:
                 eventos_orfaos = _processar_alarmes(cliente_odoo, info_coletor, resultado_validacao)
@@ -66,7 +78,9 @@ def ingerir_arquivo(caminho, registro_path, dsn, cliente_odoo):
                 motivo_rejeicao = str(exc)
                 total_gravado = 0
         else:
-            total_gravado = _processar_leituras(dsn, info_coletor, resultado_validacao)
+            total_gravado = _processar_leituras(
+                dsn, info_coletor, resultado_validacao,
+                resultado_validacao.pubkey_fingerprint, datetime.utcnow())
 
     odoo_cliente.escrever_ledger(
         cliente_odoo, info_coletor['id'], resultado_validacao.tipo_arquivo, resultado_validacao.data_referencia,

@@ -94,9 +94,10 @@ def test_ingerir_arquivo_corrompido_grava_ledger_invalido_sem_dados(tmp_path):
     registro_coletores.registrar_a_partir_de_chave_privada(registro_path, chave_path, gerador_simulado.COLETOR_ID)
     caminho_arquivo = output_dir / f"{gerador_simulado.COLETOR_ID}_leituras_{data.isoformat()}.txt"
     linhas = caminho_arquivo.read_text().split('\n')
-    campos = linhas[9].split('|')
+    idx_primeira_linha_corpo = next(i for i, l in enumerate(linhas) if l and not l.startswith('#'))
+    campos = linhas[idx_primeira_linha_corpo].split('|')
     campos[5] = '999.9'
-    linhas[9] = '|'.join(campos)
+    linhas[idx_primeira_linha_corpo] = '|'.join(campos)
     caminho_arquivo.write_text('\n'.join(linhas))
 
     _limpar_timescale(info_coletor['site_code'])
@@ -281,3 +282,21 @@ def test_ingerir_arquivo_alarme_com_par_cria_e_resolve_alarm_event(tmp_path):
     finally:
         _limpar_ledger(cliente, info_coletor['id'], data.isoformat(), tipo_arquivo='alarmes')
         _limpar_alarm_events(cliente, info_sensor['id'])
+
+
+def test_rejeita_quando_tenant_do_header_diverge_do_cadastro(monkeypatch, tmp_path):
+    from ingestao import ingestor, validador
+    res_val = validador.ResultadoValidacao(
+        status_validacao='valido', motivo_rejeicao=None, total_linhas=1,
+        coletor_id='COL-1', data_referencia='2026-07-16', tipo_arquivo='leituras',
+        cliente_id='CLI-INTRUSO', site_id='SITE-1', leituras=[])
+    monkeypatch.setattr(validador, 'validar_arquivo', lambda *a, **k: res_val)
+    # cadastro diz que COL-1 é do CLI-1 / SITE-1
+    monkeypatch.setattr(ingestor.odoo_cliente, 'resolver_coletor',
+                        lambda c, cid: {'id': 1, 'site_code': 'SITE-1', 'cliente_id': 'CLI-1'})
+    escritos = {}
+    monkeypatch.setattr(ingestor.odoo_cliente, 'escrever_ledger',
+                        lambda *a, **k: escritos.setdefault('args', a))
+    r = ingestor.ingerir_arquivo('x', 'reg', 'dsn', object())
+    assert r.status_validacao == 'invalido'
+    assert 'tenant' in r.motivo_rejeicao.lower()

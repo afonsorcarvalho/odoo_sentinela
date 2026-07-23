@@ -8,7 +8,11 @@ CREATE TABLE sensor_reading (
     valor           DOUBLE PRECISION NOT NULL,
     unidade         TEXT NOT NULL,
     protocolo_origem TEXT NOT NULL,
-    status_leitura  TEXT NOT NULL
+    status_leitura  TEXT NOT NULL,
+    cliente_id      TEXT,
+    pubkey_fingerprint TEXT,
+    file_hash       TEXT,
+    ts_ingestao     TIMESTAMPTZ
 );
 
 SELECT create_hypertable('sensor_reading', by_range('time'));

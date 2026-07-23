@@ -13,6 +13,8 @@ SENSORES = [
 AREA_ID = 'EXPURGO'
 COLETOR_ID = 'COL-SIM-0001'
 HUB_ID = 'HUB-SIM-0001'
+CLIENTE_ID = 'CLI-SIM-0001'
+SITE_ID = 'SITE-SIM-0001'
 PROTOCOLO_ORIGEM = '4-20mA'
 FIRMWARE_VERSION = '0.1.0-sim'
 TIMEZONE_OFFSET = '-03:00'
@@ -35,7 +37,7 @@ def _valor_para_sensor(sensor, minuto, injetar_alarme):
     return round(random.gauss(-3.5, 0.3), 1)
 
 
-def montar_corpo_leituras(cabecalho, data, injetar_alarme=False):
+def montar_corpo_leituras(cabecalho, data, assinar, injetar_alarme=False):
     hash_atual = formato.hash_seed(cabecalho)
     linhas = []
     seq = 1
@@ -46,13 +48,14 @@ def montar_corpo_leituras(cabecalho, data, injetar_alarme=False):
             linha, hash_atual = formato.gerar_linha_leitura(
                 hash_atual, seq, timestamp, sensor['sensor_id'], AREA_ID,
                 sensor['tipo_medida'], valor, sensor['unidade'], PROTOCOLO_ORIGEM, 'ok',
+                0, 1.0, 0.0,
             )
-            linhas.append(linha)
+            linhas.append(linha + '|' + assinar(hash_atual))
             seq += 1
     return linhas, hash_atual
 
 
-def montar_corpo_alarmes(cabecalho, data, injetar_alarme=False):
+def montar_corpo_alarmes(cabecalho, data, assinar, injetar_alarme=False):
     hash_atual = formato.hash_seed(cabecalho)
     linhas = []
     if not injetar_alarme:
@@ -63,13 +66,13 @@ def montar_corpo_alarmes(cabecalho, data, injetar_alarme=False):
         sensor_pressao['tipo_medida'], 'entrada_alarme', 'acima_limite', 1.0,
         LIMITE_MIN_PRESSAO_VIGENTE, LIMITE_MAX_PRESSAO_VIGENTE,
     )
-    linhas.append(linha1)
+    linhas.append(linha1 + '|' + assinar(hash_atual))
     linha2, hash_atual = formato.gerar_linha_alarme(
         hash_atual, 2, _timestamp(data, MINUTO_FIM_ALARME), sensor_pressao['sensor_id'], AREA_ID,
         sensor_pressao['tipo_medida'], 'saida_alarme', 'acima_limite', -3.5,
         LIMITE_MIN_PRESSAO_VIGENTE, LIMITE_MAX_PRESSAO_VIGENTE,
     )
-    linhas.append(linha2)
+    linhas.append(linha2 + '|' + assinar(hash_atual))
     return linhas, hash_atual
 
 
@@ -80,6 +83,9 @@ def gerar_dia(data, output_dir, injetar_alarme=False, chave_path=None):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    def assinar(hash_hex):
+        return base64.b64encode(identidade.assinar(chave, hash_hex.encode())).decode()
+
     geradores_de_corpo = (
         ('leituras', montar_corpo_leituras, 'total_linhas'),
         ('alarmes', montar_corpo_alarmes, 'total_eventos'),
@@ -88,13 +94,16 @@ def gerar_dia(data, output_dir, injetar_alarme=False, chave_path=None):
         cabecalho = formato.montar_cabecalho(
             tipo_arquivo, COLETOR_ID, HUB_ID, fingerprint,
             data.isoformat(), TIMEZONE_OFFSET, FIRMWARE_VERSION,
+            CLIENTE_ID, SITE_ID,
         )
-        linhas, hash_final = montar_corpo(cabecalho, data, injetar_alarme)
-        assinatura = identidade.assinar(chave, hash_final.encode())
-        assinatura_b64 = base64.b64encode(assinatura).decode()
+        hash_0 = formato.hash_seed(cabecalho)
+        hdr_sig = assinar(hash_0)
+        cabecalho_com_hdr = cabecalho + f"# hdr_sig: {hdr_sig}\n"
+        linhas, hash_final = montar_corpo(cabecalho, data, assinar, injetar_alarme)
+        assinatura_b64 = assinar(hash_final)
         rodape = formato.montar_rodape(len(linhas), hash_final, assinatura_b64, campo_total)
         corpo = '\n'.join(linhas) + ('\n' if linhas else '')
-        conteudo = cabecalho + corpo + rodape
+        conteudo = cabecalho_com_hdr + corpo + rodape
         nome_arquivo = f"{COLETOR_ID}_{tipo_arquivo}_{data.isoformat()}.txt"
         (output_dir / nome_arquivo).write_text(conteudo)
     return output_dir

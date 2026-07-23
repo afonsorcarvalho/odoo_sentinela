@@ -5,8 +5,10 @@ Parte 2 — valores: cada linha verificada do arquivo tem que bater com a linha
 correspondente no Timescale, por (sensor_id, timestamp_utc). Divergência em
 qualquer parte = alerta de auditoria.
 """
+import argparse
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from . import timescale, validador
 
@@ -87,3 +89,66 @@ def confrontar_arquivo(caminho, registro_path, conn):
         assinaturas_ok=True, valores_ok=(not divergencias and not injetadas),
         arquivo_nao_fechado=arquivo_nao_fechado, divergencias=divergencias,
         injetadas_timescale=injetadas)
+
+
+def confrontar_periodo(diretorio_arquivos, coletor_id, datas, registro_path, conn):
+    resultados = []
+    for data in datas:
+        caminho = Path(diretorio_arquivos) / f"{data}_leituras.txt"
+        if not caminho.exists():
+            resultados.append(ResultadoConfronto(
+                coletor_id=coletor_id, data_referencia=data,
+                assinaturas_ok=False, valores_ok=False, arquivo_nao_fechado=False,
+                motivo='arquivo ausente no acervo (fonte da verdade faltando)'))
+            continue
+        resultados.append(confrontar_arquivo(str(caminho), registro_path, conn))
+    return resultados
+
+
+def _datas_entre(de, ate):
+    from datetime import date, timedelta
+    d0, d1 = date.fromisoformat(de), date.fromisoformat(ate)
+    dias, atual = [], d0
+    while atual <= d1:
+        dias.append(atual.isoformat())
+        atual += timedelta(days=1)
+    return dias
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description='Confronto de veracidade Timescale vs arquivos assinados (§5.2)')
+    parser.add_argument('--diretorio', required=True, help='dir do acervo do coletor')
+    parser.add_argument('--coletor', required=True)
+    parser.add_argument('--de', required=True, help='YYYY-MM-DD')
+    parser.add_argument('--ate', required=True, help='YYYY-MM-DD')
+    parser.add_argument('--registro', default='ingestao/coletores_conhecidos.json')
+    parser.add_argument('--dsn', default='postgresql://sentinela:sentinela@localhost:5433/sentinela')
+    args = parser.parse_args(argv)
+
+    conn = timescale.conectar(args.dsn)
+    try:
+        resultados = confrontar_periodo(
+            args.diretorio, args.coletor, _datas_entre(args.de, args.ate),
+            args.registro, conn)
+    finally:
+        conn.close()
+
+    houve_alerta = False
+    for r in resultados:
+        alerta = (not r.assinaturas_ok) or (not r.valores_ok)
+        houve_alerta = houve_alerta or alerta
+        marca = 'ALERTA' if alerta else 'ok'
+        extra = f" motivo={r.motivo}" if r.motivo else ''
+        extra += f" divergencias={len(r.divergencias)}" if r.divergencias else ''
+        extra += f" injetadas={len(r.injetadas_timescale)}" if r.injetadas_timescale else ''
+        extra += ' (arquivo_nao_fechado)' if r.arquivo_nao_fechado else ''
+        print(f"[{marca}] {r.coletor_id} {r.data_referencia} "
+              f"assinaturas={r.assinaturas_ok} valores={r.valores_ok}{extra}")
+
+    return 1 if houve_alerta else 0
+
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())

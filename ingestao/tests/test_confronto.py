@@ -136,3 +136,24 @@ def test_confronto_detecta_injecao_no_timescale(tmp_path):
     finally:
         _limpar(conn)
         conn.close()
+
+
+def test_confrontar_periodo_agrega_por_dia(tmp_path):
+    caminho, registro = _gerar_arquivo(tmp_path)  # gera d/COL-CONF/2026-07-16_leituras.txt
+    diretorio = str(tmp_path / "d" / "COL-CONF")
+    conn = timescale.conectar(DSN)
+    try:
+        _limpar(conn)
+        timescale.inserir_leituras(
+            conn, 'SITE-1', 'COL-CONF',
+            [{'timestamp': datetime(2026, 7, 16, 3, 1, 0, tzinfo=timezone.utc),
+              'sensor_id': 'SNR-1', 'area_id': 'EXPURGO', 'tipo_medida': 'temperatura',
+              'valor': 96.83, 'unidade': 'C', 'protocolo_origem': '4-20ma',
+              'status_leitura': 'ok'}])
+        resultados = confronto.confrontar_periodo(
+            diretorio, 'COL-CONF', ['2026-07-16'], registro, conn)
+        assert len(resultados) == 1
+        assert resultados[0].valores_ok is True
+    finally:
+        _limpar(conn)
+        conn.close()

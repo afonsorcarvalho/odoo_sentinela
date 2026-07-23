@@ -67,7 +67,22 @@ describe('OPTIONS_SCHEMA', () => {
       label: undefined,
       limiteMin: undefined,
       limiteMax: undefined,
+      casasDecimais: undefined,
+      digitosInteiros: undefined,
     })
+  })
+
+  it('kpi: casasDecimais e digitosInteiros válidos são preservados', () => {
+    const r = OPTIONS_SCHEMA.kpi.parse({ casasDecimais: 2, digitosInteiros: 3 })
+    expect(r).toMatchObject({ casasDecimais: 2, digitosInteiros: 3 })
+  })
+  it('kpi: casasDecimais fora do range vira undefined (catch)', () => {
+    expect(OPTIONS_SCHEMA.kpi.parse({ casasDecimais: 99 }).casasDecimais).toBeUndefined()
+    expect(OPTIONS_SCHEMA.kpi.parse({ casasDecimais: -1 }).casasDecimais).toBeUndefined()
+  })
+  it('kpi: digitosInteiros inválido (0 ou string) vira undefined (catch)', () => {
+    expect(OPTIONS_SCHEMA.kpi.parse({ digitosInteiros: 0 }).digitosInteiros).toBeUndefined()
+    expect(OPTIONS_SCHEMA.kpi.parse({ digitosInteiros: 'x' as unknown as number }).digitosInteiros).toBeUndefined()
   })
 
   it('kpi refine (schema isolado): limiteMin > limiteMax reprova (success:false)', () => {
@@ -147,6 +162,8 @@ describe('parseLayout — options por tipo (transform em runtime)', () => {
       label: undefined,
       limiteMin: undefined,
       limiteMax: undefined,
+      casasDecimais: undefined,
+      digitosInteiros: undefined,
     })
   })
 
@@ -165,7 +182,7 @@ describe('parseLayout — options por tipo (transform em runtime)', () => {
     }
     const result = parseLayout(raw)
     expect(result).not.toBeNull()
-    expect(result?.widgets[0].options).toEqual({ label: 'Vazão', limiteMin: 5, limiteMax: 10 })
+    expect(result?.widgets[0].options).toEqual({ label: 'Vazão', limiteMin: 5, limiteMax: 10, casasDecimais: undefined, digitosInteiros: undefined })
   })
 
   it('backward-compat: blob antigo {scope: "site"} parseia e ganha defaults, version continua 1', () => {

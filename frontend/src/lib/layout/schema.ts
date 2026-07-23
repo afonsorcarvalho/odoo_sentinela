@@ -22,6 +22,8 @@ const kpiOptions = z
     label: z.string().optional().catch(undefined),
     limiteMin: z.number().optional().catch(undefined), // override display-only (§KPI)
     limiteMax: z.number().optional().catch(undefined), // NUNCA suaviza alarm_state
+    casasDecimais: z.number().int().min(0).max(6).optional().catch(undefined), // nº fixo de decimais; ausente = auto
+    digitosInteiros: z.number().int().min(1).max(12).optional().catch(undefined), // zero-pad mín. da parte inteira
   })
   .refine(
     (o) => o.limiteMin == null || o.limiteMax == null || o.limiteMin <= o.limiteMax,

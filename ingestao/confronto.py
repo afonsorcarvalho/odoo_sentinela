@@ -106,7 +106,7 @@ def confrontar_periodo(diretorio_arquivos, coletor_id, datas, registro_path, con
 
 
 def _datas_entre(de, ate):
-    from datetime import date, timedelta
+    from datetime import date
     d0, d1 = date.fromisoformat(de), date.fromisoformat(ate)
     dias, atual = [], d0
     while atual <= d1:

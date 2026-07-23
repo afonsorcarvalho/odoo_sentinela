@@ -138,6 +138,48 @@ def test_confronto_detecta_injecao_no_timescale(tmp_path):
         conn.close()
 
 
+def test_confrontar_periodo_arquivo_ausente_sem_conn(tmp_path):
+    # branch de arquivo ausente retorna antes de tocar conn — conn=None é seguro.
+    diretorio_vazio = str(tmp_path / "vazio")
+    resultados = confronto.confrontar_periodo(
+        diretorio_vazio, 'X', ['2026-07-16'], 'ingestao/coletores_conhecidos.json', conn=None)
+    assert len(resultados) == 1
+    r = resultados[0]
+    assert r.assinaturas_ok is False
+    assert r.valores_ok is False
+    assert 'ausente' in r.motivo
+
+
+def test_main_retorna_1_quando_arquivo_ausente(tmp_path, capsys):
+    diretorio_vazio = str(tmp_path / "vazio")
+    registro = str(tmp_path / "reg.json")
+    argv = ['--diretorio', diretorio_vazio, '--coletor', 'X',
+            '--de', '2026-07-16', '--ate', '2026-07-16',
+            '--registro', registro, '--dsn', DSN]
+    assert confronto.main(argv) == 1
+
+
+def test_main_retorna_0_quando_dia_limpo(tmp_path, capsys):
+    caminho, registro = _gerar_arquivo(tmp_path)  # gera d/COL-CONF/2026-07-16_leituras.txt
+    diretorio = str(tmp_path / "d" / "COL-CONF")
+    conn = timescale.conectar(DSN)
+    try:
+        _limpar(conn)
+        timescale.inserir_leituras(
+            conn, 'SITE-1', 'COL-CONF',
+            [{'timestamp': datetime(2026, 7, 16, 3, 1, 0, tzinfo=timezone.utc),
+              'sensor_id': 'SNR-1', 'area_id': 'EXPURGO', 'tipo_medida': 'temperatura',
+              'valor': 96.83, 'unidade': 'C', 'protocolo_origem': '4-20ma',
+              'status_leitura': 'ok'}])
+        argv = ['--diretorio', diretorio, '--coletor', 'COL-CONF',
+                '--de', '2026-07-16', '--ate', '2026-07-16',
+                '--registro', registro, '--dsn', DSN]
+        assert confronto.main(argv) == 0
+    finally:
+        _limpar(conn)
+        conn.close()
+
+
 def test_confrontar_periodo_agrega_por_dia(tmp_path):
     caminho, registro = _gerar_arquivo(tmp_path)  # gera d/COL-CONF/2026-07-16_leituras.txt
     diretorio = str(tmp_path / "d" / "COL-CONF")

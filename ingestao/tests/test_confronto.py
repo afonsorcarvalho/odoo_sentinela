@@ -351,7 +351,8 @@ def test_main_retorna_2_quando_periodo_vazio_ou_invertido(tmp_path):
 
 
 def test_confrontar_periodo_agrega_por_dia(tmp_path):
-    caminho, registro = _gerar_arquivo(tmp_path)  # gera d/COL-CONF/2026-07-16_leituras.txt
+    # gera d/COL-CONF/2026-07-16_HUB-1-COL-CONF_leituras.txt (nome novo)
+    caminho, registro = _gerar_arquivo(tmp_path)
     diretorio = str(tmp_path / "d" / "COL-CONF")
     conn = timescale.conectar(DSN)
     try:
@@ -369,3 +370,80 @@ def test_confrontar_periodo_agrega_por_dia(tmp_path):
     finally:
         _limpar(conn)
         conn.close()
+
+
+def _inserir_leitura_de_referencia(conn):
+    timescale.inserir_leituras(
+        conn, 'SITE-1', 'COL-CONF',
+        [{'timestamp': datetime(2026, 7, 16, 3, 1, 0, tzinfo=timezone.utc),
+          'sensor_id': 'SNR-1', 'area_id': 'EXPURGO', 'tipo_medida': 'temperatura',
+          'valor': 96.83, 'unidade': 'C', 'protocolo_origem': '4-20ma',
+          'status_leitura': 'ok'}])
+
+
+def test_confrontar_periodo_acha_arquivo_com_nome_novo(tmp_path):
+    """FIX C1: o nome do dia passou a ser {data}_{hub}-{coletor}_leituras.txt.
+    Buscar o nome literal antigo devolvia 'arquivo ausente' pra TODO dia — um
+    falso positivo de perda de lastro no gate de auditoria."""
+    caminho, registro = _gerar_arquivo(tmp_path)
+    assert caminho.name == '2026-07-16_HUB-1-COL-CONF_leituras.txt'  # nome novo
+    diretorio = str(tmp_path / "d" / "COL-CONF")
+    conn = timescale.conectar(DSN)
+    try:
+        _limpar(conn)
+        _inserir_leitura_de_referencia(conn)
+        resultados = confronto.confrontar_periodo(
+            diretorio, 'COL-CONF', ['2026-07-16'], registro, conn)
+        assert len(resultados) == 1
+        r = resultados[0]
+        assert r.motivo is None            # não foi tratado como ausente
+        assert r.assinaturas_ok is True
+        assert r.valores_ok is True
+    finally:
+        _limpar(conn)
+        conn.close()
+
+
+def test_confrontar_periodo_acha_arquivo_com_nome_legado(tmp_path):
+    """FIX C1: o acervo é misto (decisão de não migrar) — o glob tem que cobrir
+    também o nome legado {data}_leituras.txt, senão a correção do nome novo
+    cegaria a auditoria sobre tudo que já está em disco."""
+    caminho, registro = _gerar_arquivo(tmp_path)
+    legado = caminho.parent / '2026-07-16_leituras.txt'
+    caminho.rename(legado)                 # acervo legado: nome plano
+    diretorio = str(tmp_path / "d" / "COL-CONF")
+    conn = timescale.conectar(DSN)
+    try:
+        _limpar(conn)
+        _inserir_leitura_de_referencia(conn)
+        resultados = confronto.confrontar_periodo(
+            diretorio, 'COL-CONF', ['2026-07-16'], registro, conn)
+        assert len(resultados) == 1
+        r = resultados[0]
+        assert r.motivo is None
+        assert r.assinaturas_ok is True
+        assert r.valores_ok is True
+    finally:
+        _limpar(conn)
+        conn.close()
+
+
+def test_confrontar_periodo_reporta_ambiguidade_quando_dois_arquivos_casam(tmp_path):
+    """FIX C1: dois arquivos do mesmo dia no mesmo acervo (ex.: hub atualizado no
+    meio do dia — legado + nome novo, cada um cobrindo parte do dia) tornam a
+    fonte da verdade ambígua. Escolher um em silêncio produziria 'injetadas'
+    falsas pras linhas do outro; o gate reporta ALERTA e nomeia os candidatos."""
+    caminho, registro = _gerar_arquivo(tmp_path)
+    import shutil
+    shutil.copy(str(caminho), str(caminho.parent / '2026-07-16_leituras.txt'))
+    diretorio = str(tmp_path / "d" / "COL-CONF")
+    # branch de ambiguidade retorna antes de tocar conn — conn=None é seguro.
+    resultados = confronto.confrontar_periodo(
+        diretorio, 'COL-CONF', ['2026-07-16'], registro, conn=None)
+    assert len(resultados) == 1
+    r = resultados[0]
+    assert r.assinaturas_ok is False
+    assert r.valores_ok is False
+    assert 'ambíguo' in r.motivo
+    assert '2026-07-16_leituras.txt' in r.motivo
+    assert '2026-07-16_HUB-1-COL-CONF_leituras.txt' in r.motivo

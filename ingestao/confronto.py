@@ -138,16 +138,42 @@ def confrontar_arquivo(caminho, registro_path, conn, coletor_esperado=None, data
         injetadas_timescale=injetadas)
 
 
+def _candidatos_do_dia(diretorio_arquivos, data):
+    """Arquivos de leituras do dia `data` no acervo, ordenados (determinístico).
+
+    O glob `{data}*_leituras.txt` cobre os DOIS formatos de nome em campo:
+    o novo (`{data}_{hub}-{coletor}_leituras.txt`) e o legado (`{data}_leituras.txt`).
+    Um `{data}_*_leituras.txt` NÃO casaria o legado — o `_` extra exigiria um
+    segmento entre a data e `_leituras` —, e o acervo é misto por decisão
+    explícita (não há migração dos arquivos antigos).
+    """
+    return sorted(Path(diretorio_arquivos).glob(f"{data}*_leituras.txt"))
+
+
 def confrontar_periodo(diretorio_arquivos, coletor_id, datas, registro_path, conn):
     resultados = []
     for data in datas:
-        caminho = Path(diretorio_arquivos) / f"{data}_leituras.txt"
-        if not caminho.exists():
+        candidatos = _candidatos_do_dia(diretorio_arquivos, data)
+        if not candidatos:
             resultados.append(ResultadoConfronto(
                 coletor_id=coletor_id, data_referencia=data,
                 assinaturas_ok=False, valores_ok=False, arquivo_nao_fechado=False,
                 motivo='arquivo ausente no acervo (fonte da verdade faltando)'))
             continue
+        if len(candidatos) > 1:
+            # Dois arquivos para o mesmo dia (ex.: hub atualizado no meio do dia,
+            # deixando o legado e o nome novo lado a lado) tornam a fonte da
+            # verdade indeterminada: cada um cobre só parte do dia, e confrontar
+            # um deles sozinho acusaria as linhas do outro como injeção. Um gate
+            # de auditoria não pode escolher em silêncio — reporta e exige humano.
+            nomes = ', '.join(c.name for c in candidatos)
+            resultados.append(ResultadoConfronto(
+                coletor_id=coletor_id, data_referencia=data,
+                assinaturas_ok=False, valores_ok=False, arquivo_nao_fechado=False,
+                motivo=f'acervo ambíguo para o dia: {len(candidatos)} arquivos casam '
+                       f'({nomes}) — fonte da verdade indeterminada'))
+            continue
+        caminho = candidatos[0]
         resultados.append(confrontar_arquivo(
             str(caminho), registro_path, conn,
             coletor_esperado=coletor_id, data_esperada=data))

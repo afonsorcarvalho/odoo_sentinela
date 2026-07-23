@@ -13,6 +13,14 @@ vi.mock('../../lib/useLiveTail', () => ({
   useLiveTail: (code: string) => mockUseLiveTail(code),
 }))
 
+// Por padrão repassa o alvo sem animar (equivalente a reduced-motion), para
+// não quebrar os testes existentes que não configuram este mock. Só os testes
+// da regressão do count-up sobrescrevem com mockImplementationOnce/mockReturnValueOnce.
+const mockUseCountUp = vi.fn((target: number | null) => target)
+vi.mock('../../lib/useCountUp', () => ({
+  useCountUp: (target: number | null) => mockUseCountUp(target),
+}))
+
 function renderWithClient(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
@@ -132,6 +140,14 @@ describe('KpiWidget', () => {
       mockUseLiveTail.mockReturnValue({ last: { value: 19.063, alarm_state: 'ok' } })
       renderWithClient(<KpiWidget sensorCode="S1" casasDecimais={2} digitosInteiros={3} />)
       expect(screen.getByText('019.06')).toBeInTheDocument()
+    })
+
+    it('guarda anti-regressão: frame interpolado do count-up (fracionário) não injeta casas espúrias quando o alvo (rawValue) é inteiro', () => {
+      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'ok' } })
+      mockUseCountUp.mockReturnValueOnce(13.42718)
+      renderWithClient(<KpiWidget sensorCode="S1" />)
+      expect(screen.getByText('13')).toBeInTheDocument()
+      expect(screen.queryByText('13.427')).not.toBeInTheDocument()
     })
   })
 })

@@ -4,7 +4,7 @@ import { useLiveTail } from '../../lib/useLiveTail'
 import { useCountUp } from '../../lib/useCountUp'
 import { useFitText } from '../../lib/useFitText'
 import { usePrefersReducedMotion } from '../../lib/useSensorCarousel'
-import { formatKpi } from '../../lib/kpiFormat'
+import { formatKpi, autoCasas } from '../../lib/kpiFormat'
 import { statusTextColor } from '../statusVisuals'
 import type { StatusResult } from '../../lib/status'
 
@@ -59,8 +59,15 @@ export function KpiWidget({
   const reducedMotion = usePrefersReducedMotion()
   // Formatação: casasDecimais/digitosInteiros vêm das options do widget; ausentes
   // caem no auto histórico (casas detectadas do valor bruto, cap 3; sem padding).
+  // O auto é derivado de `rawValue` (o alvo fixo), NUNCA de `animated` (frame
+  // interpolado do count-up): durante a transição de ~550ms, `animated` é um
+  // float ruidoso e autoCasas(animated) injetaria casas decimais espúrias que
+  // só se corrigiriam no frame final, quebrando também a estabilidade de
+  // comprimento do useFitText.
   const displayValue =
-    animated != null ? formatKpi(animated, { casasDecimais, digitosInteiros }) : '—'
+    animated != null
+      ? formatKpi(animated, { casasDecimais: casasDecimais ?? autoCasas(rawValue ?? 0), digitosInteiros })
+      : '—'
 
   // O valor escala para preencher a caixa (largura e altura) via useFitText.
   // Reajusta quando: o comprimento do texto muda (mais/menos dígitos — largura

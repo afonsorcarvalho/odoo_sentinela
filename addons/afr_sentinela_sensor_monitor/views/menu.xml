@@ -7,6 +7,7 @@
     <menuitem id="menu_hub" name="Hubs" parent="menu_sensor_monitor_cadastro" action="action_hub" sequence="30"/>
     <menuitem id="menu_coletor" name="Coletores" parent="menu_sensor_monitor_cadastro" action="action_coletor" sequence="40"/>
     <menuitem id="menu_sensor" name="Sensores" parent="menu_sensor_monitor_cadastro" action="action_sensor" sequence="50"/>
+    <menuitem id="menu_calibracao" name="Calibrações" parent="menu_sensor_monitor_cadastro" action="action_calibracao" sequence="55"/>
 
     <menuitem id="menu_sensor_monitor_alarmes" name="Alarmes" parent="menu_sensor_monitor_root" sequence="20"/>
     <menuitem id="menu_alarm_threshold" name="Limiares" parent="menu_sensor_monitor_alarmes" action="action_alarm_threshold" sequence="10"/>

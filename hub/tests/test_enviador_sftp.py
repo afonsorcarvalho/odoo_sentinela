@@ -143,14 +143,53 @@ def test_transporte_cria_diretorios_antes_do_put():
     with mock.patch("paramiko.SSHClient", return_value=cliente), \
          mock.patch("paramiko.Ed25519Key.from_private_key_file"):
         t = TransporteParamiko("h", 22, "u", "/dev/null", "/uploads")
+
+        # --- 1ª chamada: árvore nova, nenhum nível existe ainda ---
         t.enviar("/local/x.txt", "CLI-1/2026/07/21/SITE-1/HUB-0001/COL/x.txt")
-    # criou cada nível do pai sob /uploads, em ordem, antes do put
-    criados = [c.args[0] for c in sftp.mkdir.call_args_list]
-    assert criados == [
+
+        # criou cada nível do pai sob /uploads, em ordem
+        criados_1 = [c.args[0] for c in sftp.mkdir.call_args_list]
+        assert criados_1 == [
+            "/uploads/CLI-1", "/uploads/CLI-1/2026", "/uploads/CLI-1/2026/07",
+            "/uploads/CLI-1/2026/07/21", "/uploads/CLI-1/2026/07/21/SITE-1",
+            "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001",
+            "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL",
+        ]
+        sftp.put.assert_called_once_with(
+            "/local/x.txt", "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL/x.txt")
+
+        # (b) ordem: os 7 mkdir da 1ª chamada aparecem como bloco contíguo
+        # em sftp.mock_calls e o put vem logo depois — se _mkdir_p fosse
+        # chamado depois do put, este bloco não existiria na sequência real.
+        sftp.assert_has_calls(
+            [mock.call.mkdir(p) for p in criados_1] +
+            [mock.call.put("/local/x.txt",
+                            "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL/x.txt")]
+        )
+
+        sftp.reset_mock()
+
+        # --- 2ª chamada: outro coletor sob a mesma árvore cliente/dia ---
+        # (a) os níveis CLI-1 .. HUB-0001 já foram criados na 1ª chamada;
+        # _mkdir_p deve engolir o IOError desses níveis (ramo "já existe")
+        # e a chamada não deve propagar exceção. Só o nível novo (COL2) é
+        # de fato criado sem levantar.
+        t.enviar("/local/y.txt", "CLI-1/2026/07/21/SITE-1/HUB-0001/COL2/y.txt")
+
+    criados_2 = [c.args[0] for c in sftp.mkdir.call_args_list]
+    assert criados_2 == [
         "/uploads/CLI-1", "/uploads/CLI-1/2026", "/uploads/CLI-1/2026/07",
         "/uploads/CLI-1/2026/07/21", "/uploads/CLI-1/2026/07/21/SITE-1",
         "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001",
-        "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL",
+        "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL2",
     ]
     sftp.put.assert_called_once_with(
-        "/local/x.txt", "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL/x.txt")
+        "/local/y.txt", "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL2/y.txt")
+
+    # (b) idem para a 2ª chamada: mesmo com mkdir levantando IOError
+    # internamente para os níveis repetidos, todos os mkdir precedem o put.
+    sftp.assert_has_calls(
+        [mock.call.mkdir(p) for p in criados_2] +
+        [mock.call.put("/local/y.txt",
+                        "/uploads/CLI-1/2026/07/21/SITE-1/HUB-0001/COL2/y.txt")]
+    )

@@ -11,6 +11,8 @@ def carregar_identidade(caminho):
 
 def fundir(identidade, operacional):
     merged = dict(identidade)
+    merged['cliente_id'] = operacional.get('cliente_id', '')
+    merged['site_id'] = operacional.get('site_id', '')
     merged['intervalo_leitura_s'] = operacional['intervalo_leitura_s']
     merged['barramentos'] = operacional['barramentos']
     return merged

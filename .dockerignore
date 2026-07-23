@@ -1,0 +1,9 @@
+.venv
+node_modules
+frontend
+exemplos
+.git
+.worktrees
+.superpowers
+**/__pycache__
+*.pyc

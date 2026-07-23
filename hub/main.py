@@ -85,7 +85,8 @@ def main(argv=None):
     tz = _tz(cfg.timezone_offset)
     assinador = AssinadorSoftware(cfg.caminho_chave)
     arquivo = ArquivoDiario(cfg.coletor_id, cfg.hub_id, cfg.firmware_version,
-                            cfg.timezone_offset, cfg.caminho_dados, assinador)
+                            cfg.timezone_offset, cfg.caminho_dados, assinador,
+                            cliente_id=cfg.cliente_id, site_id=cfg.site_id)
     leitor = Leitor(cfg)
     publicador = PublicadorMqtt(cfg.mqtt_host, cfg.mqtt_port)
     enviador = None

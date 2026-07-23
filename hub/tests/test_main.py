@@ -47,6 +47,7 @@ class _LeitorFake:
             "timestamp": agora, "sensor_id": "SNR-EXP-TEMP-01", "area_id": "AREA-EXPURGO",
             "tipo_medida": "temperatura", "valor": 42.0, "unidade": "C",
             "protocolo_origem": "4-20ma", "status_leitura": "ok",
+            "cert_ver": 3, "cal_ganho": 0.965, "cal_offset": 0.33,
         }]
     def fechar(self):
         pass
@@ -105,6 +106,7 @@ def _cfg_com_sftp(tmp_path):
     return SimpleNamespace(
         timezone_offset='-03:00', caminho_chave=str(tmp_path / 'k.pem'), coletor_id='COL',
         hub_id='HUB', firmware_version='0.1.0', caminho_dados=str(tmp_path / 'dados'),
+        cliente_id='CLI-1', site_id='SITE-1',
         mqtt_host='localhost', mqtt_port=1883, intervalo_leitura_s=5,
         sftp=SimpleNamespace(host='10.8.0.1', port=22, username='u', ssh_key_path='k',
                              remote_dir='/uploads'),

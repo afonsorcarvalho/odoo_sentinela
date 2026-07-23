@@ -14,14 +14,15 @@ from contrato import formato
 
 
 def reconstruir_estado(texto):
-    """A partir do conteúdo de um arquivo (cabeçalho + N linhas, sem rodapé),
-    devolve (hash_atual, proximo_seq) — o estado de onde continuar/selar."""
+    """A partir do conteúdo (cabeçalho + hdr_sig + N linhas, sem rodapé),
+    devolve (hash_atual, proximo_seq)."""
     linhas = [l for l in texto.split("\n") if l != ""]
-    cabecalho = [l for l in linhas if l.startswith("#")]
+    cabecalho = [l for l in linhas
+                 if l.startswith("#") and not l.startswith("# hdr_sig:")]
     corpo = [l for l in linhas if not l.startswith("#")]
     hash_atual = formato.hash_seed("\n".join(cabecalho) + "\n")
     for linha in corpo:
-        sem_hash = linha.rsplit("|", 1)[0]
+        sem_hash = linha.rsplit("|", 2)[0]  # tira hash E sig
         hash_atual = formato.hash_linha(hash_atual, sem_hash)
     return hash_atual, len(corpo) + 1
 
@@ -32,11 +33,13 @@ def _esta_selado(caminho):
 
 class ArquivoDiario:
     def __init__(self, coletor_id, hub_id, firmware_version, timezone_offset,
-                 caminho_dados, assinador):
+                 caminho_dados, assinador, cliente_id='', site_id=''):
         self._coletor_id = coletor_id
         self._hub_id = hub_id
         self._firmware = firmware_version
         self._tz_offset = timezone_offset
+        self._cliente_id = cliente_id
+        self._site_id = site_id
         self._dir = Path(caminho_dados).expanduser() / coletor_id
         self._assinador = assinador
         self._data_atual = None
@@ -55,10 +58,11 @@ class ArquivoDiario:
             cabecalho = formato.montar_cabecalho(
                 "leituras", self._coletor_id, self._hub_id,
                 self._assinador.fingerprint(), data_referencia,
-                self._tz_offset, self._firmware,
+                self._tz_offset, self._firmware, self._cliente_id, self._site_id,
             )
-            caminho.write_text(cabecalho)
             self._hash = formato.hash_seed(cabecalho)
+            hdr_sig = base64.b64encode(self._assinador.assinar(self._hash.encode())).decode()
+            caminho.write_text(cabecalho + f"# hdr_sig: {hdr_sig}\n")
             self._seq = 1
         self._data_atual = data_referencia
 
@@ -74,9 +78,11 @@ class ArquivoDiario:
             self._hash, self._seq, ts, leitura["sensor_id"], leitura["area_id"],
             leitura["tipo_medida"], leitura["valor"], leitura["unidade"],
             leitura["protocolo_origem"], leitura["status_leitura"],
+            leitura["cert_ver"], leitura["cal_ganho"], leitura["cal_offset"],
         )
+        sig = base64.b64encode(self._assinador.assinar(self._hash.encode())).decode()
         with self.caminho(data_referencia).open("a") as fh:
-            fh.write(linha + "\n")
+            fh.write(linha + "|" + sig + "\n")
         self._seq += 1
 
     def selar(self, data_referencia=None):

@@ -50,3 +50,30 @@ class TestCalibracao(TransactionCase):
             'conversor_tipo_snapshot': 'nenhum'})
         assert futuro.estado == 'futuro'
         assert expirado.estado == 'expirado'
+
+    def test_vigente_resolve_maior_versao_que_casa_conversor(self):
+        sensor = self._sensor()
+        sensor.conversor_tipo = 'nenhum'
+        hoje = date.today()
+        base = {'sensor_id': sensor.id, 'validade_de': hoje - timedelta(days=1),
+                'validade_ate': hoje + timedelta(days=365)}
+        self.env['sensor_monitor.calibracao'].create(
+            {**base, 'cert_numero': 'v1', 'versao': 1, 'cal_ganho': 0.9,
+             'cal_offset': 0.0, 'conversor_tipo_snapshot': 'nenhum'})
+        v2 = self.env['sensor_monitor.calibracao'].create(
+            {**base, 'cert_numero': 'v2', 'versao': 2, 'cal_ganho': 0.965,
+             'cal_offset': 0.33, 'conversor_tipo_snapshot': 'nenhum'})
+        assert sensor.calibracao_vigente_id == v2
+
+    def test_troca_de_conversor_invalida_cert(self):
+        sensor = self._sensor()
+        sensor.conversor_tipo = 'nenhum'
+        hoje = date.today()
+        self.env['sensor_monitor.calibracao'].create({
+            'sensor_id': sensor.id, 'cert_numero': 'v1', 'versao': 1,
+            'cal_ganho': 0.965, 'cal_offset': 0.33,
+            'validade_de': hoje - timedelta(days=1), 'validade_ate': hoje + timedelta(days=365),
+            'conversor_tipo_snapshot': 'nenhum'})
+        assert sensor.calibracao_vigente_id  # casa
+        sensor.conversor_tipo = '485_pt100'  # troca o conversor
+        assert not sensor.calibracao_vigente_id  # cert antigo deixa de valer

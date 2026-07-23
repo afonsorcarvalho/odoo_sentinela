@@ -18,6 +18,7 @@ class CanalConfig:
     map_in: tuple
     map_out: tuple
     filtro: dict = None
+    calibracao: dict = None
 
 
 @dataclass
@@ -58,6 +59,8 @@ class HubConfig:
     mqtt_port: int
     barramentos: list = field(default_factory=list)
     sftp: object = None
+    cliente_id: str = ''
+    site_id: str = ''
 
 
 def _par(lista, nome):
@@ -70,6 +73,12 @@ def _canal(bruto):
     for campo in ("sensor_id", "area_id"):
         validar_identificador(str(bruto[campo]))
     mapa = bruto["map"]
+    cal = bruto.get("calibracao") or {}
+    calibracao = {
+        'cert_ver': int(cal.get('cert_ver', 0)),
+        'ganho': float(cal.get('ganho', 1.0)),
+        'offset': float(cal.get('offset', 0.0)),
+    }
     return CanalConfig(
         ch=int(bruto["ch"]),
         sensor_id=bruto["sensor_id"],
@@ -80,6 +89,7 @@ def _canal(bruto):
         map_in=_par(mapa["in"], "map.in"),
         map_out=_par(mapa["out"], "map.out"),
         filtro=bruto.get("filtro"),
+        calibracao=calibracao,
     )
 
 
@@ -121,4 +131,5 @@ def carregar_config(caminho):
         caminho_chave=dados["caminho_chave"], caminho_dados=dados["caminho_dados"],
         mqtt_host=mqtt.get("host", "localhost"), mqtt_port=int(mqtt.get("port", 1883)),
         barramentos=barramentos, sftp=sftp,
+        cliente_id=dados.get("cliente_id", ""), site_id=dados.get("site_id", ""),
     )

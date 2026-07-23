@@ -33,7 +33,7 @@ def _ts_utc_iso(timestamp_iso):
     # offset (timezone_offset), então o ts do arquivo é sempre aware.
     if dt.tzinfo is None:
         raise ValueError(f"timestamp sem offset (naive), não confrontável: {timestamp_iso!r}")
-    return dt.astimezone(timezone.utc).isoformat()
+    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def confrontar_arquivo(caminho, registro_path, conn):

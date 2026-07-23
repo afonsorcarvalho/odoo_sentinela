@@ -91,6 +91,29 @@ def test_confronto_detecta_ausencia_no_timescale(tmp_path):
         conn.close()
 
 
+def test_confronto_tolera_subsegundo_no_timescale(tmp_path):
+    """C-T2: writer com timestamp em microssegundos (simulador_continuo/backfill_demo)
+    não pode gerar falsa divergência + falsa injeção para a mesma leitura real.
+    A chave de confronto deve ser truncada a whole-second em ambos os lados."""
+    caminho, registro = _gerar_arquivo(tmp_path)  # linha em 03:01:00.000000 (whole-second)
+    conn = timescale.conectar(DSN)
+    try:
+        _limpar(conn)
+        timescale.inserir_leituras(
+            conn, 'SITE-1', 'COL-CONF',
+            [{'timestamp': datetime(2026, 7, 16, 3, 1, 0, 500000, tzinfo=timezone.utc),
+              'sensor_id': 'SNR-1', 'area_id': 'EXPURGO', 'tipo_medida': 'temperatura',
+              'valor': 96.83, 'unidade': 'C', 'protocolo_origem': '4-20ma',
+              'status_leitura': 'ok'}])
+        r = confronto.confrontar_arquivo(str(caminho), registro, conn)
+        assert r.valores_ok is True
+        assert r.divergencias == []
+        assert r.injetadas_timescale == []
+    finally:
+        _limpar(conn)
+        conn.close()
+
+
 def test_confronto_detecta_injecao_no_timescale(tmp_path):
     # arquivo com 2 linhas (03:01 e 03:03) → janela cobre 03:02 (injeção ENTRE linhas)
     caminho, registro = _gerar_arquivo(tmp_path, leituras=[

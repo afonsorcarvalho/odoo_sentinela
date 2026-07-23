@@ -52,6 +52,6 @@ def buscar_leituras_para_confronto(conn, coletor_id, ts_inicio, ts_fim):
         )
         linhas = cur.fetchall()
     return {
-        (sensor_id, time.astimezone(timezone.utc).isoformat()): valor
+        (sensor_id, time.astimezone(timezone.utc).replace(microsecond=0).isoformat()): valor
         for sensor_id, time, valor in linhas
     }

@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from hub.arquivo_diario import ArquivoDiario
 from hub.assinador import AssinadorSoftware
 from ingestao import registro_coletores, validador
@@ -18,10 +16,6 @@ def _leitura(dt, valor, sensor):
     }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="integração hub→ingestão: exige validador v2 (Parte B2, ainda não implementada)",
-)
 def test_arquivo_do_hub_e_aceito_pela_ingestao(tmp_path):
     coletor_id = "COL-RS485-BUS0"
     assinador = AssinadorSoftware(tmp_path / "k.pem")

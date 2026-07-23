@@ -8,6 +8,11 @@ def validar_identificador(valor):
         raise ValueError(f"identificador '{valor}' contém caractere proibido (|, \\n ou \\r)")
 
 
+def validar_segmento_path(valor):
+    if valor in ('', '.', '..') or '/' in valor or '\\' in valor:
+        raise ValueError(f"segmento de path inválido: '{valor}'")
+
+
 def montar_cabecalho(tipo_arquivo, coletor_id, hub_id, pubkey_fingerprint,
                      data_referencia, timezone_offset, firmware_version,
                      cliente_id, site_id):

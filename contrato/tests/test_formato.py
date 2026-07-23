@@ -87,3 +87,15 @@ def test_linha_leitura_carrega_coeficientes_de_calibracao():
     # hash cobre os coeficientes: recomputar com o mesmo prefixo bate
     sem_hash = '|'.join(campos[:-1])
     assert formato.hash_linha(seed, sem_hash) == novo_hash
+
+
+def test_validar_segmento_path_aceita_codigo_normal():
+    formato.validar_segmento_path("COL-RS485-BUS0")
+    formato.validar_segmento_path("HUB-0001")
+    formato.validar_segmento_path("CLI-1")
+
+
+@pytest.mark.parametrize("ruim", ["", ".", "..", "a/b", "a\\b", "../../etc"])
+def test_validar_segmento_path_rejeita_traversal(ruim):
+    with pytest.raises(ValueError):
+        formato.validar_segmento_path(ruim)

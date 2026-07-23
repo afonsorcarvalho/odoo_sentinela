@@ -35,6 +35,11 @@ class TestFileLedger(TransactionCase):
         })
         self.assertEqual(ledger.hub_id, self.hub)
 
+    def test_status_incompleto_e_aceito(self):
+        campos = self.env['sensor_monitor.file.ledger'].fields_get(['status_validacao'])
+        valores = dict(campos['status_validacao']['selection'])
+        assert 'incompleto' in valores
+
     def test_cron_detect_gaps_creates_missing_entry(self):
         self.env['sensor_monitor.file.ledger'].create({
             'coletor_id': self.coletor.id, 'tipo_arquivo': 'leituras',

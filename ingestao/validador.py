@@ -1,5 +1,5 @@
 import base64
-import hashlib
+import binascii
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -7,12 +7,13 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from contrato import formato
 from . import registro_coletores
 
 HEADER_KEYS = {
-    'schema_version', 'tipo_arquivo', 'coletor_id', 'hub_id',
+    'schema_version', 'tipo_arquivo', 'cliente_id', 'site_id', 'coletor_id', 'hub_id',
     'coletor_pubkey_fingerprint', 'data_referencia', 'timezone_offset',
-    'firmware_version', 'dia_anterior_hash_final',
+    'firmware_version', 'dia_anterior_hash_final', 'hdr_sig',
 }
 
 
@@ -26,6 +27,9 @@ class ResultadoValidacao:
     hash_final: str = None
     assinatura: str = None
     tipo_arquivo: str = None
+    cliente_id: str = None
+    site_id: str = None
+    pubkey_fingerprint: str = None
     leituras: list = field(default_factory=list)
     eventos: list = field(default_factory=list)
 
@@ -61,7 +65,9 @@ def parse_arquivo(texto):
         linhas_corpo.append(linhas[idx])
         idx += 1
     linhas_rodape = linhas[idx:]
-    cabecalho_canonico = '\n'.join(linhas_cabecalho) + '\n'
+    # canônico do header = tudo menos a linha hdr_sig (que assina esse canônico)
+    canonico = [l for l in linhas_cabecalho if not l.startswith('# hdr_sig:')]
+    cabecalho_canonico = '\n'.join(canonico) + '\n'
     metadados_cabecalho = _parse_bloco_metadados(linhas_cabecalho)
     metadados_rodape = _parse_bloco_metadados(linhas_rodape)
     return metadados_cabecalho, cabecalho_canonico, linhas_corpo, metadados_rodape
@@ -70,112 +76,113 @@ def parse_arquivo(texto):
 def parse_linha_leitura(linha):
     campos = linha.split('|')
     (seq, timestamp, sensor_id, area_id, tipo_medida, valor, unidade,
-     protocolo_origem, status_leitura, hash_linha) = campos
-    linha_sem_hash = '|'.join(campos[:-1])
+     protocolo_origem, status_leitura, cert_ver, cal_ganho, cal_offset,
+     hash_linha, sig) = campos
     return {
-        'seq': int(seq),
-        'timestamp': timestamp,
-        'sensor_id': sensor_id,
-        'area_id': area_id,
-        'tipo_medida': tipo_medida,
-        'valor': float(valor),
-        'unidade': unidade,
-        'protocolo_origem': protocolo_origem,
-        'status_leitura': status_leitura,
-        'hash': hash_linha,
-        'linha_sem_hash': linha_sem_hash,
+        'seq': int(seq), 'timestamp': timestamp, 'sensor_id': sensor_id,
+        'area_id': area_id, 'tipo_medida': tipo_medida, 'valor': float(valor),
+        'unidade': unidade, 'protocolo_origem': protocolo_origem,
+        'status_leitura': status_leitura, 'cert_ver': int(cert_ver),
+        'cal_ganho': float(cal_ganho), 'cal_offset': float(cal_offset),
+        'hash': hash_linha, 'sig': sig, 'linha_sem_hash': '|'.join(campos[:-2]),
     }
 
 
 def parse_linha_alarme(linha):
     campos = linha.split('|')
     (seq, timestamp, sensor_id, area_id, tipo_medida, tipo_evento, tipo_violacao,
-     valor, limite_min_vigente, limite_max_vigente, hash_linha) = campos
-    linha_sem_hash = '|'.join(campos[:-1])
+     valor, limite_min_vigente, limite_max_vigente, hash_linha, sig) = campos
     return {
-        'seq': int(seq),
-        'timestamp': timestamp,
-        'sensor_id': sensor_id,
-        'area_id': area_id,
-        'tipo_medida': tipo_medida,
-        'tipo_evento': tipo_evento,
-        'tipo_violacao': tipo_violacao,
-        'valor': float(valor),
+        'seq': int(seq), 'timestamp': timestamp, 'sensor_id': sensor_id,
+        'area_id': area_id, 'tipo_medida': tipo_medida, 'tipo_evento': tipo_evento,
+        'tipo_violacao': tipo_violacao, 'valor': float(valor),
         'limite_min_vigente': None if limite_min_vigente == '—' else float(limite_min_vigente),
         'limite_max_vigente': None if limite_max_vigente == '—' else float(limite_max_vigente),
-        'hash': hash_linha,
-        'linha_sem_hash': linha_sem_hash,
+        'hash': hash_linha, 'sig': sig, 'linha_sem_hash': '|'.join(campos[:-2]),
     }
 
 
-def _hash_seed(cabecalho_canonico):
-    return hashlib.sha256(cabecalho_canonico.encode()).hexdigest()
-
-
-def _hash_linha(hash_anterior, linha_sem_hash):
-    return hashlib.sha256((hash_anterior + linha_sem_hash).encode()).hexdigest()
+def _verificar_sig(chave_publica, sig_b64, hash_hex):
+    try:
+        assinatura = base64.b64decode(sig_b64)
+    except (binascii.Error, TypeError, ValueError) as exc:
+        raise InvalidSignature('assinatura base64 inválida ou ausente') from exc
+    chave_publica.verify(assinatura, hash_hex.encode(), ec.ECDSA(hashes.SHA256()))
 
 
 def validar_arquivo(caminho, registro_path):
     texto = Path(caminho).read_text()
     metadados_cab, cabecalho_canonico, linhas_corpo, metadados_rod = parse_arquivo(texto)
     coletor_id = metadados_cab.get('coletor_id')
-    data_referencia = metadados_cab.get('data_referencia')
     tipo_arquivo = metadados_cab.get('tipo_arquivo')
     hash_final_declarado = metadados_rod.get('hash_final')
     assinatura_declarada = metadados_rod.get('assinatura')
-    total_linhas = len(linhas_corpo)
 
-    def _invalido(motivo):
-        return ResultadoValidacao(
-            status_validacao='invalido',
-            motivo_rejeicao=motivo,
-            total_linhas=total_linhas,
-            coletor_id=coletor_id,
-            data_referencia=data_referencia,
-            hash_final=hash_final_declarado,
-            assinatura=assinatura_declarada,
-            tipo_arquivo=tipo_arquivo,
-        )
-
-    parse_linha = parse_linha_alarme if tipo_arquivo == 'alarmes' else parse_linha_leitura
-
-    hash_atual = _hash_seed(cabecalho_canonico)
-    linhas_parseadas = []
-    for linha in linhas_corpo:
-        parsed = parse_linha(linha)
-        hash_esperado = _hash_linha(hash_atual, parsed['linha_sem_hash'])
-        if hash_esperado != parsed['hash']:
-            return _invalido(f"cadeia de hash quebrada na linha seq={parsed['seq']}")
-        hash_atual = hash_esperado
-        linhas_parseadas.append(parsed)
-
-    if hash_atual != hash_final_declarado:
-        return _invalido('hash_final do rodapé não bate com a cadeia recalculada')
+    def _res(status, motivo, leituras=None, total=None):
+        r = ResultadoValidacao(
+            status_validacao=status, motivo_rejeicao=motivo,
+            total_linhas=total if total is not None else len(linhas_corpo),
+            coletor_id=coletor_id, data_referencia=metadados_cab.get('data_referencia'),
+            hash_final=hash_final_declarado, assinatura=assinatura_declarada,
+            tipo_arquivo=tipo_arquivo, cliente_id=metadados_cab.get('cliente_id'),
+            site_id=metadados_cab.get('site_id'),
+            pubkey_fingerprint=metadados_cab.get('coletor_pubkey_fingerprint'))
+        if leituras is not None:
+            if tipo_arquivo == 'alarmes':
+                r.eventos = leituras
+            else:
+                r.leituras = leituras
+        return r
 
     try:
         chave_publica = registro_coletores.obter_chave_publica(registro_path, coletor_id)
     except KeyError as exc:
-        return _invalido(str(exc))
+        return _res('invalido', str(exc))
 
-    assinatura = base64.b64decode(assinatura_declarada)
+    # 1. hdr_sig semeia a cadeia
+    hash_atual = formato.hash_seed(cabecalho_canonico)
+    hdr_sig = metadados_cab.get('hdr_sig')
+    if not hdr_sig:
+        return _res('invalido', 'header sem hdr_sig (schema v2 exige header assinado)')
     try:
-        chave_publica.verify(assinatura, hash_final_declarado.encode(), ec.ECDSA(hashes.SHA256()))
+        _verificar_sig(chave_publica, hdr_sig, hash_atual)
     except InvalidSignature:
-        return _invalido('assinatura inválida')
+        return _res('invalido', 'assinatura do header (hdr_sig) inválida')
 
-    resultado = ResultadoValidacao(
-        status_validacao='valido',
-        motivo_rejeicao=None,
-        total_linhas=total_linhas,
-        coletor_id=coletor_id,
-        data_referencia=data_referencia,
-        hash_final=hash_final_declarado,
-        assinatura=assinatura_declarada,
-        tipo_arquivo=tipo_arquivo,
-    )
-    if tipo_arquivo == 'alarmes':
-        resultado.eventos = linhas_parseadas
-    else:
-        resultado.leituras = linhas_parseadas
-    return resultado
+    # 2. caminha a cadeia, verificando hash + sig por linha
+    parse_linha = parse_linha_alarme if tipo_arquivo == 'alarmes' else parse_linha_leitura
+    validas = []
+    for linha in linhas_corpo:
+        try:
+            parsed = parse_linha(linha)
+        except ValueError:
+            break  # linha malformada (cauda truncada por crash)
+        hash_esperado = formato.hash_linha(hash_atual, parsed['linha_sem_hash'])
+        if hash_esperado != parsed['hash']:
+            break
+        try:
+            _verificar_sig(chave_publica, parsed['sig'], parsed['hash'])
+        except InvalidSignature:
+            break
+        hash_atual = hash_esperado
+        validas.append(parsed)
+
+    tem_footer = hash_final_declarado is not None
+    quebrou_cedo = len(validas) < len(linhas_corpo)
+
+    # 3. decidir status
+    if tem_footer:
+        if quebrou_cedo:
+            return _res('invalido',
+                        f'cadeia/sig quebrada na linha seq={len(validas) + 1}', total=len(linhas_corpo))
+        if hash_atual != hash_final_declarado:
+            return _res('invalido', 'hash_final do rodapé não bate com a cadeia recalculada')
+        try:
+            _verificar_sig(chave_publica, assinatura_declarada, hash_final_declarado)
+        except InvalidSignature:
+            return _res('invalido', 'assinatura do arquivo (footer) inválida')
+        return _res('valido', None, leituras=validas, total=len(validas))
+
+    # sem footer: autêntico até a última sig válida, porém não fechado
+    return _res('incompleto', 'arquivo sem rodapé (crash não-recuperado)',
+                leituras=validas, total=len(validas))

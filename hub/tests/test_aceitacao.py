@@ -12,13 +12,15 @@ def _leitura(dt, valor, sensor):
         "timestamp": dt, "sensor_id": sensor, "area_id": "AREA-EXPURGO",
         "tipo_medida": "temperatura", "valor": valor, "unidade": "C",
         "protocolo_origem": "4-20ma", "status_leitura": "ok",
+        "cert_ver": 3, "cal_ganho": 0.965, "cal_offset": 0.33,
     }
 
 
 def test_arquivo_do_hub_e_aceito_pela_ingestao(tmp_path):
     coletor_id = "COL-RS485-BUS0"
     assinador = AssinadorSoftware(tmp_path / "k.pem")
-    arq = ArquivoDiario(coletor_id, "HUB-0001", "0.1.0", "-03:00", tmp_path / "dados", assinador)
+    arq = ArquivoDiario(coletor_id, "HUB-0001", "0.1.0", "-03:00", tmp_path / "dados", assinador,
+                        cliente_id="CLI-1", site_id="SITE-1")
 
     base = datetime(2026, 7, 21, 0, 1, tzinfo=TZ)
     for i in range(3):

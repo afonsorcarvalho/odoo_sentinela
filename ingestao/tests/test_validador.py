@@ -1,7 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 
 from coletor_simulado import gerador as gerador_simulado
 from contrato import identidade as identidade_simulado
+from hub.arquivo_diario import ArquivoDiario
+from hub.assinador import AssinadorSoftware
 from ingestao import registro_coletores, validador
 
 
@@ -34,14 +36,15 @@ def test_validar_arquivo_com_linha_corrompida(tmp_path):
     output_dir, registro_path = _gerar_dia_e_registrar(tmp_path)
     caminho_arquivo = output_dir / f"{gerador_simulado.COLETOR_ID}_leituras_2026-07-18.txt"
     linhas = caminho_arquivo.read_text().split('\n')
-    campos = linhas[9].split('|')
+    idx = next(i for i, l in enumerate(linhas) if l and not l.startswith('#'))
+    campos = linhas[idx].split('|')
     campos[5] = '999.9'
-    linhas[9] = '|'.join(campos)
+    linhas[idx] = '|'.join(campos)
     caminho_arquivo.write_text('\n'.join(linhas))
 
     resultado = validador.validar_arquivo(caminho_arquivo, registro_path)
     assert resultado.status_validacao == 'invalido'
-    assert 'hash' in resultado.motivo_rejeicao.lower()
+    assert 'quebrada' in resultado.motivo_rejeicao.lower()
     assert resultado.leituras == []
     assert resultado.data_referencia == '2026-07-18'
 
@@ -88,3 +91,71 @@ def test_validar_arquivo_alarme_com_par_entrada_saida(tmp_path):
     assert len(resultado.eventos) == 2
     assert resultado.eventos[0]['tipo_evento'] == 'entrada_alarme'
     assert resultado.eventos[1]['tipo_evento'] == 'saida_alarme'
+
+
+def _leitura(ts, valor=96.83):
+    return {'timestamp': ts, 'sensor_id': 'SNR-1', 'area_id': 'EXPURGO',
+            'tipo_medida': 'temperatura', 'valor': valor, 'unidade': 'C',
+            'protocolo_origem': '4-20ma', 'status_leitura': 'ok',
+            'cert_ver': 3, 'cal_ganho': 0.965, 'cal_offset': 0.33}
+
+
+def _preparar(tmp_path, selar=True):
+    assinador = AssinadorSoftware(str(tmp_path / "k.pem"))
+    arq = ArquivoDiario('COL-1', 'HUB-1', '2.3.1', '-03:00', str(tmp_path / "d"),
+                        assinador, cliente_id='CLI-1', site_id='SITE-1')
+    arq.registrar(_leitura(datetime(2026, 7, 16, 0, 1, 0)))
+    arq.registrar(_leitura(datetime(2026, 7, 16, 0, 2, 0)))
+    if selar:
+        arq.selar('2026-07-16')
+    registro = str(tmp_path / "reg.json")
+    registro_coletores.registrar_coletor(registro, 'COL-1', assinador.chave_publica_pem())
+    return arq.caminho('2026-07-16'), registro
+
+
+def test_arquivo_v2_selado_valido(tmp_path):
+    caminho, registro = _preparar(tmp_path, selar=True)
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == 'valido'
+    assert r.total_linhas == 2
+    assert r.cliente_id == 'CLI-1' and r.site_id == 'SITE-1'
+
+
+def test_arquivo_sem_rodape_e_incompleto(tmp_path):
+    caminho, registro = _preparar(tmp_path, selar=False)  # crash: sem footer
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == 'incompleto'
+    assert len(r.leituras) == 2  # aceita linhas verificadas até a última sig válida
+
+
+def test_sig_de_linha_adulterada_rejeita(tmp_path):
+    caminho, registro = _preparar(tmp_path, selar=True)
+    linhas = caminho.read_text().split('\n')
+    corpo_idx = next(i for i, l in enumerate(linhas) if l and not l.startswith('#'))
+    campos = linhas[corpo_idx].split('|')
+    campos[5] = '999.99'  # adultera o valor, mantém hash/sig antigos
+    linhas[corpo_idx] = '|'.join(campos)
+    caminho.write_text('\n'.join(linhas))
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == 'invalido'
+
+
+def test_hdr_sig_adulterado_rejeita(tmp_path):
+    caminho, registro = _preparar(tmp_path, selar=True)
+    linhas = caminho.read_text().split('\n')
+    i = next(i for i, l in enumerate(linhas) if l.startswith('# cliente_id:'))
+    linhas[i] = '# cliente_id: CLI-OUTRO'  # muda header coberto pelo hdr_sig
+    caminho.write_text('\n'.join(linhas))
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == 'invalido'
+    assert 'header' in (r.motivo_rejeicao or '').lower()
+
+
+def test_assinatura_footer_corrompida_e_invalido_nao_exception(tmp_path):
+    caminho, registro = _preparar(tmp_path, selar=True)
+    linhas = caminho.read_text().split('\n')
+    i = next(i for i, l in enumerate(linhas) if l.startswith('# assinatura:'))
+    linhas[i] = '# assinatura: !!!notbase64!!!'  # base64 malformado, não ausente
+    caminho.write_text('\n'.join(linhas))
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == 'invalido'

@@ -19,6 +19,7 @@ class FileLedger(models.Model):
     horario_recebimento = fields.Datetime()
     status_validacao = fields.Selection([
         ('valido', 'Válido'),
+        ('incompleto', 'Incompleto (sem rodapé)'),
         ('invalido', 'Inválido'),
         ('pendente', 'Pendente'),
         ('faltante', 'Faltante'),

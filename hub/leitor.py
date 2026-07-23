@@ -34,10 +34,13 @@ class Leitor:
         ]
 
     def _normalizar(self, canal, valor, status, agora):
+        cal = canal.calibracao or {'cert_ver': 0, 'ganho': 1.0, 'offset': 0.0}
+        corrigido = cal['ganho'] * valor + cal['offset']
         return {
             "timestamp": agora, "sensor_id": canal.sensor_id, "area_id": canal.area_id,
-            "tipo_medida": canal.tipo_medida, "valor": valor, "unidade": canal.unidade,
+            "tipo_medida": canal.tipo_medida, "valor": corrigido, "unidade": canal.unidade,
             "protocolo_origem": canal.protocolo_origem, "status_leitura": status,
+            "cert_ver": cal['cert_ver'], "cal_ganho": cal['ganho'], "cal_offset": cal['offset'],
         }
 
     def ler_todos(self, agora):

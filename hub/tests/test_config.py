@@ -88,3 +88,73 @@ def test_sftp_sem_host_falha(tmp_path):
     ruim = VALIDA + SFTP_BLOCO.replace("host: 192.168.0.10", "port: 2022")
     with pytest.raises(ValueError):
         config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_hubconfig_carrega_tenant_e_calibracao_do_canal(tmp_path):
+    from hub import config as config_mod
+    yaml_txt = """
+hub_id: HUB-1
+coletor_id: COL-1
+cliente_id: CLI-000123
+site_id: SITE-0001
+firmware_version: 2.3.1
+timezone_offset: "-03:00"
+intervalo_leitura_s: 60
+caminho_chave: /tmp/k.pem
+caminho_dados: /tmp/dados
+barramentos:
+  - porta: /dev/ttyUSB0
+    baud: 9600
+    paridade: N
+    stop_bits: 1
+    dispositivos:
+      - endereco: 1
+        driver: n4aib16
+        canais:
+          - ch: 1
+            sensor_id: SNR-1
+            area_id: EXPURGO
+            tipo_medida: temperatura
+            unidade: C
+            protocolo_origem: 4-20ma
+            map: {in: [4, 20], out: [0, 150]}
+            calibracao: {cert_ver: 3, ganho: 0.965, offset: 0.33}
+"""
+    p = tmp_path / "config.yaml"
+    p.write_text(yaml_txt)
+    cfg = config_mod.carregar_config(str(p))
+    assert cfg.cliente_id == 'CLI-000123'
+    assert cfg.site_id == 'SITE-0001'
+    canal = cfg.barramentos[0].dispositivos[0].canais[0]
+    assert canal.calibracao == {'cert_ver': 3, 'ganho': 0.965, 'offset': 0.33}
+
+
+def test_canal_sem_calibracao_usa_identidade(tmp_path):
+    from hub import config as config_mod
+    yaml_txt = """
+hub_id: HUB-1
+coletor_id: COL-1
+cliente_id: CLI-1
+site_id: SITE-1
+firmware_version: 2.3.1
+timezone_offset: "-03:00"
+intervalo_leitura_s: 60
+caminho_chave: /tmp/k.pem
+caminho_dados: /tmp/dados
+barramentos:
+  - porta: /dev/ttyUSB0
+    baud: 9600
+    paridade: N
+    stop_bits: 1
+    dispositivos:
+      - endereco: 1
+        driver: n4aib16
+        canais:
+          - {ch: 1, sensor_id: SNR-1, area_id: EXPURGO, tipo_medida: temperatura,
+             unidade: C, protocolo_origem: 4-20ma, map: {in: [4, 20], out: [0, 150]}}
+"""
+    p = tmp_path / "config.yaml"
+    p.write_text(yaml_txt)
+    cfg = config_mod.carregar_config(str(p))
+    canal = cfg.barramentos[0].dispositivos[0].canais[0]
+    assert canal.calibracao == {'cert_ver': 0, 'ganho': 1.0, 'offset': 0.0}

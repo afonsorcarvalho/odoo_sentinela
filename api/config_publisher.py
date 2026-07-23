@@ -129,8 +129,18 @@ def serializar_config_hub(cliente, hub_code, version=None):
             'dispositivos': dispositivos,
         })
 
+    site_row = ex('sensor_monitor.hub', 'read', [hub['id']], fields=['site_id'])[0]
+    site_odoo_id = site_row['site_id'][0]
+    site = ex('sensor_monitor.site', 'read', [site_odoo_id],
+              fields=['site_code', 'partner_id'])[0]
+    partner_id = site['partner_id'][0]
+    partner = ex('res.partner', 'read', [partner_id], fields=['ref'])[0]
+    cliente_id = partner.get('ref') or f"CLI-{partner_id}"
+
     return {
         'version': version if version is not None else hub['config_version_desejada'],
         'intervalo_leitura_s': 5,
         'barramentos': barramentos,
+        'cliente_id': cliente_id,
+        'site_id': site['site_code'],
     }

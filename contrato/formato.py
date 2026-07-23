@@ -8,12 +8,16 @@ def validar_identificador(valor):
         raise ValueError(f"identificador '{valor}' contém caractere proibido (|, \\n ou \\r)")
 
 
-def montar_cabecalho(tipo_arquivo, coletor_id, hub_id, pubkey_fingerprint, data_referencia, timezone_offset, firmware_version):
-    for valor in (coletor_id, hub_id):
+def montar_cabecalho(tipo_arquivo, coletor_id, hub_id, pubkey_fingerprint,
+                     data_referencia, timezone_offset, firmware_version,
+                     cliente_id, site_id):
+    for valor in (coletor_id, hub_id, cliente_id, site_id):
         validar_identificador(valor)
     linhas = [
-        "# schema_version: 1",
+        "# schema_version: 2",
         f"# tipo_arquivo: {tipo_arquivo}",
+        f"# cliente_id: {cliente_id}",
+        f"# site_id: {site_id}",
         f"# coletor_id: {coletor_id}",
         f"# hub_id: {hub_id}",
         f"# coletor_pubkey_fingerprint: {pubkey_fingerprint}",
@@ -34,10 +38,20 @@ def hash_linha(hash_anterior, linha_sem_hash):
     return hashlib.sha256((hash_anterior + linha_sem_hash).encode()).hexdigest()
 
 
-def gerar_linha_leitura(hash_anterior, seq, timestamp, sensor_id, area_id, tipo_medida, valor, unidade, protocolo_origem, status_leitura):
+def fmt_coef(valor):
+    return f"{float(valor):.4f}"
+
+
+def gerar_linha_leitura(hash_anterior, seq, timestamp, sensor_id, area_id, tipo_medida,
+                        valor, unidade, protocolo_origem, status_leitura,
+                        cert_ver, cal_ganho, cal_offset):
     for identificador in (sensor_id, area_id):
         validar_identificador(identificador)
-    campos_sem_hash = [str(seq), timestamp, sensor_id, area_id, tipo_medida, str(valor), unidade, protocolo_origem, status_leitura]
+    campos_sem_hash = [
+        str(seq), timestamp, sensor_id, area_id, tipo_medida, str(valor), unidade,
+        protocolo_origem, status_leitura,
+        str(int(cert_ver)), fmt_coef(cal_ganho), fmt_coef(cal_offset),
+    ]
     linha_sem_hash = '|'.join(campos_sem_hash)
     novo_hash = hash_linha(hash_anterior, linha_sem_hash)
     return linha_sem_hash + '|' + novo_hash, novo_hash

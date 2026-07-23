@@ -2,7 +2,7 @@ import base64
 from datetime import date
 
 from coletor_simulado import gerador
-from contrato import identidade
+from contrato import formato, identidade
 
 
 def test_gerar_dia_sem_alarme(tmp_path):
@@ -57,6 +57,40 @@ def test_assinatura_do_rodape_de_alarmes_verifica(tmp_path):
     assinatura_b64 = next(l for l in linhas if l.startswith('# assinatura:')).split(': ', 1)[1]
     assinatura = base64.b64decode(assinatura_b64)
     identidade.verificar_assinatura(chave.public_key(), assinatura, hash_final.encode())
+
+
+def test_hdr_sig_presente_e_valido(tmp_path):
+    chave_path = tmp_path / 'chave.pem'
+    output_dir = gerador.gerar_dia(date(2026, 7, 18), tmp_path / 'output', chave_path=chave_path)
+    chave = identidade.carregar_ou_criar_chave(chave_path)
+    conteudo = (output_dir / 'COL-SIM-0001_leituras_2026-07-18.txt').read_text()
+    linhas = conteudo.split('\n')
+    linhas_header = []
+    for l in linhas:
+        if not l.startswith('#'):
+            break
+        linhas_header.append(l)
+    cabecalho_canonico = '\n'.join(
+        l for l in linhas_header if not l.startswith('# hdr_sig:')
+    ) + '\n'
+    hdr_sig_b64 = next(l for l in linhas_header if l.startswith('# hdr_sig:')).split(': ', 1)[1]
+    hash_0 = formato.hash_seed(cabecalho_canonico)
+    identidade.verificar_assinatura(chave.public_key(), base64.b64decode(hdr_sig_b64), hash_0.encode())
+
+
+def test_sig_da_ultima_linha_de_leituras_verifica(tmp_path):
+    chave_path = tmp_path / 'chave.pem'
+    output_dir = gerador.gerar_dia(date(2026, 7, 18), tmp_path / 'output', chave_path=chave_path)
+    chave = identidade.carregar_ou_criar_chave(chave_path)
+    conteudo = (output_dir / 'COL-SIM-0001_leituras_2026-07-18.txt').read_text()
+    linhas = conteudo.strip().split('\n')
+    corpo_linhas = [l for l in linhas if l and not l.startswith('#')]
+    ultima_linha = corpo_linhas[-1]
+    campos = ultima_linha.split('|')
+    assert len(campos) == 14  # 12 colunas de dado + hash + sig
+    hash_da_linha = campos[-2]
+    sig_b64 = campos[-1]
+    identidade.verificar_assinatura(chave.public_key(), base64.b64decode(sig_b64), hash_da_linha.encode())
 
 
 def test_chave_persiste_entre_execucoes(tmp_path):

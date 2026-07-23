@@ -3,6 +3,7 @@ import argparse
 from . import odoo_cliente
 
 PARTNER_NAME = 'Cliente Simulado'
+CLIENTE_REF = 'CLI-SIM-0001'
 SITE_CODE = 'SITE-SIM-0001'
 HUB_CODE = 'HUB-SIM-0001'
 AREA_CODE = 'AREA-SIM-EXPURGO'
@@ -29,8 +30,13 @@ def _buscar_id(cliente, model, domain):
 
 def provisionar(cliente):
     partner_id = _buscar_ou_criar(
-        cliente, 'res.partner', [('name', '=', PARTNER_NAME)], {'name': PARTNER_NAME},
+        cliente, 'res.partner', [('name', '=', PARTNER_NAME)],
+        {'name': PARTNER_NAME, 'ref': CLIENTE_REF},
     )
+    # idempotente: se o partner já existia (DB reaproveitada), _buscar_ou_criar não
+    # atualiza — garante que o ref bata com o CLIENTE_ID do gerador_simulado mesmo
+    # em execuções repetidas contra a mesma base.
+    odoo_cliente.executar(cliente, 'res.partner', 'write', [partner_id], {'ref': CLIENTE_REF})
     site_id = _buscar_ou_criar(
         cliente, 'sensor_monitor.site', [('site_code', '=', SITE_CODE)],
         {'name': 'Site Simulado', 'partner_id': partner_id, 'site_code': SITE_CODE, 'vertical': 'cme_hospitalar'},

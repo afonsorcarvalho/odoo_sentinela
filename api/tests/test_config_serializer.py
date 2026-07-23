@@ -132,3 +132,14 @@ def test_canal_sem_cert_emite_identidade():
     disp = next(d for d in bus['dispositivos'] if d['endereco'] == 1)
     canal = next(c for c in disp['canais'] if c['sensor_id'] == SENSOR_CODE)
     assert canal['calibracao'] == {'cert_ver': 0, 'ganho': 1.0, 'offset': 0.0}
+
+
+def test_config_traz_tenant_no_topo():
+    from ingestao import odoo_cliente
+    from api.config_publisher import serializar_config_hub
+    from api.odoo import get_cliente_servico
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_modbus(cliente)
+    cfg = serializar_config_hub(cliente, hub_code)
+    assert cfg['site_id']  # site_code do site do hub
+    assert cfg['cliente_id']  # partner.ref ou CLI-<id>

@@ -86,3 +86,45 @@ def test_serializar_hub_inexistente_levanta_value_error():
         assert False, 'esperado ValueError'
     except ValueError:
         pass
+
+
+def test_canal_carrega_calibracao_vigente():
+    from ingestao import odoo_cliente
+    from api.config_publisher import serializar_config_hub
+    from api.odoo import get_cliente_servico
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+
+    sensor_id = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
+    ex('sensor_monitor.sensor', 'write', [sensor_id], {'conversor_tipo': 'nenhum'})
+    # cert vigente casando o conversor 'nenhum'
+    ex('sensor_monitor.calibracao', 'create', {
+        'sensor_id': sensor_id, 'cert_numero': 'CERT-CFG', 'versao': 7,
+        'cal_ganho': 0.965, 'cal_offset': 0.33,
+        'validade_de': '2020-01-01', 'validade_ate': '2099-12-31',
+        'conversor_tipo_snapshot': 'nenhum'})
+
+    cfg = serializar_config_hub(cliente, hub_code)
+    bus = next(b for b in cfg['barramentos'] if b['porta'] == '/dev/ttyUSB0')
+    disp = next(d for d in bus['dispositivos'] if d['endereco'] == 1)
+    canal = next(c for c in disp['canais'] if c['sensor_id'] == SENSOR_CODE)
+    assert canal['calibracao'] == {'cert_ver': 7, 'ganho': 0.965, 'offset': 0.33}
+
+
+def test_canal_sem_cert_emite_identidade():
+    from ingestao import odoo_cliente
+    from api.config_publisher import serializar_config_hub
+    from api.odoo import get_cliente_servico
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    # garante que o sensor não tem cert casando o conversor atual
+    sensor_id = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
+    ex('sensor_monitor.sensor', 'write', [sensor_id], {'conversor_tipo': '485_0_30v'})
+
+    cfg = serializar_config_hub(cliente, hub_code)
+    bus = next(b for b in cfg['barramentos'] if b['porta'] == '/dev/ttyUSB0')
+    disp = next(d for d in bus['dispositivos'] if d['endereco'] == 1)
+    canal = next(c for c in disp['canais'] if c['sensor_id'] == SENSOR_CODE)
+    assert canal['calibracao'] == {'cert_ver': 0, 'ganho': 1.0, 'offset': 0.0}

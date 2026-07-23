@@ -68,6 +68,23 @@ def test_recuperar_pendentes_sela_dia_passado(tmp_path):
     assert "# assinatura: " in texto
 
 
+def test_caminho_tem_nome_auto_descritivo(tmp_path):
+    arq, _ = _fazer(tmp_path)
+    caminho = arq.caminho("2026-07-21")
+    assert caminho.name == "2026-07-21_HUB-0001-COL-RS485-BUS0_leituras.txt"
+
+
+def test_recuperar_pendentes_sela_dia_passado_com_nome_novo(tmp_path):
+    arq, _ = _fazer(tmp_path)
+    ontem = datetime(2026, 7, 20, 8, 0, tzinfo=TZ)
+    arq.registrar(_leitura(ontem))
+    # simula crash antes de selar: fecha sem selar, reabre em novo dia
+    arq_novo, _ = _fazer(tmp_path, ass=arq._assinador)
+    arq_novo.recuperar_pendentes(date(2026, 7, 21))
+    texto = arq_novo.caminho("2026-07-20").read_text()
+    assert "# assinatura: " in texto
+
+
 def test_arquivo_v2_tem_hdr_sig_e_sig_por_linha(tmp_path, assinador):
     from hub.arquivo_diario import ArquivoDiario
     arq = ArquivoDiario('COL-1', 'HUB-1', '2.3.1', '-03:00', str(tmp_path), assinador,

@@ -47,7 +47,8 @@ class ArquivoDiario:
         self._seq = 1
 
     def caminho(self, data_referencia):
-        return self._dir / f"{data_referencia}_leituras.txt"
+        nome = f"{data_referencia}_{self._hub_id}-{self._coletor_id}_leituras.txt"
+        return self._dir / nome
 
     def _abrir(self, data_referencia):
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -100,6 +101,6 @@ class ArquivoDiario:
 
     def recuperar_pendentes(self, hoje: date):
         for nome in glob.glob(str(self._dir / "*_leituras.txt")):
-            data_str = os.path.basename(nome).replace("_leituras.txt", "")
+            data_str = os.path.basename(nome)[:10]
             if date.fromisoformat(data_str) < hoje and not _esta_selado(Path(nome)):
                 self.selar(data_str)

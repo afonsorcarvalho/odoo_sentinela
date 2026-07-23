@@ -139,6 +139,26 @@ def test_hub_id_com_barra_falha_no_carregar_config(tmp_path):
         config.carregar_config(_escrever(tmp_path, ruim))
 
 
+# --- FIX: _validar_segmento coagia com str(valor) antes de validar, então
+# None (campo em branco no YAML) e bool viravam 'None'/'False' e PASSAVAM na
+# validação — o crash fatal que essa validação existe pra evitar só se movia
+# para mais tarde (_caminho_remoto ou montar_cabecalho -> validar_identificador
+# com o valor bruto ainda None). Ver review: config.yaml preenchido à mão em
+# campo, com uma chave presente e valor em branco, produz None no YAML.
+
+
+def test_cliente_id_em_branco_falha_no_carregar_config(tmp_path):
+    ruim = (VALIDA + "    cliente_id:\n    site_id: SITE-0001\n" + SFTP_BLOCO)
+    with pytest.raises(ValueError, match="cliente_id"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_site_id_booleano_falha_no_carregar_config(tmp_path):
+    ruim = (VALIDA + "    cliente_id: CLI-000123\n    site_id: false\n" + SFTP_BLOCO)
+    with pytest.raises(ValueError, match="site_id"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
 def test_sem_sftp_nao_exige_tenant(tmp_path):
     # hub/config.py também é usado em cenários sem envio (bancada, simulação):
     # sem o bloco sftp ninguém monta caminho remoto, então não há o que exigir.

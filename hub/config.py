@@ -101,8 +101,13 @@ def _validar_segmento(nome_campo, valor, motivo_extra=''):
     o processo do Hub horas depois, no primeiro arquivo selado, parando a leitura
     dos sensores. A mensagem tem que dizer QUAL campo e por quê.
     """
+    if not isinstance(valor, str):
+        raise ValueError(
+            f"'{nome_campo}' inválido: {valor!r} (tipo {type(valor).__name__}) — "
+            f"precisa ser string; valor em branco ou booleano no YAML vira "
+            f"None/True/False, que não é um segmento de path válido.{motivo_extra}")
     try:
-        validar_segmento_path(str(valor))
+        validar_segmento_path(valor)
     except ValueError:
         raise ValueError(
             f"'{nome_campo}' inválido: {valor!r} — precisa ser um segmento de path "

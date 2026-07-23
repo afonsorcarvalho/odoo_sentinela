@@ -16,4 +16,6 @@ OPERACIONAL = {
             {'ch': 1, 'sensor_id': 'SNR-EXP-TEMP-01', 'area_id': 'AREA-EXPURGO',
              'tipo_medida': 'temperatura', 'unidade': 'C', 'protocolo_origem': '4-20ma',
              'map': {'in': [4, 20], 'out': [-50, 150]}}]}]}],
+    # emitidos no topo por api.config_publisher.serializar_config_hub (schema-v2, tenant binding)
+    'cliente_id': 'CLI-43', 'site_id': 'SITE-01',
 }

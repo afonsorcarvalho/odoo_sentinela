@@ -71,7 +71,8 @@ def serializar_config_hub(cliente, hub_code, version=None):
                           [('modbus_register_id', 'in', regs)],
                           fields=['sensor_code', 'modbus_channel', 'ma_in_min', 'ma_in_max',
                                   'eng_out_min', 'eng_out_max', 'filtro_tipo', 'filtro_alpha',
-                                  'unidade', 'protocolo_origem', 'area_id', 'measurement_type_id'])
+                                  'unidade', 'protocolo_origem', 'area_id', 'measurement_type_id',
+                                  'calibracao_vigente_id'])
 
             # area_id/measurement_type_id vêm como (id, display_name) via search_read;
             # o Hub espera os CÓDIGOS (area_code / measurement_type.code), não o nome
@@ -87,6 +88,13 @@ def serializar_config_hub(cliente, hub_code, version=None):
             if tipo_ids:
                 tipos = ex('sensor_monitor.measurement.type', 'read', list(tipo_ids), fields=['code'])
                 tipos_por_id = {t['id']: t['code'] for t in tipos}
+
+            cert_ids = {s['calibracao_vigente_id'][0] for s in sensores if s.get('calibracao_vigente_id')}
+            certs_por_id = {}
+            if cert_ids:
+                certs = ex('sensor_monitor.calibracao', 'read', list(cert_ids),
+                           fields=['versao', 'cal_ganho', 'cal_offset'])
+                certs_por_id = {c['id']: c for c in certs}
 
             canais = []
             for s in sensores:
@@ -104,6 +112,12 @@ def serializar_config_hub(cliente, hub_code, version=None):
                 }
                 if s['filtro_tipo'] != 'none':
                     canal['filtro'] = {'tipo': s['filtro_tipo'], 'alpha': s['filtro_alpha']}
+                cert = certs_por_id.get(s['calibracao_vigente_id'][0]) if s.get('calibracao_vigente_id') else None
+                canal['calibracao'] = {
+                    'cert_ver': cert['versao'] if cert else 0,
+                    'ganho': cert['cal_ganho'] if cert else 1.0,
+                    'offset': cert['cal_offset'] if cert else 0.0,
+                }
                 canais.append(canal)
 
             dispositivos.append({'endereco': dev['slave_address'], 'driver': driver, 'canais': canais})

@@ -31,3 +31,5 @@ access_modbus_profile_register_view,modbus.profile.register.view,model_sensor_mo
 access_modbus_profile_register_admin,modbus.profile.register.admin,model_sensor_monitor_modbus_profile_register,group_sensor_monitor_admin,1,1,1,1
 access_modbus_device_view,modbus.device.view,model_sensor_monitor_modbus_device,group_sensor_monitor_view,1,0,0,0
 access_modbus_device_admin,modbus.device.admin,model_sensor_monitor_modbus_device,group_sensor_monitor_admin,1,1,1,1
+access_calibracao_view,calibracao.view,model_sensor_monitor_calibracao,group_sensor_monitor_view,1,0,0,0
+access_calibracao_admin,calibracao.admin,model_sensor_monitor_calibracao,group_sensor_monitor_admin,1,1,1,1

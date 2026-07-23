@@ -1,0 +1,51 @@
+<odoo>
+    <record id="view_calibracao_list" model="ir.ui.view">
+        <field name="name">sensor_monitor.calibracao.list</field>
+        <field name="model">sensor_monitor.calibracao</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sensor_id"/>
+                <field name="cert_numero"/>
+                <field name="versao"/>
+                <field name="cal_ganho"/>
+                <field name="cal_offset"/>
+                <field name="validade_de"/>
+                <field name="validade_ate"/>
+                <field name="estado"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_calibracao_form" model="ir.ui.view">
+        <field name="name">sensor_monitor.calibracao.form</field>
+        <field name="model">sensor_monitor.calibracao</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="sensor_id"/>
+                        <field name="cert_numero"/>
+                        <field name="versao"/>
+                        <field name="conversor_tipo_snapshot"/>
+                        <field name="estado"/>
+                    </group>
+                    <group string="Correção certificada (aplicada DEPOIS do map — vem do laboratório, tem validade)">
+                        <field name="cal_ganho"/>
+                        <field name="cal_offset"/>
+                        <field name="validade_de"/>
+                        <field name="validade_ate"/>
+                    </group>
+                    <group>
+                        <field name="empresa_calibracao_id"/>
+                        <field name="documento" filename="documento_nome"/>
+                        <field name="documento_nome" invisible="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_calibracao" model="ir.actions.act_window">
+        <field name="name">Calibrações</field>
+        <field name="res_model">sensor_monitor.calibracao</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

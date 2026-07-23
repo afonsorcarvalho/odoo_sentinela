@@ -28,15 +28,43 @@
                         <field name="protocolo_origem"/>
                         <field name="unidade"/>
                         <field name="ativo"/>
+                        <field name="conversor_tipo"/>
                         <field name="modbus_register_id" invisible="protocolo_origem != 'rs485'"/>
                         <field name="modbus_channel" invisible="protocolo_origem != 'rs485'"/>
-                        <field name="ma_in_min" invisible="protocolo_origem != 'rs485'"/>
-                        <field name="ma_in_max" invisible="protocolo_origem != 'rs485'"/>
-                        <field name="eng_out_min" invisible="protocolo_origem != 'rs485'"/>
-                        <field name="eng_out_max" invisible="protocolo_origem != 'rs485'"/>
+                        <field name="ma_in_min" invisible="protocolo_origem != 'rs485'"
+                               help="Faixa do sinal FÍSICO de entrada (ex. 4 mA). NÃO é calibração."/>
+                        <field name="ma_in_max" invisible="protocolo_origem != 'rs485'"
+                               help="Faixa do sinal FÍSICO de entrada (ex. 20 mA). NÃO é calibração."/>
+                        <field name="eng_out_min" invisible="protocolo_origem != 'rs485'"
+                               help="Valor de ENGENHARIA correspondente a ma_in_min (ex. 0 °C)."/>
+                        <field name="eng_out_max" invisible="protocolo_origem != 'rs485'"
+                               help="Valor de ENGENHARIA correspondente a ma_in_max (ex. 150 °C)."/>
                         <field name="filtro_tipo" invisible="protocolo_origem != 'rs485'"/>
                         <field name="filtro_alpha" invisible="protocolo_origem != 'rs485' or filtro_tipo == 'none'"/>
                     </group>
+                    <notebook>
+                        <page string="Calibração">
+                            <p class="text-muted">
+                                Correção CERTIFICADA da malha (ganho/offset do certificado),
+                                aplicada DEPOIS do map. Não confundir com a faixa do map acima
+                                (sinal físico → engenharia) nem com o scale/offset do registrador
+                                Modbus (decode do datasheet). A calibração vem do laboratório e tem validade.
+                            </p>
+                            <field name="calibracao_vigente_id" readonly="1"/>
+                            <field name="calibracao_ids">
+                                <list editable="bottom">
+                                    <field name="cert_numero"/>
+                                    <field name="versao"/>
+                                    <field name="conversor_tipo_snapshot"/>
+                                    <field name="cal_ganho"/>
+                                    <field name="cal_offset"/>
+                                    <field name="validade_de"/>
+                                    <field name="validade_ate"/>
+                                    <field name="estado"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

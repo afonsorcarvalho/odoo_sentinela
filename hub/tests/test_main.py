@@ -133,3 +133,33 @@ def test_main_com_sftp_identity_sem_hub_code_levanta_systemexit(monkeypatch, tmp
                         lambda p: {'hub_id': 'HUB-0001'})  # sem hub_code
     with pytest.raises(SystemExit, match="hub_code"):
         hub_main.main(['--config', 'c.yaml', '--identity', 'identity.yaml'])
+
+
+def test_main_constroi_enviador_sftp_real_com_assinatura_atual(monkeypatch, tmp_path):
+    # Regressão de wiring: os testes acima nunca chegam na construção do
+    # EnviadorSftp (levantam SystemExit antes). Este teste deixa a classe
+    # REAL (não mockada) e força o main() a passar por essa linha, para que
+    # uma quebra de assinatura em hub/main.py (ex.: faltar hub_id=) estoure
+    # um TypeError aqui — e não passe despercebida como antes.
+    _monkeypatch_infra(monkeypatch, tmp_path)
+    monkeypatch.setattr('hub.identidade_config.carregar_identidade',
+                        lambda p: {'hub_code': 'HUB-0001'})
+    monkeypatch.setattr('hub.identidade_ssh.carregar_ou_criar_chave_ssh', lambda p: None)
+    monkeypatch.setattr('hub.agente_config.AgenteControle',
+                        lambda **k: SimpleNamespace(iniciar=lambda: None, parar=lambda: None))
+    capturado = {}
+
+    def _executar_fake(config, leitor, arquivo, publicador, **kwargs):
+        capturado['enviador'] = kwargs.get('enviador')
+
+    monkeypatch.setattr(hub_main, 'executar', _executar_fake)
+
+    hub_main.main(['--config', 'c.yaml', '--identity', 'identity.yaml'])
+
+    from hub.enviador_sftp import EnviadorSftp
+    enviador = capturado['enviador']
+    assert isinstance(enviador, EnviadorSftp)
+    assert enviador._coletor_id == 'COL'
+    assert enviador._cliente_id == 'CLI-1'
+    assert enviador._site_id == 'SITE-1'
+    assert enviador._hub_id == 'HUB'

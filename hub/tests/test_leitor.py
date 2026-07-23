@@ -78,3 +78,18 @@ def test_dispositivo_offline_vira_sensor_offline(tmp_path):
     leituras = leitor.ler_todos(datetime(2026, 7, 21, 0, 1, tzinfo=TZ))
     assert leituras[0]["status_leitura"] == "sensor_offline"
     assert leituras[0]["valor"] == 0.0
+
+
+def test_normalizar_aplica_calibracao_e_carimba_coeficientes():
+    from hub.config import CanalConfig
+    from hub.leitor import Leitor
+    canal = CanalConfig(
+        ch=1, sensor_id='SNR-1', area_id='EXPURGO', tipo_medida='temperatura',
+        unidade='C', protocolo_origem='4-20ma', map_in=(4, 20), map_out=(0, 150),
+        calibracao={'cert_ver': 3, 'ganho': 0.965, 'offset': 0.33})
+    # nominal (já mapeado pelo backend) = 100.0 → corrigido = 0.965*100 + 0.33 = 96.83
+    leitura = Leitor._normalizar(object.__new__(Leitor), canal, 100.0, 'ok', 'AGORA')
+    assert leitura['cert_ver'] == 3
+    assert leitura['cal_ganho'] == 0.965
+    assert leitura['cal_offset'] == 0.33
+    assert abs(leitura['valor'] - 96.83) < 1e-9

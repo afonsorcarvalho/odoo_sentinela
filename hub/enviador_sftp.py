@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Protocol
 
 from hub.arquivo_diario import _esta_selado
+from contrato.formato import validar_segmento_path
 
 
 class Transporte(Protocol):
@@ -18,7 +19,12 @@ class Transporte(Protocol):
 
 
 class EnviadorSftp:
-    def __init__(self, coletor_id, caminho_dados, transporte, caminho_estado=None):
+    def __init__(self, coletor_id, caminho_dados, transporte,
+                 cliente_id, site_id, hub_id, caminho_estado=None):
+        self._coletor_id = coletor_id
+        self._cliente_id = cliente_id
+        self._site_id = site_id
+        self._hub_id = hub_id
         self._dir = Path(caminho_dados).expanduser() / coletor_id
         self._transporte = transporte
         self._estado_path = Path(caminho_estado) if caminho_estado else self._dir / "_enviados.json"
@@ -33,14 +39,23 @@ class EnviadorSftp:
         self._estado_path.parent.mkdir(parents=True, exist_ok=True)
         self._estado_path.write_text(json.dumps(self._enviados, indent=2))
 
+    def _caminho_remoto(self, nome):
+        data = nome[:10]              # AAAA-MM-DD
+        ano, mes, dia = data[:4], data[5:7], data[8:10]
+        for seg in (self._cliente_id, self._site_id, self._hub_id, self._coletor_id):
+            validar_segmento_path(seg)
+        return "/".join([self._cliente_id, ano, mes, dia,
+                         self._site_id, self._hub_id, self._coletor_id, nome])
+
     def varrer(self):
         enviados_agora = []
         for caminho in sorted(self._dir.glob("*_leituras.txt")):
             nome = caminho.name
             if nome in self._enviados or not _esta_selado(caminho):
                 continue
+            remoto = self._caminho_remoto(nome)
             try:
-                self._transporte.enviar(str(caminho), nome)
+                self._transporte.enviar(str(caminho), remoto)
             except Exception:
                 continue  # falha não-fatal; retry no próximo varrer
             self._enviados[nome] = {"enviado_em": datetime.now(timezone.utc).isoformat()}

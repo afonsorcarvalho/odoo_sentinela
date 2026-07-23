@@ -38,17 +38,21 @@ def test_envia_selado_nao_enviado(tmp_path):
     d = _dir(tmp_path)
     _selado(d, "2026-07-21_leituras.txt")
     t = _TransporteFake()
-    env = EnviadorSftp(COLETOR, tmp_path / "dados", t)
+    env = EnviadorSftp(COLETOR, tmp_path / "dados", t,
+                       cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
     enviados = env.varrer()
     assert enviados == ["2026-07-21_leituras.txt"]
-    assert t.enviados == ["2026-07-21_leituras.txt"]
+    assert t.enviados == [
+        f"CLI-1/2026/07/21/SITE-1/HUB-0001/{COLETOR}/2026-07-21_leituras.txt"
+    ]
 
 
 def test_ignora_aberto_nao_selado(tmp_path):
     d = _dir(tmp_path)
     _aberto(d, "2026-07-22_leituras.txt")
     t = _TransporteFake()
-    env = EnviadorSftp(COLETOR, tmp_path / "dados", t)
+    env = EnviadorSftp(COLETOR, tmp_path / "dados", t,
+                       cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
     assert env.varrer() == []
     assert t.enviados == []
 
@@ -57,32 +61,52 @@ def test_nao_reenvia(tmp_path):
     d = _dir(tmp_path)
     _selado(d, "2026-07-21_leituras.txt")
     t = _TransporteFake()
-    env = EnviadorSftp(COLETOR, tmp_path / "dados", t)
+    env = EnviadorSftp(COLETOR, tmp_path / "dados", t,
+                       cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
     env.varrer()
     assert env.varrer() == []          # segunda varredura não reenvia
-    assert t.enviados == ["2026-07-21_leituras.txt"]
+    assert t.enviados == [
+        f"CLI-1/2026/07/21/SITE-1/HUB-0001/{COLETOR}/2026-07-21_leituras.txt"
+    ]
 
 
 def test_falha_deixa_pendente_para_retry(tmp_path):
     d = _dir(tmp_path)
     _selado(d, "2026-07-21_leituras.txt")
     falho = _TransporteFake(falhar=True)
-    env = EnviadorSftp(COLETOR, tmp_path / "dados", falho)
+    env = EnviadorSftp(COLETOR, tmp_path / "dados", falho,
+                       cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
     assert env.varrer() == []          # falhou, nada registrado
     ok = _TransporteFake()
-    env2 = EnviadorSftp(COLETOR, tmp_path / "dados", ok)
+    env2 = EnviadorSftp(COLETOR, tmp_path / "dados", ok,
+                        cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
     assert env2.varrer() == ["2026-07-21_leituras.txt"]   # retry envia
 
 
 def test_estado_persiste_entre_instancias(tmp_path):
     d = _dir(tmp_path)
     _selado(d, "2026-07-21_leituras.txt")
-    EnviadorSftp(COLETOR, tmp_path / "dados", _TransporteFake()).varrer()
+    EnviadorSftp(COLETOR, tmp_path / "dados", _TransporteFake(),
+                cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001").varrer()
     estado = json.loads((d / "_enviados.json").read_text())
     assert "2026-07-21_leituras.txt" in estado
     # nova instância lê o estado e não reenvia
-    env2 = EnviadorSftp(COLETOR, tmp_path / "dados", _TransporteFake())
+    env2 = EnviadorSftp(COLETOR, tmp_path / "dados", _TransporteFake(),
+                        cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
     assert env2.varrer() == []
+
+
+def test_envia_com_subcaminho_da_arvore(tmp_path):
+    d = _dir(tmp_path)
+    nome = "2026-07-21_HUB-0001-COL-RS485-BUS0_leituras.txt"
+    _selado(d, nome)
+    t = _TransporteFake()
+    env = EnviadorSftp(COLETOR, tmp_path / "dados", t,
+                       cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
+    env.varrer()
+    assert t.enviados == [
+        f"CLI-1/2026/07/21/SITE-1/HUB-0001/{COLETOR}/{nome}"
+    ]
 
 
 def test_transporte_paramiko_conecta_autentica_e_poe(tmp_path):

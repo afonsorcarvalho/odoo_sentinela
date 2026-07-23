@@ -23,11 +23,11 @@ def _tz(offset):
 
 
 def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=None,
-             enviador=None, reconfigurar=None, caminho_config=None):
+             enviador=None, reconfigurar=None, caminho_config=None, arquivo_factory=None):
     intervalo = config.intervalo_leitura_s
 
     def _recarregar():
-        nonlocal config, leitor, intervalo
+        nonlocal config, leitor, arquivo, intervalo
         # Constrói a config/leitor NOVOS antes de tocar no leitor antigo: se
         # carregar_config/Leitor levantar (ex. serial /dev/ttyUSB0 ocupada),
         # o leitor antigo continua aberto e funcionando (não vira brick).
@@ -42,6 +42,8 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
         leitor = novo_leitor
         config = nova_config
         intervalo = config.intervalo_leitura_s
+        if arquivo_factory is not None:
+            arquivo = arquivo_factory(nova_config)
         reconfigurar.clear()
 
     arquivo.recuperar_pendentes(agora_fn().date())
@@ -84,9 +86,13 @@ def main(argv=None):
     cfg = config_mod.carregar_config(args.config)
     tz = _tz(cfg.timezone_offset)
     assinador = AssinadorSoftware(cfg.caminho_chave)
-    arquivo = ArquivoDiario(cfg.coletor_id, cfg.hub_id, cfg.firmware_version,
-                            cfg.timezone_offset, cfg.caminho_dados, assinador,
-                            cliente_id=cfg.cliente_id, site_id=cfg.site_id)
+
+    def _novo_arquivo(c):
+        return ArquivoDiario(c.coletor_id, c.hub_id, c.firmware_version,
+                             c.timezone_offset, c.caminho_dados, assinador,
+                             cliente_id=c.cliente_id, site_id=c.site_id)
+
+    arquivo = _novo_arquivo(cfg)
     leitor = Leitor(cfg)
     publicador = PublicadorMqtt(cfg.mqtt_host, cfg.mqtt_port)
     enviador = None
@@ -124,7 +130,8 @@ def main(argv=None):
     try:
         executar(cfg, leitor, arquivo, publicador,
                  agora_fn=lambda: datetime.now(tz), parar=parar, enviador=enviador,
-                 reconfigurar=reconfigurar, caminho_config=args.config)
+                 reconfigurar=reconfigurar, caminho_config=args.config,
+                 arquivo_factory=_novo_arquivo)
     finally:
         if agente is not None:
             agente.parar()

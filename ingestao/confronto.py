@@ -38,7 +38,7 @@ def _ts_utc_iso(timestamp_iso):
     return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def confrontar_arquivo(caminho, registro_path, conn):
+def confrontar_arquivo(caminho, registro_path, conn, coletor_esperado=None, data_esperada=None):
     rv = validador.validar_arquivo(caminho, registro_path)
 
     # Parte 1: assinaturas
@@ -50,12 +50,37 @@ def confrontar_arquivo(caminho, registro_path, conn):
             assinaturas_ok=False, valores_ok=False, arquivo_nao_fechado=False,
             motivo=f'assinatura inválida: {rv.motivo_rejeicao}')
 
+    # Anti-substituição: um arquivo válido e corretamente assinado, mas de OUTRO
+    # coletor/data/tipo, colocado no lugar do arquivo pedido, não pode passar por
+    # confronto "limpo" — ele nunca é comparado contra os dados do coletor real.
+    if coletor_esperado is not None and (
+            rv.coletor_id != coletor_esperado
+            or rv.data_referencia != data_esperada
+            or rv.tipo_arquivo != 'leituras'):
+        return ResultadoConfronto(
+            coletor_id=rv.coletor_id, data_referencia=rv.data_referencia,
+            assinaturas_ok=False, valores_ok=False, arquivo_nao_fechado=False,
+            motivo='identidade do arquivo diverge do solicitado (coletor/data/tipo)')
+
     # Parte 2: value-match contra o Timescale
     linhas = rv.leituras
     if not linhas:
+        injetadas = []
+        if conn is not None:
+            # Dia assinado sem nenhuma leitura: mesmo sem chaves de arquivo pra
+            # comparar, qualquer row no Timescale pro dia é fabricada. Janela é o
+            # dia UTC inteiro derivado de data_referencia — pode errar/sobrar nas
+            # bordas de timezone, mas um dia vazio assinado com QUALQUER row já é
+            # alerta por si só.
+            ts_inicio = datetime.fromisoformat(rv.data_referencia + 'T00:00:00+00:00')
+            ts_fim = ts_inicio + timedelta(days=1)
+            mapa_vazio = timescale.buscar_leituras_para_confronto(
+                conn, rv.coletor_id, ts_inicio, ts_fim)
+            injetadas = [{'sensor_id': s, 'timestamp': ts} for (s, ts) in mapa_vazio]
         return ResultadoConfronto(
             coletor_id=rv.coletor_id, data_referencia=rv.data_referencia,
-            assinaturas_ok=True, valores_ok=True, arquivo_nao_fechado=arquivo_nao_fechado)
+            assinaturas_ok=True, valores_ok=(not injetadas),
+            arquivo_nao_fechado=arquivo_nao_fechado, injetadas_timescale=injetadas)
 
     ts_chaves = [_ts_utc_iso(l['timestamp']) for l in linhas]
     ts_inicio = min(datetime.fromisoformat(k) for k in ts_chaves)
@@ -77,12 +102,13 @@ def confrontar_arquivo(caminho, registro_path, conn):
             })
 
     # count-match reverso: rows no Timescale sem contraparte assinada = injeção.
-    # Só confiável quando o arquivo está fechado (senão pode ser cauda legítima
-    # que o crash não gravou no arquivo).
-    injetadas = []
-    if not arquivo_nao_fechado:
-        injetadas = [{'sensor_id': s, 'timestamp': ts}
-                     for (s, ts) in mapa if (s, ts) not in chaves_arquivo]
+    # SEMPRE ativo, mesmo em arquivo incompleto (footerless): a janela de busca é
+    # [min_ts, max_ts+1s) onde max_ts é a ÚLTIMA linha verificada por cadeia — uma
+    # cauda legítima não gravada (crash) fica DEPOIS de max_ts, fora da janela.
+    # Tudo que aparece dentro de [min_ts, max_ts] e não tem par no arquivo é
+    # injeção comprovada, arquivo selado ou não.
+    injetadas = [{'sensor_id': s, 'timestamp': ts}
+                 for (s, ts) in mapa if (s, ts) not in chaves_arquivo]
 
     return ResultadoConfronto(
         coletor_id=rv.coletor_id, data_referencia=rv.data_referencia,
@@ -101,7 +127,9 @@ def confrontar_periodo(diretorio_arquivos, coletor_id, datas, registro_path, con
                 assinaturas_ok=False, valores_ok=False, arquivo_nao_fechado=False,
                 motivo='arquivo ausente no acervo (fonte da verdade faltando)'))
             continue
-        resultados.append(confrontar_arquivo(str(caminho), registro_path, conn))
+        resultados.append(confrontar_arquivo(
+            str(caminho), registro_path, conn,
+            coletor_esperado=coletor_id, data_esperada=data))
     return resultados
 
 
@@ -133,6 +161,12 @@ def main(argv=None):
             args.registro, conn)
     finally:
         conn.close()
+
+    if not resultados:
+        print(f"[ERRO] período vazio ou invertido (--de {args.de} --ate {args.ate}): "
+              f"nenhum dia a confrontar — gate de auditoria não pode dar all-clear "
+              f"silencioso sobre um range vazio.")
+        return 2
 
     houve_alerta = False
     for r in resultados:

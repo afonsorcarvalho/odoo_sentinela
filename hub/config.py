@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from contrato.formato import validar_identificador
+from contrato.formato import validar_identificador, validar_segmento_path
 
 
 @dataclass
@@ -93,10 +93,31 @@ def _canal(bruto):
     )
 
 
+def _validar_segmento(nome_campo, valor, motivo_extra=''):
+    """Valida na ENTRADA um campo que vira segmento de path (local e/ou remoto).
+
+    Falhar aqui é falhar no boot, alto e claro. Sem isso, o ValueError cru nascia
+    lá no EnviadorSftp._caminho_remoto — fora do try/except do varrer — e derrubava
+    o processo do Hub horas depois, no primeiro arquivo selado, parando a leitura
+    dos sensores. A mensagem tem que dizer QUAL campo e por quê.
+    """
+    try:
+        validar_segmento_path(str(valor))
+    except ValueError:
+        raise ValueError(
+            f"'{nome_campo}' inválido: {valor!r} — precisa ser um segmento de path "
+            f"simples (não pode ser vazio, '.', '..' nem conter '/' ou '\\'); "
+            f"ele vira um diretório no caminho do arquivo.{motivo_extra}")
+
+
 def carregar_config(caminho):
     dados = yaml.safe_load(Path(caminho).read_text())
     for campo in ("hub_id", "coletor_id"):
         validar_identificador(str(dados[campo]))
+        # hub_id e coletor_id compõem o nome do arquivo e o caminho remoto, e
+        # coletor_id é também o diretório LOCAL de dados: validar na entrada
+        # cobre os dois lados de uma vez.
+        _validar_segmento(campo, dados[campo])
     barramentos = []
     for bus in dados["barramentos"]:
         dispositivos = [
@@ -118,6 +139,15 @@ def carregar_config(caminho):
         for campo in ("host", "username", "ssh_key_path"):
             if not bloco_sftp.get(campo):
                 raise ValueError(f"sftp.{campo} é obrigatório quando 'sftp' está presente")
+        # cliente_id/site_id só são exigidos quando há envio: o EnviadorSftp monta
+        # {cliente}/AAAA/MM/DD/{site}/{hub}/{coletor}/ e não tem como sem eles.
+        # Sem o bloco 'sftp' (bancada, simulação, hub sem transporte) ninguém monta
+        # caminho remoto, e exigir tenant só quebraria esses cenários.
+        for campo in ("cliente_id", "site_id"):
+            _validar_segmento(
+                campo, dados.get(campo, ''),
+                motivo_extra=" É obrigatório quando o bloco 'sftp' está presente, "
+                             "porque compõe o caminho remoto do envio.")
         sftp = SftpConfig(
             host=bloco_sftp["host"], port=int(bloco_sftp.get("port", 22)),
             username=bloco_sftp["username"], ssh_key_path=bloco_sftp["ssh_key_path"],

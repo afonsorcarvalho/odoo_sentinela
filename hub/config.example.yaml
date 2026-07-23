@@ -1,5 +1,12 @@
 hub_id: HUB-0001A2F3
 coletor_id: COL-RS485-BUS0        # "coletor lógico" deste barramento RS-485
+# tenant — vai no cabeçalho assinado E na árvore remota de uploads
+# ({cliente}/AAAA/MM/DD/{site}/{hub}/{coletor}/). Obrigatórios quando há bloco
+# `sftp`; devem casar com o cadastro no Odoo (cliente_id = `ref` do partner,
+# site_id = `site_code`), senão a ingestão rejeita com "tenant do header diverge".
+# Sem '/', '\', vazio, '.' ou '..' — o Hub falha no boot se forem inválidos.
+cliente_id: CLI-000123
+site_id: SITE-0001
 firmware_version: 0.1.0
 timezone_offset: "-03:00"
 intervalo_leitura_s: 60            # default; use 5 em teste

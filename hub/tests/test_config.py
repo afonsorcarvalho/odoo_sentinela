@@ -71,13 +71,21 @@ SFTP_BLOCO = """
 """
 
 
+# tenant: obrigatório junto com o bloco sftp (o EnviadorSftp monta
+# {cliente}/AAAA/MM/DD/{site}/{hub}/{coletor}/ e não tem como sem eles).
+TENANT = """
+    cliente_id: CLI-000123
+    site_id: SITE-0001
+"""
+
+
 def test_sem_sftp_fica_none(tmp_path):
     cfg = config.carregar_config(_escrever(tmp_path, VALIDA))
     assert cfg.sftp is None
 
 
 def test_com_sftp_carrega(tmp_path):
-    cfg = config.carregar_config(_escrever(tmp_path, VALIDA + SFTP_BLOCO))
+    cfg = config.carregar_config(_escrever(tmp_path, VALIDA + TENANT + SFTP_BLOCO))
     assert cfg.sftp.host == "192.168.0.10"
     assert cfg.sftp.port == 2022
     assert cfg.sftp.username == "hub-0001A2F3"
@@ -85,9 +93,57 @@ def test_com_sftp_carrega(tmp_path):
 
 
 def test_sftp_sem_host_falha(tmp_path):
-    ruim = VALIDA + SFTP_BLOCO.replace("host: 192.168.0.10", "port: 2022")
-    with pytest.raises(ValueError):
+    ruim = (VALIDA + TENANT
+            + SFTP_BLOCO.replace("host: 192.168.0.10", "port: 2022"))
+    with pytest.raises(ValueError, match="sftp.host"):
         config.carregar_config(_escrever(tmp_path, ruim))
+
+
+# --- FIX C4: segmento de tenant inválido matava o processo do Hub ---
+# _caminho_remoto chama validar_segmento_path FORA do try/except do varrer: o
+# ValueError subia por varrer() -> executar() e derrubava o Hub (parava de ler
+# sensores) horas depois do boot, no primeiro arquivo selado. cliente_id/site_id
+# eram opcionais com default '' e o config.example.yaml não os trazia, então
+# `segmento de path inválido: ''` era o caminho normal, não o excepcional.
+
+
+def test_sftp_sem_cliente_id_falha_no_carregar_config(tmp_path):
+    ruim = VALIDA + "    site_id: SITE-0001\n" + SFTP_BLOCO
+    with pytest.raises(ValueError, match="cliente_id"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_sftp_sem_site_id_falha_no_carregar_config(tmp_path):
+    ruim = VALIDA + "    cliente_id: CLI-000123\n" + SFTP_BLOCO
+    with pytest.raises(ValueError, match="site_id"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_cliente_id_com_barra_falha_no_carregar_config(tmp_path):
+    ruim = (VALIDA + TENANT.replace("CLI-000123", "CLI/000123") + SFTP_BLOCO)
+    with pytest.raises(ValueError, match="cliente_id"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_coletor_id_com_barra_falha_no_carregar_config(tmp_path):
+    # coletor_id também é diretório LOCAL (ArquivoDiario/EnviadorSftp): validar
+    # na entrada cobre local e remoto de uma vez (Minor #1 do review).
+    ruim = VALIDA.replace("coletor_id: COL-RS485-BUS0", "coletor_id: ../escapa")
+    with pytest.raises(ValueError, match="coletor_id"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_hub_id_com_barra_falha_no_carregar_config(tmp_path):
+    ruim = VALIDA.replace("hub_id: HUB-0001", "hub_id: HUB/0001")
+    with pytest.raises(ValueError, match="hub_id"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_sem_sftp_nao_exige_tenant(tmp_path):
+    # hub/config.py também é usado em cenários sem envio (bancada, simulação):
+    # sem o bloco sftp ninguém monta caminho remoto, então não há o que exigir.
+    cfg = config.carregar_config(_escrever(tmp_path, VALIDA))
+    assert cfg.cliente_id == "" and cfg.site_id == ""
 
 
 def test_hubconfig_carrega_tenant_e_calibracao_do_canal(tmp_path):

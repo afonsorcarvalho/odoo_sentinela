@@ -4,6 +4,7 @@ import { useLiveTail } from '../../lib/useLiveTail'
 import { useCountUp } from '../../lib/useCountUp'
 import { useFitText } from '../../lib/useFitText'
 import { usePrefersReducedMotion } from '../../lib/useSensorCarousel'
+import { formatKpi } from '../../lib/kpiFormat'
 import { statusTextColor } from '../statusVisuals'
 import type { StatusResult } from '../../lib/status'
 
@@ -29,11 +30,15 @@ export function KpiWidget({
   label,
   limiteMin,
   limiteMax,
+  casasDecimais,
+  digitosInteiros,
 }: {
   sensorCode: string
   label?: string
   limiteMin?: number
   limiteMax?: number
+  casasDecimais?: number
+  digitosInteiros?: number
 }) {
   const meta = useSensorMeta(sensorCode)
   const { last } = useLiveTail(sensorCode)
@@ -52,9 +57,10 @@ export function KpiWidget({
   const rawValue = last?.value ?? null
   const animated = useCountUp(rawValue)
   const reducedMotion = usePrefersReducedMotion()
-  // Preserva as casas decimais do valor bruto durante a interpolação.
-  const casas = rawValue != null && !Number.isInteger(rawValue) ? Math.min(String(rawValue).split('.')[1]?.length ?? 1, 3) : 0
-  const displayValue = animated != null ? animated.toFixed(casas) : '—'
+  // Formatação: casasDecimais/digitosInteiros vêm das options do widget; ausentes
+  // caem no auto histórico (casas detectadas do valor bruto, cap 3; sem padding).
+  const displayValue =
+    animated != null ? formatKpi(animated, { casasDecimais, digitosInteiros }) : '—'
 
   // O valor escala para preencher a caixa (largura e altura) via useFitText.
   // Reajusta quando: o comprimento do texto muda (mais/menos dígitos — largura

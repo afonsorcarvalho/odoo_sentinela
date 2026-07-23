@@ -52,6 +52,8 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetDescriptor> = {
           label={w.options?.label as string | undefined}
           limiteMin={w.options?.limiteMin as number | undefined}
           limiteMax={w.options?.limiteMax as number | undefined}
+          casasDecimais={w.options?.casasDecimais as number | undefined}
+          digitosInteiros={w.options?.digitosInteiros as number | undefined}
         />
       : <WidgetPlaceholder texto="Configurar sensor" />,
   },

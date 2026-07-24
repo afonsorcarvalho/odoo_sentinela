@@ -125,6 +125,47 @@ def _cfg2(tmp_path):
     return config.carregar_config(p)
 
 
+CFG_2CANAIS = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-1
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+              - ch: 2
+                sensor_id: SNR-2
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+"""
+
+
+def _cfg_2canais(tmp_path):
+    p = tmp_path / "c3.yaml"
+    p.write_text(textwrap.dedent(CFG_2CANAIS))
+    return config.carregar_config(p)
+
+
 def test_ler_todos_normaliza(tmp_path):
     leitor = Leitor(_cfg(tmp_path), backend=_BackendFake(_DriverFake()))
     agora = datetime(2026, 7, 21, 0, 1, tzinfo=TZ)
@@ -170,3 +211,31 @@ def test_indexerror_num_dispositivo_nao_derruba_os_outros(tmp_path):
     assert por_sensor["SNR-BOM"]["valor"] == 42.0
     assert por_sensor["SNR-RUIM"]["status_leitura"] == "sensor_offline"
     assert por_sensor["SNR-RUIM"]["valor"] == 0.0
+
+
+def test_falha_em_canal_do_meio_nao_deixa_leitura_ok_duplicada(tmp_path):
+    """Dispositivo com 2 canais: ch1 lê ok, ch2 estoura (TypeError em float(None)).
+
+    Antes do fix, ch1 já tinha sido `leituras.append(...ok...)` dentro do try
+    quando ch2 lança — e o `except` reprocessava TODOS os canais do
+    dispositivo como sensor_offline, gerando 2 entradas para SNR-1 (uma ok,
+    uma sensor_offline) além da entrada sensor_offline de SNR-2. O contrato é
+    uma leitura por sensor_id por varredura.
+    """
+    driver = _DriverFake([
+        {"channel": 1, "value": 50.0, "unit": "C"},
+        {"channel": 2, "value": None, "unit": "C"},
+    ])
+    backend = _BackendFake(driver)
+    leitor = Leitor(_cfg_2canais(tmp_path), backend=backend)
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+
+    sensor_ids = [r["sensor_id"] for r in leituras]
+    assert sorted(sensor_ids) == ["SNR-1", "SNR-2"]
+    assert len(leituras) == 2  # uma leitura por sensor_id, sem duplicata
+
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+    assert por_sensor["SNR-1"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-1"]["valor"] == 0.0
+    assert por_sensor["SNR-2"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-2"]["valor"] == 0.0

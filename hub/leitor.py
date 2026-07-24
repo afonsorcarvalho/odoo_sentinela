@@ -50,21 +50,23 @@ class Leitor:
             try:
                 lidos = disp.driver.read_channels(maps=self._specs(disp.canais))
                 por_canal = {e["channel"]: e for e in lidos}
+                leituras_disp = []
                 for canal in disp.canais:
                     entrada = por_canal.get(canal.ch)
                     if entrada is None:
-                        leituras.append(self._normalizar(canal, 0.0, "erro_leitura", agora))
+                        leituras_disp.append(self._normalizar(canal, 0.0, "erro_leitura", agora))
                     else:
-                        leituras.append(self._normalizar(canal, float(entrada["value"]), "ok", agora))
+                        leituras_disp.append(self._normalizar(canal, float(entrada["value"]), "ok", agora))
             except Exception as e:
                 chave = id(disp)
                 if chave not in self._falhados:
                     self._falhados.add(chave)
                     print(f"[hub] leitura falhou, dispositivo offline: "
-                          f"driver={disp.canais[0].sensor_id if disp.canais else '?'} erro={e!r}")
+                          f"sensor={disp.canais[0].sensor_id if disp.canais else '?'} erro={e!r}")
                 for canal in disp.canais:
                     leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))
             else:
+                leituras.extend(leituras_disp)
                 self._falhados.discard(id(disp))
         return leituras
 

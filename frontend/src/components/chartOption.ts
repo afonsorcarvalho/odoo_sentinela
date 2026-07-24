@@ -1,5 +1,6 @@
 import type { EChartsOption } from 'echarts'
 import type { HistoryResponse, Threshold, LivePoint } from '../lib/types'
+import { DEFAULT_STALE_MS } from '../lib/freshness'
 
 export type Banda = { inicio: number; fim: number; direcao: 'acima' | 'abaixo' }
 
@@ -82,6 +83,15 @@ export function buildChartOption(
   // com os dados ja mesclados (custo O(historico+cauda) ~1000 pts/tick,
   // trivial; nenhuma pressao no banco pois nada e refetchado).
   tail: LivePoint[] = [],
+  // Instante "agora" para decidir a faixa de silencio. Nunca lido internamente
+  // via Date.now() — buildChartOption fica pura/determinista/testavel; quem
+  // chama em runtime (TimeSeriesChart) passa Date.now().
+  now?: number,
+  // Cor da faixa X fora-de-limite (markArea). Mesmo motivo do critColor: sem
+  // valor resolvido concreto, canvas nao pinta var(--...).
+  critSoftColor: string = 'var(--color-crit-soft)',
+  // Cor da faixa cinza de silencio (sem dado). Idem.
+  mutedColor: string = 'var(--color-muted)',
 ): EChartsOption {
   const histData: [number, number][] = history
     ? history.points.map((p) => [p.ts, 'value' in p ? p.value : p.avg])
@@ -105,17 +115,39 @@ export function buildChartOption(
       }
     : undefined
 
-  const markArea = threshold
-    ? {
-        itemStyle: { color: goodSoftColor, opacity: 0.5 },
-        // markArea 2D espera pares [inicio, fim]; tipar como tupla p/ o TS não
-        // inferir array de tamanho variável (MarkArea2DDataItemOption exige 2).
-        data: [[{ yAxis: threshold.limite_min }, { yAxis: threshold.limite_max }]] as [
-          { yAxis: number },
-          { yAxis: number },
-        ][],
-      }
-    : undefined
+  // markArea unico por serie: acumula faixa verde (Y) + faixas fora-limite (X)
+  // + faixa de silencio (X). itemStyle agora e POR ITEM (cores diferem), entao
+  // sai do root. Ordem = z-order: verde (fundo) -> vermelhas -> cinza.
+  type AreaPair = [Record<string, unknown>, Record<string, unknown>]
+  const areaData: AreaPair[] = []
+
+  if (threshold) {
+    areaData.push([
+      { yAxis: threshold.limite_min, itemStyle: { color: goodSoftColor, opacity: 0.5 } },
+      { yAxis: threshold.limite_max },
+    ])
+    for (const b of computeOutOfRangeBands(data, threshold)) {
+      areaData.push([
+        { xAxis: b.inicio, itemStyle: { color: critSoftColor, opacity: 0.55 }, name: `${b.direcao} do limite` },
+        { xAxis: b.fim },
+      ])
+    }
+  }
+
+  // Faixa de silencio: do ultimo ponto ate `now`, se o silencio ja passou de
+  // stale. Gatilho por gap de dado (nao pelo tier), calculado aqui a partir de
+  // `now` -- assim o dashboard abrindo com sensor parado ha 1h ja mostra o buraco.
+  if (now != null && data.length > 0) {
+    const ultimoTs = data[data.length - 1][0]
+    if (now - ultimoTs > DEFAULT_STALE_MS) {
+      areaData.push([
+        { xAxis: ultimoTs, itemStyle: { color: mutedColor, opacity: 0.25 }, name: 'sem dado' },
+        { xAxis: now },
+      ])
+    }
+  }
+
+  const markArea = areaData.length ? { data: areaData } : undefined
 
   // Eixo Y: garante que as linhas de limite fiquem SEMPRE visiveis (elas sao o
   // ponto do readout de instrumento — ver a leitura relativa a faixa segura).

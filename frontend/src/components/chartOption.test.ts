@@ -73,7 +73,10 @@ describe('buildChartOption', () => {
     const threshold = { sensor_id: 'A', limite_min: 10, limite_max: 20, is_valor_padrao_regulatorio: false }
     const option = buildChartOption(undefined, threshold)
     const markArea = (option.series as any)[0].markArea
-    expect(markArea.data).toEqual([[{ yAxis: 10 }, { yAxis: 20 }]])
+    // itemStyle agora vive no item (nao mais na raiz do markArea) — ver Task 2.
+    expect(markArea.data).toEqual([
+      [{ yAxis: 10, itemStyle: { color: 'var(--color-good-soft)', opacity: 0.5 } }, { yAxis: 20 }],
+    ])
   })
   it('sem threshold, series[0].markArea e undefined', () => {
     const option = buildChartOption(undefined, null)
@@ -81,7 +84,41 @@ describe('buildChartOption', () => {
   })
   it('usa a cor resolvida recebida no markArea, nao a custom property crua', () => {
     const opt = buildChartOption(hist, t, undefined, '#00ff00') as any
-    expect(opt.series[0].markArea.itemStyle.color).toBe('#00ff00')
+    // itemStyle agora vive no item (nao mais na raiz do markArea) — ver Task 2.
+    expect(opt.series[0].markArea.data[0][0].itemStyle.color).toBe('#00ff00')
+  })
+
+  it('desenha faixa X vermelha quando a serie sai do limite', () => {
+    const h: HistoryResponse = {
+      sensor_code: 'S', window: '1h', resolution: 'raw',
+      points: [{ ts: 0, value: 20 }, { ts: 100, value: 25 }, { ts: 200, value: 20 }],
+    }
+    const opt = buildChartOption(h, t) as any
+    const areas = opt.series[0].markArea.data as any[]
+    // primeiro item e a faixa verde em Y (yAxis); deve haver ao menos um item X (xAxis)
+    const xBands = areas.filter((pair) => 'xAxis' in pair[0])
+    expect(xBands.length).toBeGreaterThanOrEqual(1)
+    expect(xBands[0][0].name).toMatch(/acima do limite/)
+  })
+
+  it('faixa verde de conformidade continua presente (primeiro item, em Y)', () => {
+    const opt = buildChartOption(hist, t) as any
+    const areas = opt.series[0].markArea.data as any[]
+    expect('yAxis' in areas[0][0]).toBe(true)
+  })
+
+  it('desenha faixa de silencio quando now esta muito alem do ultimo ponto', () => {
+    const opt = buildChartOption(hist, t, undefined, undefined, [], 2000 + 6 * 60_000) as any
+    const areas = opt.series[0].markArea.data as any[]
+    const silencio = areas.filter((pair) => 'xAxis' in pair[0] && pair[1].xAxis === 2000 + 6 * 60_000)
+    expect(silencio).toHaveLength(1)
+  })
+
+  it('nao desenha faixa de silencio quando now esta perto do ultimo ponto', () => {
+    const opt = buildChartOption(hist, t, undefined, undefined, [], 2000 + 60_000) as any
+    const areas = (opt.series[0].markArea?.data ?? []) as any[]
+    const silencio = areas.filter((pair) => 'xAxis' in pair[0] && pair[1].xAxis === 2000 + 60_000)
+    expect(silencio).toHaveLength(0)
   })
 })
 

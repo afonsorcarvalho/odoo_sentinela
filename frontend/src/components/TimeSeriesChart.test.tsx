@@ -7,6 +7,17 @@ vi.mock('echarts', () => ({
   init: () => ({ setOption, dispose, resize: vi.fn() }),
 }))
 
+// Espia buildChartOption para verificar que TimeSeriesChart repassa `now` e a
+// cor resolvida de `--color-muted` na posicao correta (assinatura da Task 2).
+// Delega para a implementacao real (importOriginal) para nao quebrar os
+// testes existentes, que leem os dados de serie de verdade via lastSeriesData().
+const buildSpy = vi.hoisted(() => vi.fn())
+vi.mock('./chartOption', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./chartOption')>()
+  buildSpy.mockImplementation(actual.buildChartOption)
+  return { ...actual, buildChartOption: (...args: unknown[]) => buildSpy(...args) }
+})
+
 import { TimeSeriesChart } from './TimeSeriesChart'
 import type { HistoryResponse, Threshold, LivePoint } from '../lib/types'
 
@@ -49,5 +60,16 @@ describe('TimeSeriesChart', () => {
     const { unmount } = render(<TimeSeriesChart history={hist} threshold={t} tail={[]} />)
     unmount()
     expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('repassa `now` e a cor resolvida de --color-muted para buildChartOption', () => {
+    buildSpy.mockClear()
+    render(<TimeSeriesChart history={undefined} threshold={null} tail={[]} now={12345} />)
+    const call = buildSpy.mock.calls.at(-1)
+    // now e o 6o argumento posicional (history, threshold, crit, goodSoft, tail, now, mutedColor)
+    expect(call?.[5]).toBe(12345)
+    // 7 args: garante que mutedColor tambem chegou (nao so now), sem depender
+    // do valor exato resolvido por getComputedStyle em jsdom.
+    expect(call).toHaveLength(7)
   })
 })

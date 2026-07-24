@@ -99,7 +99,13 @@ export function buildChartOption(
   const tailData: [number, number][] = tail
     .filter((p) => p.ts > lastHistTs)
     .map((p) => [p.ts, p.value])
-  const data = [...histData, ...tailData]
+  // A cauda ao vivo SO complementa historico existente — nunca o substitui.
+  // Sem este guard, historico vazio (ex.: agregado 30d ainda nao materializado)
+  // deixava lastHistTs=-Infinity, toda a cauda passava, e a serie virava
+  // so-cauda (buffer de ~minutos): o eixo `type:time` entao mostrava segundos
+  // numa janela de 30 dias. Historico ausente => serie vazia (empty-state no
+  // TimeSeriesChart), nao a cauda mascarando a ausencia de dado.
+  const data = histData.length ? [...histData, ...tailData] : []
 
   const markLine = threshold
     ? {

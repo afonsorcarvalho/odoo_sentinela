@@ -13,11 +13,15 @@ import type { HistoryResponse, Threshold, LivePoint } from '../lib/types'
 // mesclados por buildChartOption — custo ~1000 pontos/tick, trivial, e a cauda
 // (useLiveTail) e limitada a 300, entao a serie nunca cresce sem limite.
 export function TimeSeriesChart({
-  history, threshold, tail, now,
+  history, threshold, tail, status, now,
 }: {
   history: HistoryResponse | undefined
   threshold: Threshold | null
   tail: LivePoint[]
+  // Estado do fetch de historico, para distinguir "sem dados no periodo" de
+  // "carregando" e de "falha". Opcional: chamadores que nao passam mantem o
+  // comportamento anterior (empty-state generico quando nao ha pontos).
+  status?: 'loading' | 'error'
   now?: number
 }) {
   const { el, chart } = useECharts()
@@ -36,5 +40,32 @@ export function TimeSeriesChart({
     )
   }, [history, threshold, critColor, goodSoftColor, tail, now, mutedColor, chart])
 
-  return <div ref={el} style={{ width: '100%', height: '100%', minHeight: 160 }} />
+  // Precedencia: pontos presentes > carregando > falha > vazio. Dado presente
+  // sempre vence (TanStack mantem `data` num refetch que falha, entao nao
+  // apagamos um grafico que tem dado). Empty-state so quando nao ha ponto algum.
+  const hasPoints = !!history && history.points.length > 0
+  const emptyMessage = hasPoints
+    ? null
+    : status === 'loading'
+      ? 'Carregando…'
+      : status === 'error'
+        ? 'Falha ao carregar o histórico'
+        : 'Sem dados no período'
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 160 }}>
+      {/* Div do canvas mantido montado sempre (mesmo no empty-state): preserva
+          a instancia ECharts (init/dispose) e mostra a faixa de conformidade +
+          eixos como contexto por tras da mensagem. */}
+      <div ref={el} style={{ width: '100%', height: '100%' }} />
+      {emptyMessage && (
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-medium"
+          style={{ color: 'var(--color-muted)' }}
+        >
+          {emptyMessage}
+        </div>
+      )}
+    </div>
+  )
 }

@@ -55,6 +55,16 @@ describe('buildChartOption', () => {
     const opt = buildChartOption(hist, t, '#ff0000', 'var(--color-good-soft)', tail) as any
     expect(opt.series[0].data).toEqual([[1000, 19], [2000, 21], [2500, 20.8], [3000, 21.2]])
   })
+  it('historico vazio: cauda ao vivo NAO vira a serie (empty-state, nao cauda mascarando)', () => {
+    const tail = [
+      { sensor_code: 'S', ts: 5000, value: 20.1, alarm_state: 'ok' as const },
+      { sensor_code: 'S', ts: 6000, value: 20.3, alarm_state: 'ok' as const },
+    ]
+    // history undefined -> histData vazio -> serie deve ficar vazia mesmo com cauda
+    const opt = buildChartOption(undefined, t, undefined, undefined, tail) as any
+    expect(opt.series[0].data).toEqual([])
+  })
+
   it('estende o eixo Y para conter as linhas de limite (senao ficariam clipadas)', () => {
     const opt = buildChartOption(hist, t) as any
     // faixa 18..22; dados 19..21 dentro. eixo deve conter 18 e 22 com folga.

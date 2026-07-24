@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
 const setOption = vi.fn()
 const dispose = vi.fn()
@@ -60,6 +60,27 @@ describe('TimeSeriesChart', () => {
     const { unmount } = render(<TimeSeriesChart history={hist} threshold={t} tail={[]} />)
     unmount()
     expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('sem historico e sem status: mostra "Sem dados no período"', () => {
+    render(<TimeSeriesChart history={undefined} threshold={t} tail={[]} />)
+    expect(screen.getByText('Sem dados no período')).toBeInTheDocument()
+  })
+
+  it('sem historico e status=loading: mostra "Carregando…"', () => {
+    render(<TimeSeriesChart history={undefined} threshold={t} tail={[]} status="loading" />)
+    expect(screen.getByText('Carregando…')).toBeInTheDocument()
+  })
+
+  it('sem historico e status=error: mostra a mensagem de falha', () => {
+    render(<TimeSeriesChart history={undefined} threshold={t} tail={[]} status="error" />)
+    expect(screen.getByText('Falha ao carregar o histórico')).toBeInTheDocument()
+  })
+
+  it('com pontos: nenhuma mensagem de empty-state (dado presente vence status)', () => {
+    render(<TimeSeriesChart history={hist} threshold={t} tail={[]} status="error" />)
+    expect(screen.queryByText('Sem dados no período')).not.toBeInTheDocument()
+    expect(screen.queryByText('Falha ao carregar o histórico')).not.toBeInTheDocument()
   })
 
   it('repassa `now` e a cor resolvida de --color-muted para buildChartOption', () => {

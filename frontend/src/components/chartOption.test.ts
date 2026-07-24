@@ -107,6 +107,19 @@ describe('buildChartOption', () => {
     expect('yAxis' in areas[0][0]).toBe(true)
   })
 
+  it('labels das faixas ficam ocultas (so no hover): evita sopa de texto no topo', () => {
+    // Regressao guarda: markArea renderiza o `name` de cada faixa como rotulo
+    // permanente por padrao; com varias faixas viravam texto sobreposto. O
+    // label fica desligado e so aparece no hover (emphasis).
+    const h: HistoryResponse = {
+      sensor_code: 'S', window: '1h', resolution: 'raw',
+      points: [{ ts: 0, value: 20 }, { ts: 100, value: 25 }, { ts: 200, value: 20 }],
+    }
+    const opt = buildChartOption(h, t) as any
+    expect(opt.series[0].markArea.label.show).toBe(false)
+    expect(opt.series[0].markArea.emphasis.label.show).toBe(true)
+  })
+
   it('desenha faixa de silencio quando now esta muito alem do ultimo ponto', () => {
     const opt = buildChartOption(hist, t, undefined, undefined, [], 2000 + 6 * 60_000) as any
     const areas = opt.series[0].markArea.data as any[]

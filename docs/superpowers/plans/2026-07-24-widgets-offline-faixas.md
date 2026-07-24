@@ -343,7 +343,9 @@ git commit -m "feat(chart): renderiza faixas fora-de-limite e faixa de silencio 
 
 **Interfaces:**
 - Consumes: nova assinatura de `buildChartOption` (Task 2).
-- Produces: `TimeSeriesChart` ganha prop `now?: number`; resolve `--color-crit-soft` e `--color-muted` via `useThemeColor` e as passa (junto com `now`) a `buildChartOption`.
+- Produces: `TimeSeriesChart` ganha prop `now?: number`; resolve `--color-muted` via `useThemeColor` e o passa (junto com `now`) a `buildChartOption`.
+
+> NOTA (ajuste pós-Task 2): a faixa fora-de-limite passou a usar `critColor` (já resolvido/passado hoje) em opacity baixa — o param `critSoftColor` foi REMOVIDO da assinatura. Nova ordem: `buildChartOption(history, threshold, critColor, goodSoftColor, tail, now?, mutedColor?)`. Não resolver nem passar `--color-crit-soft`.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -365,7 +367,7 @@ E o teste:
 it('repassa `now` para buildChartOption', () => {
   buildSpy.mockClear()
   render(<TimeSeriesChart history={undefined} threshold={null} tail={[]} now={12345} />)
-  // now e o 6o argumento posicional (history, threshold, crit, goodSoft, tail, now, ...)
+  // now e o 6o argumento posicional (history, threshold, crit, goodSoft, tail, now, mutedColor)
   expect(buildSpy.mock.calls.at(-1)?.[5]).toBe(12345)
 })
 ```
@@ -393,10 +395,9 @@ export function TimeSeriesChart({
 }) {
 ```
 
-Resolver as duas cores novas (perto de `critColor`/`goodSoftColor`):
+Resolver a cor nova (perto de `critColor`/`goodSoftColor`):
 
 ```ts
-  const critSoftColor = useThemeColor('--color-crit-soft')
   const mutedColor = useThemeColor('--color-muted')
 ```
 
@@ -405,10 +406,10 @@ Atualizar a chamada e as deps do `useEffect`:
 ```ts
   useEffect(() => {
     chart.current?.setOption(
-      buildChartOption(history, threshold, critColor, goodSoftColor, tail, now, critSoftColor, mutedColor),
+      buildChartOption(history, threshold, critColor, goodSoftColor, tail, now, mutedColor),
       { notMerge: true },
     )
-  }, [history, threshold, critColor, goodSoftColor, tail, now, critSoftColor, mutedColor, chart])
+  }, [history, threshold, critColor, goodSoftColor, tail, now, mutedColor, chart])
 ```
 
 - [ ] **Step 4: Rodar e ver passar**

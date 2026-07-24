@@ -39,6 +39,18 @@ describe('SensorDetailPanel', () => {
     expect(screen.getByText('21.0')).toBeInTheDocument()
   })
 
+  it('status=loading repassado ao chart: mostra "Carregando…" (nao "Sem dados") durante o load', () => {
+    render(
+      <SensorDetailPanel
+        group={group} selectedCode="TEMP-EXP-01" onSelectSensor={vi.fn()}
+        threshold={null} unidade="°C" value={null} state="ok"
+        window="24h" onWindowChange={vi.fn()} history={undefined} tail={[]} status="loading"
+      />,
+    )
+    expect(screen.getByText('Carregando…')).toBeInTheDocument()
+    expect(screen.queryByText('Sem dados no período')).not.toBeInTheDocument()
+  })
+
   it('clicar no botao de outra metrica chama onSelectSensor', () => {
     const onSelectSensor = vi.fn()
     render(

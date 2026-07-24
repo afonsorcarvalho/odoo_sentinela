@@ -126,8 +126,11 @@ export function buildChartOption(
   const areaData: AreaPair[] = []
 
   if (threshold) {
+    // Faixa verde de conformidade: emphasis desligado no item (ela cobre toda a
+    // largura na banda segura; sem isto o hover mostraria um label vazio pois
+    // ela nao tem `name`). So as faixas fora-limite e a de silencio tem hover.
     areaData.push([
-      { yAxis: threshold.limite_min, itemStyle: { color: goodSoftColor, opacity: 0.5 } },
+      { yAxis: threshold.limite_min, itemStyle: { color: goodSoftColor, opacity: 0.5 }, emphasis: { disabled: true } },
       { yAxis: threshold.limite_max },
     ])
     for (const b of computeOutOfRangeBands(data, threshold)) {

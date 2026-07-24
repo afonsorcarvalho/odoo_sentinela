@@ -85,7 +85,10 @@ describe('buildChartOption', () => {
     const markArea = (option.series as any)[0].markArea
     // itemStyle agora vive no item (nao mais na raiz do markArea) — ver Task 2.
     expect(markArea.data).toEqual([
-      [{ yAxis: 10, itemStyle: { color: 'var(--color-good-soft)', opacity: 0.5 } }, { yAxis: 20 }],
+      [
+        { yAxis: 10, itemStyle: { color: 'var(--color-good-soft)', opacity: 0.5 }, emphasis: { disabled: true } },
+        { yAxis: 20 },
+      ],
     ])
   })
   it('sem threshold, series[0].markArea e undefined', () => {

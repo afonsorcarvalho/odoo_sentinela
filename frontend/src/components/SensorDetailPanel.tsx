@@ -8,7 +8,7 @@ import { TimeSeriesChart } from './TimeSeriesChart'
 
 export function SensorDetailPanel({
   group, selectedCode, onSelectSensor, threshold, unidade, value, state,
-  window, onWindowChange, history, tail,
+  window, onWindowChange, history, tail, status, now,
 }: {
   group: AreaGroup
   selectedCode: string
@@ -21,6 +21,11 @@ export function SensorDetailPanel({
   onWindowChange: (w: Window) => void
   history: HistoryResponse | undefined
   tail: LivePoint[]
+  // Estado do fetch de historico + instante atual, repassados ao chart: sem
+  // eles o overlay de empty-state mostra "Sem dados no período" durante o load
+  // (o painel abre com history=undefined ate o fetch resolver).
+  status?: 'loading' | 'error'
+  now?: number
 }) {
   const selected = group.sensors.find((s) => s.sensor_code === selectedCode)
   const derived: StatusResult =
@@ -76,7 +81,7 @@ export function SensorDetailPanel({
         <WindowSelector value={window} onChange={onWindowChange} />
       </div>
       <div data-testid="sensor-detail-chart-wrapper" className="min-h-0 flex-1">
-        <TimeSeriesChart history={history} threshold={threshold} tail={tail} />
+        <TimeSeriesChart history={history} threshold={threshold} tail={tail} status={status} now={now} />
       </div>
     </div>
   )

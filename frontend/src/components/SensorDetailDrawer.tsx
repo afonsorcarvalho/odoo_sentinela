@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFloating, useDismiss, useInteractions, FloatingFocusManager, FloatingPortal, FloatingOverlay } from '@floating-ui/react'
 import { useSensors, useThreshold, useHistory } from '../lib/queries'
 import { useLiveTail } from '../lib/useLiveTail'
+import { useNow } from '../lib/useNow'
 import { groupSensorsByArea } from '../lib/aggregateStatus'
 import { SensorDetailPanel } from './SensorDetailPanel'
 import type { Window } from '../lib/types'
@@ -61,7 +62,12 @@ export function SensorDetailDrawer({
   )
   const sensor = sensors.find((s) => s.sensor_code === sensorCode)
   const threshold = useThreshold(sensorCode).data ?? null
-  const history = useHistory(sensorCode, window).data
+  const historyQuery = useHistory(sensorCode, window)
+  const history = historyQuery.data
+  // Distingue "carregando" de "sem dado" no overlay do chart (senao a abertura
+  // do drawer e cada troca de janela piscam "Sem dados no período").
+  const status = historyQuery.isError ? 'error' : historyQuery.isLoading ? 'loading' : undefined
+  const now = useNow()
   const { last, tail } = useLiveTail(sensorCode)
   const value = last?.value ?? null
   const state = last?.alarm_state
@@ -112,6 +118,8 @@ export function SensorDetailDrawer({
                 onWindowChange={setWindow}
                 history={history}
                 tail={tail}
+                status={status}
+                now={now}
               />
             </div>
           </div>

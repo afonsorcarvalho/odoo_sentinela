@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildChartOption } from './chartOption'
+import { buildChartOption, computeOutOfRangeBands } from './chartOption'
 import type { HistoryResponse, Threshold } from '../lib/types'
 
 const t: Threshold = { sensor_id: 'S', limite_min: 18, limite_max: 22, is_valor_padrao_regulatorio: true }
@@ -82,5 +82,64 @@ describe('buildChartOption', () => {
   it('usa a cor resolvida recebida no markArea, nao a custom property crua', () => {
     const opt = buildChartOption(hist, t, undefined, '#00ff00') as any
     expect(opt.series[0].markArea.itemStyle.color).toBe('#00ff00')
+  })
+})
+
+const th: Threshold = { sensor_id: 'S', limite_min: 18, limite_max: 22, is_valor_padrao_regulatorio: true }
+
+describe('computeOutOfRangeBands', () => {
+  it('run contiguo acima do limite vira uma banda com direcao acima', () => {
+    // espacamento mediano = 100
+    const data: [number, number][] = [[0, 20], [100, 25], [200, 26], [300, 20]]
+    const bandas = computeOutOfRangeBands(data, th)
+    expect(bandas).toHaveLength(1)
+    expect(bandas[0].direcao).toBe('acima')
+    // banda cobre [100,200] estendida 1/2 ate os vizinhos dentro (50 e 250)
+    expect(bandas[0].inicio).toBe(50)
+    expect(bandas[0].fim).toBe(250)
+  })
+
+  it('run abaixo do limite vira banda com direcao abaixo', () => {
+    const data: [number, number][] = [[0, 20], [100, 10], [200, 20]]
+    const bandas = computeOutOfRangeBands(data, th)
+    expect(bandas).toHaveLength(1)
+    expect(bandas[0].direcao).toBe('abaixo')
+  })
+
+  it('troca de direcao sem passar por dentro fecha e abre nova banda', () => {
+    // 25 (acima) -> 10 (abaixo): dois pontos fora, direcoes distintas
+    const data: [number, number][] = [[0, 20], [100, 25], [200, 10], [300, 20]]
+    const bandas = computeOutOfRangeBands(data, th)
+    expect(bandas).toHaveLength(2)
+    expect(bandas[0].direcao).toBe('acima')
+    expect(bandas[1].direcao).toBe('abaixo')
+  })
+
+  it('ponto isolado fora do limite gera banda de largura positiva', () => {
+    const data: [number, number][] = [[0, 20], [100, 25], [200, 20]]
+    const bandas = computeOutOfRangeBands(data, th)
+    expect(bandas).toHaveLength(1)
+    expect(bandas[0].fim).toBeGreaterThan(bandas[0].inicio)
+  })
+
+  it('gap > 3x o espacamento mediano quebra a banda em duas', () => {
+    // espacamento mediano = 100; salto de 100->1000 (gap 900 > 300)
+    const data: [number, number][] = [[0, 25], [100, 25], [1000, 25], [1100, 25]]
+    const bandas = computeOutOfRangeBands(data, th)
+    expect(bandas).toHaveLength(2)
+  })
+
+  it('serie toda dentro do limite devolve []', () => {
+    const data: [number, number][] = [[0, 19], [100, 20], [200, 21]]
+    expect(computeOutOfRangeBands(data, th)).toEqual([])
+  })
+
+  it('threshold null devolve []', () => {
+    const data: [number, number][] = [[0, 100], [100, 200]]
+    expect(computeOutOfRangeBands(data, null)).toEqual([])
+  })
+
+  it('data vazia devolve []', () => {
+    expect(computeOutOfRangeBands([], th)).toEqual([])
   })
 })

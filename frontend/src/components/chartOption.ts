@@ -1,6 +1,68 @@
 import type { EChartsOption } from 'echarts'
 import type { HistoryResponse, Threshold, LivePoint } from '../lib/types'
 
+export type Banda = { inicio: number; fim: number; direcao: 'acima' | 'abaixo' }
+
+// Deriva os intervalos de tempo em que a serie plotada esteve fora do
+// threshold. Compara o valor JA desenhado (data[i][1]) -- em janela agregada
+// isso e o avg, entao toda banda tem excursao visivel da linha por baixo.
+// `now` nao entra aqui: a funcao olha so os pontos, e determinista e testavel
+// isoladamente (irma de freshness()).
+export function computeOutOfRangeBands(
+  data: [number, number][],
+  threshold: Threshold | null,
+): Banda[] {
+  if (!threshold || data.length === 0) return []
+
+  const dir = (v: number): 'acima' | 'abaixo' | null =>
+    v > threshold.limite_max ? 'acima' : v < threshold.limite_min ? 'abaixo' : null
+
+  // Espacamento mediano entre pontos consecutivos -- referencia para detectar
+  // gaps de dado e para estender pontos isolados. Series reais podem ter
+  // milhares de pontos; ordenar uma copia dos deltas e barato o suficiente.
+  const deltas: number[] = []
+  for (let i = 1; i < data.length; i++) deltas.push(data[i][0] - data[i - 1][0])
+  const sorted = [...deltas].sort((a, b) => a - b)
+  const medianGap = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0
+  const half = medianGap ? medianGap / 2 : 0.5
+  const breakGap = medianGap ? medianGap * 3 : Infinity
+
+  const bandas: Banda[] = []
+  let run: { startIdx: number; endIdx: number; direcao: 'acima' | 'abaixo' } | null = null
+
+  const flush = () => {
+    if (!run) return
+    const tStart = data[run.startIdx][0]
+    const tEnd = data[run.endIdx][0]
+    // Estende cada extremo 1/2 ate o vizinho de dentro; sem vizinho, usa half.
+    const prevTs = run.startIdx > 0 ? data[run.startIdx - 1][0] : tStart - medianGap
+    const nextTs = run.endIdx < data.length - 1 ? data[run.endIdx + 1][0] : tEnd + medianGap
+    const inicio = tStart - Math.min(half, (tStart - prevTs) / 2 || half)
+    const fim = tEnd + Math.min(half, (nextTs - tEnd) / 2 || half)
+    bandas.push({ inicio, fim, direcao: run.direcao })
+    run = null
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const d = dir(data[i][1])
+    if (d === null) {
+      flush()
+      continue
+    }
+    const gapFromPrev = run ? data[i][0] - data[run.endIdx][0] : 0
+    if (run && (run.direcao !== d || gapFromPrev > breakGap)) {
+      flush()
+    }
+    if (!run) {
+      run = { startIdx: i, endIdx: i, direcao: d }
+    } else {
+      run.endIdx = i
+    }
+  }
+  flush()
+  return bandas
+}
+
 export function buildChartOption(
   history: HistoryResponse | undefined,
   threshold: Threshold | null,

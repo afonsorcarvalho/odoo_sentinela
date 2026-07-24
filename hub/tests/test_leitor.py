@@ -253,6 +253,52 @@ def test_falha_em_canal_do_meio_nao_deixa_leitura_ok_duplicada(tmp_path):
     assert por_sensor["SNR-2"]["valor"] == 0.0
 
 
+class _DriverFalhaDepoisRecupera:
+    """Falha nas N primeiras chamadas, depois passa a responder ok."""
+    def __init__(self, n_falhas, valores=None):
+        self._n_falhas = n_falhas
+        self._chamadas = 0
+        self._valores = valores or [{"channel": 1, "value": 50.0, "unit": "C"}]
+    def read_channels(self, maps=None):
+        self._chamadas += 1
+        if self._chamadas <= self._n_falhas:
+            raise RuntimeError("sem resposta")
+        return self._valores
+    def close(self):
+        pass
+
+
+def test_log_de_falha_dedupe_e_recuperacao(tmp_path, capsys):
+    """Falha nos ciclos 1 e 2 loga UMA vez só; recuperação no ciclo 3 loga a recuperação."""
+    driver = _DriverFalhaDepoisRecupera(n_falhas=2)
+    leitor = Leitor(_cfg(tmp_path), backend=_BackendFake(driver))
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+
+    leitor.ler_todos(agora)
+    leitor.ler_todos(agora)
+    saida_falhas = capsys.readouterr().out
+    linhas_falha = [l for l in saida_falhas.splitlines() if "leitura falhou" in l]
+    assert len(linhas_falha) == 1
+    assert "driver=n4aib16" in linhas_falha[0]
+    assert "porta=/dev/ttyUSB0" in linhas_falha[0]
+    assert "endereco=1" in linhas_falha[0]
+    assert "sensor=SNR-EXP-TEMP-01" in linhas_falha[0]
+
+    leitor.ler_todos(agora)
+    saida_recuperacao = capsys.readouterr().out
+    linhas_recuperacao = [l for l in saida_recuperacao.splitlines() if "leitura recuperada" in l]
+    assert len(linhas_recuperacao) == 1
+    assert "driver=n4aib16" in linhas_recuperacao[0]
+    assert "porta=/dev/ttyUSB0" in linhas_recuperacao[0]
+    assert "endereco=1" in linhas_recuperacao[0]
+    assert "sensor=SNR-EXP-TEMP-01" in linhas_recuperacao[0]
+
+    # mais um ciclo ok: não deve repetir a recuperação
+    leitor.ler_todos(agora)
+    saida_extra = capsys.readouterr().out
+    assert "leitura recuperada" not in saida_extra
+
+
 def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
     bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
     backend = _BackendConstrucaoFalha(bom)

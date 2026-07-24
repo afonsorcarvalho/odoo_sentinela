@@ -7,9 +7,12 @@ from hub import modbus_backend as _backend_padrao
 
 
 class _DispositivoLigado:
-    def __init__(self, driver, canais):
+    def __init__(self, driver, canais, driver_nome, porta, endereco):
         self.driver = driver
         self.canais = canais  # list[CanalConfig]
+        self.driver_nome = driver_nome
+        self.porta = porta
+        self.endereco = endereco
 
 
 class Leitor:
@@ -30,7 +33,9 @@ class Leitor:
                           f"driver={disp.driver!r} porta={bus.porta} endereco={disp.endereco} erro={e!r}")
                     self._degradados.append(disp.canais)
                     continue
-                self._dispositivos.append(_DispositivoLigado(driver, disp.canais))
+                self._dispositivos.append(_DispositivoLigado(
+                    driver, disp.canais, disp.driver, bus.porta, disp.endereco,
+                ))
 
     def _specs(self, canais):
         return [
@@ -66,15 +71,23 @@ class Leitor:
                         leituras_disp.append(self._normalizar(canal, float(entrada["value"]), "ok", agora))
             except Exception as e:
                 chave = id(disp)
+                sensor_id = disp.canais[0].sensor_id if disp.canais else '?'
                 if chave not in self._falhados:
                     self._falhados.add(chave)
                     print(f"[hub] leitura falhou, dispositivo offline: "
-                          f"sensor={disp.canais[0].sensor_id if disp.canais else '?'} erro={e!r}")
+                          f"driver={disp.driver_nome} porta={disp.porta} endereco={disp.endereco} "
+                          f"sensor={sensor_id} erro={e!r}")
                 for canal in disp.canais:
                     leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))
             else:
+                chave = id(disp)
+                if chave in self._falhados:
+                    sensor_id = disp.canais[0].sensor_id if disp.canais else '?'
+                    print(f"[hub] leitura recuperada: "
+                          f"driver={disp.driver_nome} porta={disp.porta} endereco={disp.endereco} "
+                          f"sensor={sensor_id}")
+                    self._falhados.discard(chave)
                 leituras.extend(leituras_disp)
-                self._falhados.discard(id(disp))
         for canais in self._degradados:
             for canal in canais:
                 leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))

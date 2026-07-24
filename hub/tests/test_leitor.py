@@ -65,6 +65,18 @@ class _BackendMulti:
         return self._por_endereco[endereco]
 
 
+class _BackendConstrucaoFalha:
+    """criar_driver devolve driver bom no endereço 1 e estoura no 2."""
+    def __init__(self, driver_bom):
+        self._bom = driver_bom
+        from hub.modbus_backend import MapSpec
+        self.MapSpec = MapSpec
+    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco):
+        if endereco == 2:
+            raise ValueError(f"driver Modbus desconhecido: {driver_nome!r}")
+        return self._bom
+
+
 class _DriverExplode:
     """Driver que estoura com uma exceção arbitrária (não RuntimeError)."""
     def __init__(self, exc):
@@ -239,3 +251,18 @@ def test_falha_em_canal_do_meio_nao_deixa_leitura_ok_duplicada(tmp_path):
     assert por_sensor["SNR-1"]["valor"] == 0.0
     assert por_sensor["SNR-2"]["status_leitura"] == "sensor_offline"
     assert por_sensor["SNR-2"]["valor"] == 0.0
+
+
+def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
+    bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
+    backend = _BackendConstrucaoFalha(bom)
+    # NÃO deve levantar:
+    leitor = Leitor(_cfg2(tmp_path), backend=backend)
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+    # dispositivo bom publica normal
+    assert por_sensor["SNR-BOM"]["status_leitura"] == "ok"
+    assert por_sensor["SNR-BOM"]["valor"] == 42.0
+    # dispositivo que não instanciou vira sensor_offline (visível no dashboard)
+    assert por_sensor["SNR-RUIM"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-RUIM"]["valor"] == 0.0

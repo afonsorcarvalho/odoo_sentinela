@@ -17,12 +17,19 @@ class Leitor:
         self._config = config
         self._backend = backend
         self._dispositivos = []
+        self._degradados = []   # list[list[CanalConfig]] — dispositivos que não instanciaram
         self._falhados = set()
         for bus in config.barramentos:
             for disp in bus.dispositivos:
-                driver = backend.criar_driver(
-                    disp.driver, bus.porta, bus.baud, bus.paridade, bus.stop_bits, disp.endereco,
-                )
+                try:
+                    driver = backend.criar_driver(
+                        disp.driver, bus.porta, bus.baud, bus.paridade, bus.stop_bits, disp.endereco,
+                    )
+                except Exception as e:
+                    print(f"[hub] dispositivo nao instanciou, degradado: "
+                          f"driver={disp.driver!r} porta={bus.porta} endereco={disp.endereco} erro={e!r}")
+                    self._degradados.append(disp.canais)
+                    continue
                 self._dispositivos.append(_DispositivoLigado(driver, disp.canais))
 
     def _specs(self, canais):
@@ -68,6 +75,9 @@ class Leitor:
             else:
                 leituras.extend(leituras_disp)
                 self._falhados.discard(id(disp))
+        for canais in self._degradados:
+            for canal in canais:
+                leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))
         return leituras
 
     def fechar(self):

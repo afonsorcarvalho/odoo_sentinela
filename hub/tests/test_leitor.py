@@ -55,9 +55,73 @@ class _BackendFake:
         return self._driver
 
 
+class _BackendMulti:
+    """Backend fake que despacha driver por endereço do dispositivo."""
+    def __init__(self, por_endereco):
+        self._por_endereco = por_endereco  # dict[int, driver]
+        from hub.modbus_backend import MapSpec
+        self.MapSpec = MapSpec
+    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco):
+        return self._por_endereco[endereco]
+
+
+class _DriverExplode:
+    """Driver que estoura com uma exceção arbitrária (não RuntimeError)."""
+    def __init__(self, exc):
+        self._exc = exc
+    def read_channels(self, maps=None):
+        raise self._exc
+    def close(self):
+        pass
+
+
 def _cfg(tmp_path):
     p = tmp_path / "c.yaml"
     p.write_text(textwrap.dedent(CFG))
+    return config.carregar_config(p)
+
+
+CFG_2DISP = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-BOM
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+          - endereco: 2
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-RUIM
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+"""
+
+
+def _cfg2(tmp_path):
+    p = tmp_path / "c2.yaml"
+    p.write_text(textwrap.dedent(CFG_2DISP))
     return config.carregar_config(p)
 
 
@@ -93,3 +157,16 @@ def test_normalizar_aplica_calibracao_e_carimba_coeficientes():
     assert leitura['cal_ganho'] == 0.965
     assert leitura['cal_offset'] == 0.33
     assert abs(leitura['valor'] - 96.83) < 1e-9
+
+
+def test_indexerror_num_dispositivo_nao_derruba_os_outros(tmp_path):
+    bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
+    ruim = _DriverExplode(IndexError("list index out of range"))
+    backend = _BackendMulti({1: bom, 2: ruim})
+    leitor = Leitor(_cfg2(tmp_path), backend=backend)
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+    assert por_sensor["SNR-BOM"]["status_leitura"] == "ok"
+    assert por_sensor["SNR-BOM"]["valor"] == 42.0
+    assert por_sensor["SNR-RUIM"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-RUIM"]["valor"] == 0.0

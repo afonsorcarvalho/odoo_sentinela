@@ -21,6 +21,8 @@ vi.mock('../../lib/useCountUp', () => ({
   useCountUp: (target: number | null) => mockUseCountUp(target),
 }))
 
+vi.mock('../../lib/useNow', () => ({ useNow: () => 1_000_000 }))
+
 function renderWithClient(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
@@ -39,11 +41,15 @@ describe('KpiWidget', () => {
     expect(screen.getByText(/PRESS-EXP-01/)).toBeInTheDocument()
   })
 
-  it('sem last (sem leitura) -> valor "—", cor de unknown, mesmo com override setado', () => {
+  it('sem last (sem leitura) -> valor "—", atenuado (tier never), mesmo com override setado', () => {
+    // last: null -> freshness(undefined, now) = 'never', que também é
+    // "!== 'fresh'": a atenuação vence, mesmo sem alarm_state de estado
+    // algum para "gritar". Antes da feature de frescor este caso pintava de
+    // --color-ink (estado 'unknown'); agora --color-muted é o correto.
     mockUseLiveTail.mockReturnValue({ last: null })
     renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
     const valor = screen.getByText('—')
-    expect(valor.style.color).toBe('var(--color-ink)')
+    expect(valor.style.color).toBe('var(--color-muted)')
   })
 
   it('prefers-reduced-motion: nao aplica a animacao kpi-bump no span do valor', () => {
@@ -56,7 +62,7 @@ describe('KpiWidget', () => {
         removeEventListener: vi.fn(),
       }),
     )
-    mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok' } })
+    mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok', ts: 1_000_000 } })
     renderWithClient(<KpiWidget sensorCode="S1" />)
     const valor = screen.getByText('10')
     expect(valor.style.animation).toBe('')
@@ -65,13 +71,13 @@ describe('KpiWidget', () => {
 
   describe('sem override (limiteMin/limiteMax ausentes) — comportamento idêntico ao atual', () => {
     it('alarm_state ok -> --color-ink', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" />)
       expect(screen.getByText('10').style.color).toBe('var(--color-ink)')
     })
 
     it('alarm_state crit -> cor de crit', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'crit' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'crit', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" />)
       expect(screen.getByText('10').style.color).toBe(statusTextColor('crit'))
     })
@@ -79,25 +85,25 @@ describe('KpiWidget', () => {
 
   describe('override de threshold (limiteMin/limiteMax) — semântica max(), só escala', () => {
     it('valor FORA da faixa -> crit mesmo com alarm_state ok (escala)', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 100, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 100, alarm_state: 'ok', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
       expect(screen.getByText('100').style.color).toBe(statusTextColor('crit'))
     })
 
     it('valor DENTRO da faixa mas alarm_state crit -> continua crit (override não rebaixa)', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'crit' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'crit', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
       expect(screen.getByText('25').style.color).toBe(statusTextColor('crit'))
     })
 
     it('valor DENTRO da faixa e alarm_state ok -> --color-ink', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'ok', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
       expect(screen.getByText('25').style.color).toBe('var(--color-ink)')
     })
 
     it('guarda anti-regressão A2: override "dentro da faixa" não pinta de verde alarm_state warn', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'warn' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'warn', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
       const cor = screen.getByText('25').style.color
       expect(cor).toBe(statusTextColor('warn'))
@@ -105,7 +111,7 @@ describe('KpiWidget', () => {
     })
 
     it('guarda anti-regressão A2: override "dentro da faixa" não pinta de verde alarm_state crit', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'crit' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'crit', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
       const cor = screen.getByText('25').style.color
       expect(cor).toBe(statusTextColor('crit'))
@@ -113,13 +119,13 @@ describe('KpiWidget', () => {
     })
 
     it('valor FORA da faixa com alarm_state warn -> continua crit (escala de warn, não só de ok)', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 100, alarm_state: 'warn' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 100, alarm_state: 'warn', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
       expect(screen.getByText('100').style.color).toBe(statusTextColor('crit'))
     })
 
     it('só limiteMin setado (limiteMax ausente) já conta como override', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: -5, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: -5, alarm_state: 'ok', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} />)
       expect(screen.getByText('-5').style.color).toBe(statusTextColor('crit'))
     })
@@ -127,27 +133,53 @@ describe('KpiWidget', () => {
 
   describe('formato numérico configurável', () => {
     it('sem config -> auto (não regride): 19.063 exibe 19.063', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 19.063, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 19.063, alarm_state: 'ok', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" />)
       expect(screen.getByText('19.063')).toBeInTheDocument()
     })
     it('casasDecimais=2 -> 19.06', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 19.063, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 19.063, alarm_state: 'ok', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" casasDecimais={2} />)
       expect(screen.getByText('19.06')).toBeInTheDocument()
     })
     it('digitosInteiros=3 + casasDecimais=2 -> 019.06 (zero-pad)', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 19.063, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 19.063, alarm_state: 'ok', ts: 1_000_000 } })
       renderWithClient(<KpiWidget sensorCode="S1" casasDecimais={2} digitosInteiros={3} />)
       expect(screen.getByText('019.06')).toBeInTheDocument()
     })
 
     it('guarda anti-regressão: frame interpolado do count-up (fracionário) não injeta casas espúrias quando o alvo (rawValue) é inteiro', () => {
-      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'ok' } })
+      mockUseLiveTail.mockReturnValue({ last: { value: 25, alarm_state: 'ok', ts: 1_000_000 } })
       mockUseCountUp.mockReturnValueOnce(13.42718)
       renderWithClient(<KpiWidget sensorCode="S1" />)
       expect(screen.getByText('13')).toBeInTheDocument()
       expect(screen.queryByText('13.427')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('frescor (badge + atenuação)', () => {
+    it('sensor fresh: sem badge de frescor e sem opacidade reduzida', () => {
+      mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok', ts: 1_000_000 } })
+      renderWithClient(<KpiWidget sensorCode="S1" />)
+      expect(screen.queryByTestId('freshness-badge')).not.toBeInTheDocument()
+      expect(screen.getByText('10').style.opacity).toBe('')
+    })
+
+    it('sensor offline: mostra badge e atenua o numero (cor e opacidade)', () => {
+      // ts 20min atras (> DEFAULT_OFFLINE_MS 15min) -> tier offline
+      mockUseLiveTail.mockReturnValue({ last: { value: 10, alarm_state: 'ok', ts: 1_000_000 - 20 * 60_000 } })
+      renderWithClient(<KpiWidget sensorCode="S1" />)
+      expect(screen.getByTestId('freshness-badge')).toBeInTheDocument()
+      const valor = screen.getByText('10')
+      expect(valor.style.color).toBe('var(--color-muted)')
+      expect(valor.style.opacity).toBe('0.7')
+    })
+
+    it('offline atenua mesmo com override fora da faixa (nao grita crit)', () => {
+      mockUseLiveTail.mockReturnValue({ last: { value: 999, alarm_state: 'ok', ts: 1_000_000 - 20 * 60_000 } })
+      renderWithClient(<KpiWidget sensorCode="S1" limiteMin={0} limiteMax={50} />)
+      const valor = screen.getByText('999')
+      expect(valor.style.color).toBe('var(--color-muted)')
     })
   })
 })

@@ -6,6 +6,9 @@ import { useFitText } from '../../lib/useFitText'
 import { usePrefersReducedMotion } from '../../lib/useSensorCarousel'
 import { formatKpi, autoCasas } from '../../lib/kpiFormat'
 import { statusTextColor } from '../statusVisuals'
+import { useNow } from '../../lib/useNow'
+import { freshness } from '../../lib/freshness'
+import { FreshnessBadge } from '../FreshnessBadge'
 import type { StatusResult } from '../../lib/status'
 
 type State = StatusResult['state']
@@ -51,9 +54,21 @@ export function KpiWidget({
     last != null &&
     ((limiteMin != null && last.value < limiteMin) || (limiteMax != null && last.value > limiteMax))
   const state: State = foraDaFaixa ? maisSevero(estadoBackend, 'crit') : estadoBackend
+  // Frescor: mesma máquina do AreaCard (useNow força reavaliação periódica
+  // mesmo sem novo dado, para o tier envelhecer sozinho até 'offline').
+  const now = useNow()
+  const tier = freshness(last ?? undefined, now)
+  const ageMs = last ? now - last.ts : undefined
   // Mesma convenção do AreaCard: ok/unknown usam --color-ink (contraste
-  // padrão); apenas warn/crit usam o token de cor de estado.
-  const cor = state === 'ok' || state === 'unknown' ? 'var(--color-ink)' : statusTextColor(state)
+  // padrão); apenas warn/crit usam o token de cor de estado. A atenuação por
+  // frescor VENCE tudo isso — um número velho não pode gritar 'crit' do
+  // override como se fosse leitura atual.
+  const cor =
+    tier !== 'fresh'
+      ? 'var(--color-muted)'
+      : state === 'ok' || state === 'unknown'
+        ? 'var(--color-ink)'
+        : statusTextColor(state)
   const rawValue = last?.value ?? null
   const animated = useCountUp(rawValue)
   const reducedMotion = usePrefersReducedMotion()
@@ -85,12 +100,15 @@ export function KpiWidget({
       className="flex h-full flex-col rounded-lg p-3"
       style={{ background: 'var(--color-surface)' }}
     >
-      <p
-        className="truncate text-xs font-bold uppercase tracking-wide"
-        style={{ color: 'var(--color-muted)' }}
-      >
-        {titulo}
-      </p>
+      <div className="flex items-center gap-2">
+        <p
+          className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wide"
+          style={{ color: 'var(--color-muted)' }}
+        >
+          {titulo}
+        </p>
+        {tier !== 'fresh' && <FreshnessBadge tier={tier} ageMs={ageMs} />}
+      </div>
       {/* Caixa que ocupa toda a altura restante; o valor é centralizado e
           escalado por useFitText para preencher largura e altura, com uma
           folga proporcional (fillRatio) de respiro em todos os lados. */}
@@ -101,6 +119,7 @@ export function KpiWidget({
           className="inline-block whitespace-nowrap font-bold leading-none tabular-nums motion-reduce:animate-none"
           style={{
             color: cor,
+            opacity: tier !== 'fresh' ? 0.7 : undefined,
             animation: reducedMotion ? undefined : 'kpi-bump var(--dur-slow) var(--ease-overshoot)',
           }}
         >

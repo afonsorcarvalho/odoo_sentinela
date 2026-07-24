@@ -9,7 +9,9 @@ vi.mock('../../lib/queries', () => ({
   useHistory: vi.fn(() => ({ data: undefined })),
   useThreshold: () => ({ data: null }),
 }))
-vi.mock('../../lib/useLiveTail', () => ({ useLiveTail: () => ({ tail: [] }) }))
+const mockTail = vi.fn(() => ({ tail: [], last: null as unknown }))
+vi.mock('../../lib/useLiveTail', () => ({ useLiveTail: () => mockTail() }))
+vi.mock('../../lib/useNow', () => ({ useNow: () => 1_000_000 }))
 vi.mock('../TimeSeriesChart', () => ({ TimeSeriesChart: () => <div data-testid="chart" /> }))
 
 function wrap(ui: React.ReactNode) {
@@ -19,15 +21,29 @@ function wrap(ui: React.ReactNode) {
 
 describe('TimeseriesWidget', () => {
   it('mostra titulo do sensor e o seletor de janela', () => {
+    mockTail.mockReturnValue({ tail: [], last: { value: 1, alarm_state: 'ok', ts: 1_000_000 } })
     wrap(<TimeseriesWidget sensorCode="S1" />)
     expect(screen.getByText('Sensor Um')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Janela temporal' })).toBeInTheDocument()
   })
 
   it('troca a janela ao clicar num chip', async () => {
+    mockTail.mockReturnValue({ tail: [], last: { value: 1, alarm_state: 'ok', ts: 1_000_000 } })
     const { useHistory } = await import('../../lib/queries')
     wrap(<TimeseriesWidget sensorCode="S1" defaultWindow="24h" />)
     await userEvent.click(screen.getByRole('button', { name: '7d' }))
     expect(useHistory).toHaveBeenLastCalledWith('S1', '7d')
+  })
+
+  it('mostra badge de frescor quando o ultimo dado esta offline', () => {
+    mockTail.mockReturnValue({ tail: [], last: { value: 10, alarm_state: 'ok', ts: 1_000_000 - 20 * 60_000 } })
+    wrap(<TimeseriesWidget sensorCode="S1" />)
+    expect(screen.getByTestId('freshness-badge')).toBeInTheDocument()
+  })
+
+  it('sensor fresh: sem badge', () => {
+    mockTail.mockReturnValue({ tail: [], last: { value: 10, alarm_state: 'ok', ts: 1_000_000 } })
+    wrap(<TimeseriesWidget sensorCode="S1" />)
+    expect(screen.queryByTestId('freshness-badge')).not.toBeInTheDocument()
   })
 })

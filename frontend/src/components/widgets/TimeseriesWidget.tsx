@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useHistory, useThreshold, useSensors } from '../../lib/queries'
 import { useLiveTail } from '../../lib/useLiveTail'
+import { useNow } from '../../lib/useNow'
+import { freshness } from '../../lib/freshness'
 import { TimeSeriesChart } from '../TimeSeriesChart'
+import { FreshnessBadge } from '../FreshnessBadge'
 import { WindowSelector } from '../WindowSelector'
 import { WidgetPlaceholder } from './WidgetPlaceholder'
 import type { Window } from '../../lib/types'
@@ -22,7 +25,10 @@ export function TimeseriesWidget({
   const [window, setWindow] = useState<Window>(defaultWindow)
   const history = useHistory(sensorCode, window)
   const threshold = useThreshold(sensorCode)
-  const { tail } = useLiveTail(sensorCode)
+  const { tail, last } = useLiveTail(sensorCode)
+  const now = useNow()
+  const tier = freshness(last ?? undefined, now)
+  const ageMs = last ? now - last.ts : undefined
   const sensor = (useSensors().data ?? []).find((s) => s.sensor_code === sensorCode)
 
   if (!sensorCode) return <WidgetPlaceholder texto="Configurar sensor" />
@@ -36,12 +42,19 @@ export function TimeseriesWidget({
         <span className="truncate text-sm font-bold" style={{ color: 'var(--color-ink)' }}>
           {sensor?.name ?? sensorCode}
         </span>
+        {tier !== 'fresh' && <FreshnessBadge tier={tier} ageMs={ageMs} />}
         <div className="ml-auto">
           <WindowSelector value={window} onChange={setWindow} />
         </div>
       </div>
       <div className="min-h-0 flex-1">
-        <TimeSeriesChart history={history.data} threshold={threshold.data ?? null} tail={tail} />
+        <TimeSeriesChart
+          history={history.data}
+          threshold={threshold.data ?? null}
+          tail={tail}
+          now={now}
+          status={history.isError ? 'error' : history.isLoading ? 'loading' : undefined}
+        />
       </div>
     </div>
   )

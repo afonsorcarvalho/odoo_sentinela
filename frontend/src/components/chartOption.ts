@@ -87,10 +87,8 @@ export function buildChartOption(
   // via Date.now() — buildChartOption fica pura/determinista/testavel; quem
   // chama em runtime (TimeSeriesChart) passa Date.now().
   now?: number,
-  // Cor da faixa X fora-de-limite (markArea). Mesmo motivo do critColor: sem
-  // valor resolvido concreto, canvas nao pinta var(--...).
-  critSoftColor: string = 'var(--color-crit-soft)',
-  // Cor da faixa cinza de silencio (sem dado). Idem.
+  // Cor da faixa cinza de silencio (sem dado). Mesmo motivo do critColor:
+  // canvas nao pinta var(--...), precisa do valor resolvido.
   mutedColor: string = 'var(--color-muted)',
 ): EChartsOption {
   const histData: [number, number][] = history
@@ -127,8 +125,12 @@ export function buildChartOption(
       { yAxis: threshold.limite_max },
     ])
     for (const b of computeOutOfRangeBands(data, threshold)) {
+      // Vermelho VIVO (critColor, ja resolvido) em opacity baixa: le como
+      // tinta vermelha limpa sobre qualquer fundo. A cor-soft empilhada sobre
+      // a faixa verde de conformidade virava lama (dois fills escuros
+      // translucidos), por isso usamos o crit solido rebaixado, nao o soft.
       areaData.push([
-        { xAxis: b.inicio, itemStyle: { color: critSoftColor, opacity: 0.55 }, name: `${b.direcao} do limite` },
+        { xAxis: b.inicio, itemStyle: { color: critColor, opacity: 0.14 }, name: `${b.direcao} do limite` },
         { xAxis: b.fim },
       ])
     }
@@ -141,13 +143,23 @@ export function buildChartOption(
     const ultimoTs = data[data.length - 1][0]
     if (now - ultimoTs > DEFAULT_STALE_MS) {
       areaData.push([
-        { xAxis: ultimoTs, itemStyle: { color: mutedColor, opacity: 0.25 }, name: 'sem dado' },
+        { xAxis: ultimoTs, itemStyle: { color: mutedColor, opacity: 0.2 }, name: 'sem dado' },
         { xAxis: now },
       ])
     }
   }
 
-  const markArea = areaData.length ? { data: areaData } : undefined
+  // label.show=false: o `name` de cada item existe SO para o hover (emphasis),
+  // nunca como texto fixo. Sem isto o ECharts pinta o name de cada faixa como
+  // rotulo permanente no topo do grid — com varias faixas, viram sopa de texto
+  // sobreposta. No hover, o operador ve "acima/abaixo do limite" ou "sem dado".
+  const markArea = areaData.length
+    ? {
+        label: { show: false },
+        emphasis: { label: { show: true, position: 'top' as const, color: 'inherit' as const, fontSize: 10 } },
+        data: areaData,
+      }
+    : undefined
 
   // Eixo Y: garante que as linhas de limite fiquem SEMPRE visiveis (elas sao o
   // ponto do readout de instrumento — ver a leitura relativa a faixa segura).

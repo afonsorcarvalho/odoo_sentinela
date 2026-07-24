@@ -55,9 +55,126 @@ class _BackendFake:
         return self._driver
 
 
+class _BackendMulti:
+    """Backend fake que despacha driver por endereço do dispositivo."""
+    def __init__(self, por_endereco):
+        self._por_endereco = por_endereco  # dict[int, driver]
+        from hub.modbus_backend import MapSpec
+        self.MapSpec = MapSpec
+    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco):
+        return self._por_endereco[endereco]
+
+
+class _BackendConstrucaoFalha:
+    """criar_driver devolve driver bom no endereço 1 e estoura no 2."""
+    def __init__(self, driver_bom):
+        self._bom = driver_bom
+        from hub.modbus_backend import MapSpec
+        self.MapSpec = MapSpec
+    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco):
+        if endereco == 2:
+            raise ValueError(f"driver Modbus desconhecido: {driver_nome!r}")
+        return self._bom
+
+
+class _DriverExplode:
+    """Driver que estoura com uma exceção arbitrária (não RuntimeError)."""
+    def __init__(self, exc):
+        self._exc = exc
+    def read_channels(self, maps=None):
+        raise self._exc
+    def close(self):
+        pass
+
+
 def _cfg(tmp_path):
     p = tmp_path / "c.yaml"
     p.write_text(textwrap.dedent(CFG))
+    return config.carregar_config(p)
+
+
+CFG_2DISP = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-BOM
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+          - endereco: 2
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-RUIM
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+"""
+
+
+def _cfg2(tmp_path):
+    p = tmp_path / "c2.yaml"
+    p.write_text(textwrap.dedent(CFG_2DISP))
+    return config.carregar_config(p)
+
+
+CFG_2CANAIS = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-1
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+              - ch: 2
+                sensor_id: SNR-2
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [0, 100]}
+"""
+
+
+def _cfg_2canais(tmp_path):
+    p = tmp_path / "c3.yaml"
+    p.write_text(textwrap.dedent(CFG_2CANAIS))
     return config.carregar_config(p)
 
 
@@ -93,3 +210,105 @@ def test_normalizar_aplica_calibracao_e_carimba_coeficientes():
     assert leitura['cal_ganho'] == 0.965
     assert leitura['cal_offset'] == 0.33
     assert abs(leitura['valor'] - 96.83) < 1e-9
+
+
+def test_indexerror_num_dispositivo_nao_derruba_os_outros(tmp_path):
+    bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
+    ruim = _DriverExplode(IndexError("list index out of range"))
+    backend = _BackendMulti({1: bom, 2: ruim})
+    leitor = Leitor(_cfg2(tmp_path), backend=backend)
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+    assert por_sensor["SNR-BOM"]["status_leitura"] == "ok"
+    assert por_sensor["SNR-BOM"]["valor"] == 42.0
+    assert por_sensor["SNR-RUIM"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-RUIM"]["valor"] == 0.0
+
+
+def test_falha_em_canal_do_meio_nao_deixa_leitura_ok_duplicada(tmp_path):
+    """Dispositivo com 2 canais: ch1 lê ok, ch2 estoura (TypeError em float(None)).
+
+    Antes do fix, ch1 já tinha sido `leituras.append(...ok...)` dentro do try
+    quando ch2 lança — e o `except` reprocessava TODOS os canais do
+    dispositivo como sensor_offline, gerando 2 entradas para SNR-1 (uma ok,
+    uma sensor_offline) além da entrada sensor_offline de SNR-2. O contrato é
+    uma leitura por sensor_id por varredura.
+    """
+    driver = _DriverFake([
+        {"channel": 1, "value": 50.0, "unit": "C"},
+        {"channel": 2, "value": None, "unit": "C"},
+    ])
+    backend = _BackendFake(driver)
+    leitor = Leitor(_cfg_2canais(tmp_path), backend=backend)
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+
+    sensor_ids = [r["sensor_id"] for r in leituras]
+    assert sorted(sensor_ids) == ["SNR-1", "SNR-2"]
+    assert len(leituras) == 2  # uma leitura por sensor_id, sem duplicata
+
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+    assert por_sensor["SNR-1"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-1"]["valor"] == 0.0
+    assert por_sensor["SNR-2"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-2"]["valor"] == 0.0
+
+
+class _DriverFalhaDepoisRecupera:
+    """Falha nas N primeiras chamadas, depois passa a responder ok."""
+    def __init__(self, n_falhas, valores=None):
+        self._n_falhas = n_falhas
+        self._chamadas = 0
+        self._valores = valores or [{"channel": 1, "value": 50.0, "unit": "C"}]
+    def read_channels(self, maps=None):
+        self._chamadas += 1
+        if self._chamadas <= self._n_falhas:
+            raise RuntimeError("sem resposta")
+        return self._valores
+    def close(self):
+        pass
+
+
+def test_log_de_falha_dedupe_e_recuperacao(tmp_path, capsys):
+    """Falha nos ciclos 1 e 2 loga UMA vez só; recuperação no ciclo 3 loga a recuperação."""
+    driver = _DriverFalhaDepoisRecupera(n_falhas=2)
+    leitor = Leitor(_cfg(tmp_path), backend=_BackendFake(driver))
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+
+    leitor.ler_todos(agora)
+    leitor.ler_todos(agora)
+    saida_falhas = capsys.readouterr().out
+    linhas_falha = [l for l in saida_falhas.splitlines() if "leitura falhou" in l]
+    assert len(linhas_falha) == 1
+    assert "driver=n4aib16" in linhas_falha[0]
+    assert "porta=/dev/ttyUSB0" in linhas_falha[0]
+    assert "endereco=1" in linhas_falha[0]
+    assert "sensor=SNR-EXP-TEMP-01" in linhas_falha[0]
+
+    leitor.ler_todos(agora)
+    saida_recuperacao = capsys.readouterr().out
+    linhas_recuperacao = [l for l in saida_recuperacao.splitlines() if "leitura recuperada" in l]
+    assert len(linhas_recuperacao) == 1
+    assert "driver=n4aib16" in linhas_recuperacao[0]
+    assert "porta=/dev/ttyUSB0" in linhas_recuperacao[0]
+    assert "endereco=1" in linhas_recuperacao[0]
+    assert "sensor=SNR-EXP-TEMP-01" in linhas_recuperacao[0]
+
+    # mais um ciclo ok: não deve repetir a recuperação
+    leitor.ler_todos(agora)
+    saida_extra = capsys.readouterr().out
+    assert "leitura recuperada" not in saida_extra
+
+
+def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
+    bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
+    backend = _BackendConstrucaoFalha(bom)
+    # NÃO deve levantar:
+    leitor = Leitor(_cfg2(tmp_path), backend=backend)
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+    # dispositivo bom publica normal
+    assert por_sensor["SNR-BOM"]["status_leitura"] == "ok"
+    assert por_sensor["SNR-BOM"]["valor"] == 42.0
+    # dispositivo que não instanciou vira sensor_offline (visível no dashboard)
+    assert por_sensor["SNR-RUIM"]["status_leitura"] == "sensor_offline"
+    assert por_sensor["SNR-RUIM"]["valor"] == 0.0

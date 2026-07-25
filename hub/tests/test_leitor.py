@@ -582,6 +582,159 @@ def test_gate_de_faixa_atua_sobre_valor_corrigido_nao_sobre_bruto(tmp_path):
     assert dentro["valor"] == 75.0
 
 
+CFG_RECONEXAO = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            reconexao_n: 2
+            reconexao_m: 2
+            reconexao_k: 2
+            canais:
+              - ch: 1
+                sensor_id: SNR-RECONEXAO
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+                faixa_min: 0.1
+                faixa_max: 100
+"""
+
+
+def _cfg_reconexao(tmp_path):
+    p = tmp_path / "c_reconexao.yaml"
+    p.write_text(textwrap.dedent(CFG_RECONEXAO))
+    return config.carregar_config(p)
+
+
+class _DriverFaixa:
+    """Devolve sempre o mesmo valor (bom ou ruim, conforme gate de faixa do
+    canal) e conta close()."""
+    def __init__(self, valor):
+        self._valor = valor
+        self.closes = 0
+    def ler(self, maps=None):
+        return [{"channel": 1, "value": self._valor, "unit": "C"}]
+    def close(self):
+        self.closes += 1
+
+
+class _DriverFechavel:
+    """Simula um fd que, apos close(), estoura em qualquer leitura
+    subsequente (fd realmente fechado, nao so 'trocado')."""
+    def __init__(self, valor):
+        self._valor = valor
+        self._fechado = False
+        self.closes = 0
+    def ler(self, maps=None):
+        if self._fechado:
+            raise RuntimeError("fd fechado")
+        return [{"channel": 1, "value": self._valor, "unit": "C"}]
+    def close(self):
+        self._fechado = True
+        self.closes += 1
+
+
+class _BackendReconexao:
+    """Backend fake: conta chamadas de criar_driver, devolve drivers de uma
+    lista (um por chamada, repete o ultimo), e opcionalmente estoura a partir
+    de uma certa chamada (simula porta que nao reabre)."""
+    def __init__(self, drivers, falha_a_partir=None):
+        self._drivers = list(drivers)
+        self._falha_a_partir = falha_a_partir
+        self.criacoes = 0
+        from hub.modbus_backend import MapSpec
+        self.MapSpec = MapSpec
+    def criar_driver(self, *a, registros=None, **k):
+        self.criacoes += 1
+        if self._falha_a_partir is not None and self.criacoes >= self._falha_a_partir:
+            raise RuntimeError("porta indisponivel")
+        idx = min(self.criacoes - 1, len(self._drivers) - 1)
+        return self._drivers[idx]
+
+
+def test_reconecta_apos_n_falhas_seguidas(tmp_path):
+    ruim = _DriverFaixa(0.0)
+    backend = _BackendReconexao([ruim])
+    leitor = Leitor(_cfg_reconexao(tmp_path), backend=backend)
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+    assert backend.criacoes == 1  # construcao inicial
+
+    leitor.ler_todos(agora)  # ciclo 1: ruim (suspeito), falhas_seguidas=1 (< n=2)
+    assert backend.criacoes == 1
+
+    leitor.ler_todos(agora)  # ciclo 2: ruim, falhas_seguidas=2 >= n=2 -> reconecta
+    assert backend.criacoes == 2
+    assert ruim.closes == 1
+
+
+def test_ciclo_ok_zera_contadores_de_reconexao(tmp_path):
+    ruim = _DriverFaixa(0.0)
+    bom = _DriverFaixa(50.0)
+    backend = _BackendReconexao([ruim, bom])
+    leitor = Leitor(_cfg_reconexao(tmp_path), backend=backend)
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+
+    leitor.ler_todos(agora)  # ciclo 1: ruim
+    leitor.ler_todos(agora)  # ciclo 2: ruim -> reconecta, driver passa a ser `bom`
+    assert backend.criacoes == 2
+
+    leituras = leitor.ler_todos(agora)  # ciclo 3: usa driver bom -> ok, contadores zeram
+    assert leituras[0]["status_leitura"] == "ok"
+
+    leitor.ler_todos(agora)  # ciclo 4: ainda bom -> nao reconecta de novo
+    assert backend.criacoes == 2
+
+
+def test_teto_m_entra_cooldown_e_retenta_a_cada_k(tmp_path):
+    ruim = _DriverFaixa(0.0)
+    backend = _BackendReconexao([ruim])  # sempre devolve o mesmo driver ruim
+    leitor = Leitor(_cfg_reconexao(tmp_path), backend=backend)
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+
+    # n=2, m=2: cada bloco de 2 ciclos ruins gera 1 reconexao; a 3a reconexao
+    # (apos 6 ciclos ruins) estoura o teto m=2 e entra em cooldown k=2.
+    for _ in range(6):
+        leitor.ler_todos(agora)
+    assert backend.criacoes == 3  # init + 2 reconexoes concedidas
+
+    leituras = leitor.ler_todos(agora)  # ciclo 7: em cooldown (k=2 -> 1)
+    assert leituras[0]["status_leitura"] == "sensor_offline"
+    assert backend.criacoes == 3  # nao tenta reconectar ainda
+
+    leitor.ler_todos(agora)  # ciclo 8: cooldown expira (1 -> 0) -> retenta reconectar
+    assert backend.criacoes == 4
+
+
+def test_falha_ao_recriar_driver_vira_offline_sem_crash(tmp_path):
+    ruim = _DriverFechavel(0.0)
+    backend = _BackendReconexao([ruim], falha_a_partir=2)
+    leitor = Leitor(_cfg_reconexao(tmp_path), backend=backend)
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+
+    leitor.ler_todos(agora)  # ciclo 1: ruim, falhas_seguidas=1
+    leituras2 = leitor.ler_todos(agora)  # ciclo 2: ruim -> tenta reconectar, criar_driver estoura
+    assert leituras2[0]["status_leitura"] == "suspeito"  # ainda leu do driver antigo, antes do close
+
+    # ler_todos nao propagou a excecao do criar_driver; driver antigo ficou
+    # fechado (self._fechado=True) e volta a ser usado no proximo ciclo:
+    leituras3 = leitor.ler_todos(agora)  # ciclo 3: driver antigo fechado -> ler() explode
+    assert leituras3[0]["status_leitura"] == "sensor_offline"
+
+
 def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
     bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
     backend = _BackendConstrucaoFalha(bom)

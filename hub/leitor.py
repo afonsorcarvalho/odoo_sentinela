@@ -7,12 +7,17 @@ from hub import modbus_backend as _backend_padrao
 
 
 class _DispositivoLigado:
-    def __init__(self, driver, canais, driver_nome, porta, endereco):
+    def __init__(self, driver, canais, driver_nome, porta, endereco, recriar, n, m, k):
         self.driver = driver
         self.canais = canais  # list[CanalConfig]
         self.driver_nome = driver_nome
         self.porta = porta
         self.endereco = endereco
+        self.recriar = recriar          # callable() -> novo driver
+        self.n, self.m, self.k = n, m, k
+        self.falhas_seguidas = 0
+        self.reconexoes = 0
+        self.cooldown = 0               # >0 = em cooldown, conta ciclos ate retry
 
 
 class Leitor:
@@ -37,8 +42,16 @@ class Leitor:
                           f"driver={disp.driver!r} porta={bus.porta} endereco={disp.endereco} erro={e!r}")
                     self._degradados.append(disp.canais)
                     continue
+
+                def _fazer_recriar(disp=disp, bus=bus, registros=registros):
+                    return backend.criar_driver(
+                        disp.driver, bus.porta, bus.baud, bus.paridade, bus.stop_bits,
+                        disp.endereco, registros=registros,
+                    )
                 self._dispositivos.append(_DispositivoLigado(
                     driver, disp.canais, disp.driver, bus.porta, disp.endereco,
+                    recriar=_fazer_recriar,
+                    n=disp.reconexao_n, m=disp.reconexao_m, k=disp.reconexao_k,
                 ))
 
     def _specs(self, canais):
@@ -69,41 +82,85 @@ class Leitor:
             return True
         return False
 
+    def _ler_device(self, disp, agora):
+        try:
+            lidos = disp.driver.ler(maps=self._specs(disp.canais))
+            por_canal = {e["channel"]: e for e in lidos}
+            out, ruim = [], False
+            for canal in disp.canais:
+                entrada = por_canal.get(canal.ch)
+                if entrada is None:
+                    out.append(self._normalizar(canal, 0.0, "erro_leitura", agora)); ruim = True
+                else:
+                    norm = self._normalizar(canal, float(entrada["value"]), "ok", agora)
+                    if self._fora_da_faixa(canal, norm["valor"]):
+                        norm["status_leitura"] = "suspeito"; ruim = True
+                    out.append(norm)
+            chave = id(disp)
+            if not ruim and chave in self._falhados:
+                sensor_id = disp.canais[0].sensor_id if disp.canais else '?'
+                print(f"[hub] leitura recuperada: "
+                      f"driver={disp.driver_nome} porta={disp.porta} endereco={disp.endereco} "
+                      f"sensor={sensor_id}")
+                self._falhados.discard(chave)
+            return out, ruim
+        except Exception as e:
+            chave = id(disp)
+            sensor_id = disp.canais[0].sensor_id if disp.canais else '?'
+            if chave not in self._falhados:
+                self._falhados.add(chave)
+                print(f"[hub] leitura falhou, dispositivo offline: "
+                      f"driver={disp.driver_nome} porta={disp.porta} endereco={disp.endereco} "
+                      f"sensor={sensor_id} erro={e!r}")
+            return [self._normalizar(c, 0.0, "sensor_offline", agora) for c in disp.canais], True
+
+    def _tentar_recriar(self, disp):
+        try:
+            disp.driver.close()
+        except Exception:
+            pass
+        try:
+            disp.driver = disp.recriar()
+            print(f"[hub] serial reconectado: porta={disp.porta} endereco={disp.endereco}")
+            return True
+        except Exception as e:
+            print(f"[hub] falha ao reconectar: porta={disp.porta} endereco={disp.endereco} erro={e!r}")
+            return False
+
     def ler_todos(self, agora):
         leituras = []
         for disp in self._dispositivos:
-            try:
-                lidos = disp.driver.ler(maps=self._specs(disp.canais))
-                por_canal = {e["channel"]: e for e in lidos}
-                leituras_disp = []
-                for canal in disp.canais:
-                    entrada = por_canal.get(canal.ch)
-                    if entrada is None:
-                        leituras_disp.append(self._normalizar(canal, 0.0, "erro_leitura", agora))
+            if disp.cooldown > 0:
+                disp.cooldown -= 1
+                if disp.cooldown > 0:
+                    for canal in disp.canais:
+                        leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))
+                    continue
+                # cooldown expirou: tenta recriar antes de ler
+                if not self._tentar_recriar(disp):
+                    disp.cooldown = disp.k
+                    for canal in disp.canais:
+                        leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))
+                    continue
+
+            leituras_disp, ciclo_ruim = self._ler_device(disp, agora)
+            leituras.extend(leituras_disp)
+
+            if ciclo_ruim:
+                disp.falhas_seguidas += 1
+                if disp.falhas_seguidas >= disp.n:
+                    disp.falhas_seguidas = 0
+                    disp.reconexoes += 1
+                    if disp.reconexoes > disp.m:
+                        disp.reconexoes = 0
+                        disp.cooldown = disp.k
+                        print(f"[hub] device em cooldown apos {disp.m} reconexoes: "
+                              f"porta={disp.porta} endereco={disp.endereco}")
                     else:
-                        norm = self._normalizar(canal, float(entrada["value"]), "ok", agora)
-                        if self._fora_da_faixa(canal, norm["valor"]):
-                            norm["status_leitura"] = "suspeito"
-                        leituras_disp.append(norm)
-            except Exception as e:
-                chave = id(disp)
-                sensor_id = disp.canais[0].sensor_id if disp.canais else '?'
-                if chave not in self._falhados:
-                    self._falhados.add(chave)
-                    print(f"[hub] leitura falhou, dispositivo offline: "
-                          f"driver={disp.driver_nome} porta={disp.porta} endereco={disp.endereco} "
-                          f"sensor={sensor_id} erro={e!r}")
-                for canal in disp.canais:
-                    leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))
+                        self._tentar_recriar(disp)
             else:
-                chave = id(disp)
-                if chave in self._falhados:
-                    sensor_id = disp.canais[0].sensor_id if disp.canais else '?'
-                    print(f"[hub] leitura recuperada: "
-                          f"driver={disp.driver_nome} porta={disp.porta} endereco={disp.endereco} "
-                          f"sensor={sensor_id}")
-                    self._falhados.discard(chave)
-                leituras.extend(leituras_disp)
+                disp.falhas_seguidas = 0
+                disp.reconexoes = 0
         for canais in self._degradados:
             for canal in canais:
                 leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))

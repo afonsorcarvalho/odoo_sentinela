@@ -194,7 +194,18 @@ export function buildChartOption(
     // Y mais largos, ex.: "50.07"). left/right/top/bottom viram so a folga.
     grid: { left: 8, right: 14, top: 22, bottom: 8, containLabel: true },
     xAxis: { type: 'time' as const },
-    yAxis: { type: 'value' as const, scale: true, min: yMin, max: yMax },
+    // axisLabel.formatter: min/max sao calculados (lo - pad) e carregam ruido de
+    // ponto flutuante (ex.: 29.65 - pad => 29.650000000000002). ECharts fixa um
+    // tick exatamente no min/max, entao esse numero horrendo aparecia na escala.
+    // toPrecision(12) corta o ruido de 15-17 digitos; Number() remove os zeros a
+    // direita. Nao perde precisao real (12 sig figs cobrem qualquer leitura).
+    yAxis: {
+      type: 'value' as const,
+      scale: true,
+      min: yMin,
+      max: yMax,
+      axisLabel: { formatter: (v: number) => String(Number(v.toPrecision(12))) },
+    },
     series: [{ type: 'line' as const, showSymbol: false, data, markLine, markArea }],
   }
 }

@@ -65,6 +65,16 @@ describe('buildChartOption', () => {
     expect(opt.series[0].data).toEqual([])
   })
 
+  it('formatter do eixo Y remove ruido de ponto flutuante dos labels', () => {
+    const opt = buildChartOption(hist, t) as any
+    const fmt = opt.yAxis.axisLabel.formatter
+    // valor tipico com ruido de float (ex.: 29.65 - pad)
+    expect(fmt(29.650000000000002)).toBe('29.65')
+    expect(fmt(50.07)).toBe('50.07')
+    expect(fmt(0.1 + 0.2)).toBe('0.3')
+    expect(fmt(20)).toBe('20')
+  })
+
   it('estende o eixo Y para conter as linhas de limite (senao ficariam clipadas)', () => {
     const opt = buildChartOption(hist, t) as any
     // faixa 18..22; dados 19..21 dentro. eixo deve conter 18 e 22 com folga.

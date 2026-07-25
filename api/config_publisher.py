@@ -17,6 +17,13 @@ _SFTP_BASE = '/config'
 _PARIDADE_MAP = {'none': 'N', 'even': 'E', 'odd': 'O'}
 
 
+class ConfigInvalida(ValueError):
+    """Config rejeitada na publicação (falha no Odoo/API, não no Pi)."""
+
+
+_DRIVERS_CONHECIDOS = {'n4aib16', 'rs_ws_n01_2d'}
+
+
 def _sftp_conectar():
     t = paramiko.Transport((os.environ['SFTP_HOST'], int(os.environ.get('SFTP_PORT', '2022'))))
     t.connect(username=os.environ['SFTP_USER'],
@@ -65,6 +72,9 @@ def serializar_config_hub(cliente, hub_code, version=None):
             profile_id = dev['profile_id'][0]
             driver = ex('sensor_monitor.modbus.profile', 'read', [profile_id],
                         fields=['driver'])[0]['driver']
+            if driver not in _DRIVERS_CONHECIDOS:
+                raise ConfigInvalida(f"driver desconhecido {driver!r} no dispositivo addr "
+                                     f"{dev['slave_address']} (hub {hub_code})")
             regs = ex('sensor_monitor.modbus.profile.register', 'search',
                       [('profile_id', '=', profile_id)])
             sensores = ex('sensor_monitor.sensor', 'search_read',
@@ -72,7 +82,7 @@ def serializar_config_hub(cliente, hub_code, version=None):
                           fields=['sensor_code', 'modbus_channel', 'ma_in_min', 'ma_in_max',
                                   'eng_out_min', 'eng_out_max', 'filtro_tipo', 'filtro_alpha',
                                   'unidade', 'protocolo_origem', 'area_id', 'measurement_type_id',
-                                  'calibracao_vigente_id'])
+                                  'calibracao_vigente_id', 'usa_map'])
 
             # area_id/measurement_type_id vêm como (id, display_name) via search_read;
             # o Hub espera os CÓDIGOS (area_code / measurement_type.code), não o nome
@@ -104,12 +114,15 @@ def serializar_config_hub(cliente, hub_code, version=None):
                     'area_id': areas_por_id.get(s['area_id'][0]) if s.get('area_id') else None,
                     'tipo_medida': tipos_por_id.get(s['measurement_type_id'][0]) if s.get('measurement_type_id') else None,
                     'unidade': s.get('unidade') or '',
-                    # Fixo '4-20ma': rs485 é só o transporte físico do N4AIB16;
-                    # o Hub espera o tipo de sinal do canal (spec §5.3/§7).
-                    'protocolo_origem': '4-20ma',
-                    'map': {'in': [s['ma_in_min'], s['ma_in_max']],
-                            'out': [s['eng_out_min'], s['eng_out_max']]},
+                    'protocolo_origem': s.get('protocolo_origem') or 'rs485',
                 }
+                if s.get('usa_map'):
+                    if s['ma_in_min'] == s['ma_in_max'] or s['eng_out_min'] == s['eng_out_max']:
+                        raise ConfigInvalida(
+                            f"sensor {s['sensor_code']}: usa_map=True mas o map é degenerado "
+                            f"(in=[{s['ma_in_min']},{s['ma_in_max']}] out=[{s['eng_out_min']},{s['eng_out_max']}])")
+                    canal['map'] = {'in': [s['ma_in_min'], s['ma_in_max']],
+                                    'out': [s['eng_out_min'], s['eng_out_max']]}
                 if s['filtro_tipo'] != 'none':
                     canal['filtro'] = {'tipo': s['filtro_tipo'], 'alpha': s['filtro_alpha']}
                 cert = certs_por_id.get(s['calibracao_vigente_id'][0]) if s.get('calibracao_vigente_id') else None

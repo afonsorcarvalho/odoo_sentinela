@@ -97,7 +97,7 @@ class VerificacaoLote:
     invalidos: int
     incompletos: int
     indeterminados: int
-    todos_ok: bool                   # zero invalidos E zero indeterminados
+    todos_ok: bool                   # zero invalidos E zero incompletos E zero indeterminados (== validos == total)
 ```
 
 O `--json` do CLI e o futuro endpoint devolvem `VerificacaoLote` direto.
@@ -115,7 +115,7 @@ verificar_autenticidade <caminho> [--registro PATH] [--pem PATH] [--json]
 - Saída humana: linha por arquivo (estado + coletor + data + nº linhas) + resumo
   agregado. `--json`: dumpa `VerificacaoLote`.
 
-**Exit codes** (precedência 4 > 1 > 3 > 2 > 0):
+**Exit codes** (precedência 4 > 1 > 2 > 3 > 0):
 
 - `0` — todos válidos.
 - `1` — ≥1 inválido (adulteração).

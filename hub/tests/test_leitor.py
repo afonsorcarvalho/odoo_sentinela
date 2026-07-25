@@ -431,6 +431,82 @@ def test_leitor_com_driver_sem_registro_passa_registros_none(tmp_path):
     assert backend.registros_recebido is None
 
 
+CFG_FAIXA = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-HENKE
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+                faixa_min: 0.1
+                faixa_max: 100
+              - ch: 2
+                sensor_id: SNR-DENTRO
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+                faixa_min: 0.1
+                faixa_max: 100
+              - ch: 3
+                sensor_id: SNR-SEMFAIXA
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+"""
+
+
+def _cfg_faixa(tmp_path):
+    p = tmp_path / "c_faixa.yaml"
+    p.write_text(textwrap.dedent(CFG_FAIXA))
+    return config.carregar_config(p)
+
+
+def test_valor_fora_da_faixa_vira_suspeito(tmp_path):
+    # ch1 tem faixa [0.1, 100] e o driver fake devolve 0.0 -> fora da faixa -> suspeito
+    # ch2 tem a mesma faixa e o driver devolve 50.0 (dentro) -> ok
+    # ch3 nao tem faixa configurada e o driver devolve 999.0 (fora de qualquer faixa
+    # razoavel) -> sem gate, comportamento inalterado -> ok
+    driver = _DriverFake([
+        {"channel": 1, "value": 0.0, "unit": "C"},
+        {"channel": 2, "value": 50.0, "unit": "C"},
+        {"channel": 3, "value": 999.0, "unit": "C"},
+    ])
+    leitor = Leitor(_cfg_faixa(tmp_path), backend=_BackendFake(driver))
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+
+    leitura_henke = por_sensor["SNR-HENKE"]
+    assert leitura_henke["status_leitura"] == "suspeito"
+    assert leitura_henke["valor"] == 0.0  # valor real preservado
+
+    leitura_dentro = por_sensor["SNR-DENTRO"]
+    assert leitura_dentro["status_leitura"] == "ok"
+    assert leitura_dentro["valor"] == 50.0
+
+    leitura_sem_faixa = por_sensor["SNR-SEMFAIXA"]
+    assert leitura_sem_faixa["status_leitura"] == "ok"
+    assert leitura_sem_faixa["valor"] == 999.0
+
+
 def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
     bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
     backend = _BackendConstrucaoFalha(bom)

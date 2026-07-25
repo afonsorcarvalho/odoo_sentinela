@@ -61,6 +61,14 @@ class Leitor:
             "cert_ver": cal['cert_ver'], "cal_ganho": cal['ganho'], "cal_offset": cal['offset'],
         }
 
+    @staticmethod
+    def _fora_da_faixa(canal, valor):
+        if canal.faixa_min is not None and valor < canal.faixa_min:
+            return True
+        if canal.faixa_max is not None and valor > canal.faixa_max:
+            return True
+        return False
+
     def ler_todos(self, agora):
         leituras = []
         for disp in self._dispositivos:
@@ -73,7 +81,10 @@ class Leitor:
                     if entrada is None:
                         leituras_disp.append(self._normalizar(canal, 0.0, "erro_leitura", agora))
                     else:
-                        leituras_disp.append(self._normalizar(canal, float(entrada["value"]), "ok", agora))
+                        norm = self._normalizar(canal, float(entrada["value"]), "ok", agora)
+                        if self._fora_da_faixa(canal, norm["valor"]):
+                            norm["status_leitura"] = "suspeito"
+                        leituras_disp.append(norm)
             except Exception as e:
                 chave = id(disp)
                 sensor_id = disp.canais[0].sensor_id if disp.canais else '?'

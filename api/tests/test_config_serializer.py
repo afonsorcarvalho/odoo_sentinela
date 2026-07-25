@@ -182,3 +182,15 @@ def test_usa_map_true_map_degenerado_levanta():
         'eng_out_min': 0.0, 'eng_out_max': 0.0})
     with pytest.raises(ConfigInvalida):
         serializar_config_hub(cliente, provisionar_demo.HUB_CODE)
+
+
+def test_exigir_driver_conhecido_rejeita_desconhecido():
+    from api.config_publisher import _exigir_driver_conhecido, ConfigInvalida
+    with pytest.raises(ConfigInvalida):
+        _exigir_driver_conhecido('driver_inexistente', 2, 'HUB-X')
+
+
+def test_exigir_driver_conhecido_aceita_conhecidos():
+    from api.config_publisher import _exigir_driver_conhecido
+    _exigir_driver_conhecido('n4aib16', 1, 'HUB-X')      # não levanta
+    _exigir_driver_conhecido('rs_ws_n01_2d', 2, 'HUB-X')  # não levanta

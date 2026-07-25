@@ -121,6 +121,21 @@ def test_arquivo_v2_selado_valido(tmp_path):
     assert r.cliente_id == 'CLI-1' and r.site_id == 'SITE-1'
 
 
+def test_valida_arquivo_v3_com_legenda_de_colunas(tmp_path):
+    # monta um arquivo assinado v3 de 1 leitura (helper _preparar ja usado
+    # acima) e confirma que a linha '# colunas:' esta no cabecalho e nao
+    # derruba a validacao — mesmo status do equivalente v2 (test acima).
+    caminho, registro = _preparar(tmp_path, selar=True)
+    texto = caminho.read_text()
+    assert '# schema_version: 3' in texto
+    assert '# colunas: seq|timestamp|sensor_id|' in texto
+
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == 'valido'
+    assert r.total_linhas == 2
+    assert r.cliente_id == 'CLI-1' and r.site_id == 'SITE-1'
+
+
 def test_arquivo_sem_rodape_e_incompleto(tmp_path):
     caminho, registro = _preparar(tmp_path, selar=False)  # crash: sem footer
     r = validador.validar_arquivo(str(caminho), registro)

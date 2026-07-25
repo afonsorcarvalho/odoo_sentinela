@@ -13,7 +13,7 @@ from . import registro_coletores
 HEADER_KEYS = {
     'schema_version', 'tipo_arquivo', 'cliente_id', 'site_id', 'coletor_id', 'hub_id',
     'coletor_pubkey_fingerprint', 'data_referencia', 'timezone_offset',
-    'firmware_version', 'dia_anterior_hash_final', 'hdr_sig',
+    'firmware_version', 'dia_anterior_hash_final', 'hdr_sig', 'colunas',
 }
 
 

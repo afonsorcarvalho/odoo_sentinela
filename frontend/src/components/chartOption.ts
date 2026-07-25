@@ -218,6 +218,26 @@ export function buildChartOption(
     yMax = hi + pad
   }
 
+  // Casas decimais do eixo Y adaptadas ao span: min/max sao calculados
+  // (lo - pad) e o valor lido pode ser um decimal longo/periodico (avg de
+  // agregacao, ex.: 29.5343333333). ECharts fixa um tick exatamente no min/max
+  // e mostrava o decimal cru na escala. Arredonda para uma casa sensivel dado o
+  // alcance do eixo; span grande -> menos casas. toPrecision nao bastava: so
+  // corta ruido de float (15-17 digitos), nao decimal legitimo longo.
+  const ySpan = yMin != null && yMax != null ? yMax - yMin : NaN
+  const yDecimals = !Number.isFinite(ySpan)
+    ? 2
+    : ySpan >= 100
+      ? 0
+      : ySpan >= 10
+        ? 1
+        : ySpan >= 1
+          ? 2
+          : 3
+  // toFixed arredonda para a casa escolhida; Number() remove zeros a direita
+  // (27.0 -> 27), entao ticks inteiros ficam limpos e o decimal longo some.
+  const yLabelFormatter = (v: number) => String(Number(v.toFixed(yDecimals)))
+
   return {
     animation: false,
     // containLabel: ECharts reserva o espaco dos labels dos eixos DENTRO do
@@ -225,17 +245,15 @@ export function buildChartOption(
     // Y mais largos, ex.: "50.07"). left/right/top/bottom viram so a folga.
     grid: { left: 8, right: 14, top: 22, bottom: 8, containLabel: true },
     xAxis: { type: 'time' as const },
-    // axisLabel.formatter: min/max sao calculados (lo - pad) e carregam ruido de
-    // ponto flutuante (ex.: 29.65 - pad => 29.650000000000002). ECharts fixa um
-    // tick exatamente no min/max, entao esse numero horrendo aparecia na escala.
-    // toPrecision(12) corta o ruido de 15-17 digitos; Number() remove os zeros a
-    // direita. Nao perde precisao real (12 sig figs cobrem qualquer leitura).
+    // axisLabel.formatter (yLabelFormatter, ver acima): arredonda o tick fixado
+    // no min/max para uma casa decimal sensivel ao span; sem isso o decimal cru
+    // (ruido de float OU avg periodico, ex.: 29.5343333333) aparecia na escala.
     yAxis: {
       type: 'value' as const,
       scale: true,
       min: yMin,
       max: yMax,
-      axisLabel: { formatter: (v: number) => String(Number(v.toPrecision(12))) },
+      axisLabel: { formatter: yLabelFormatter },
     },
     series: [{ type: 'line' as const, showSymbol: false, data, markLine, markArea }],
   }

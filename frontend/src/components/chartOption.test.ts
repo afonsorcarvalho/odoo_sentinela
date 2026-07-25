@@ -65,14 +65,22 @@ describe('buildChartOption', () => {
     expect(opt.series[0].data).toEqual([])
   })
 
-  it('formatter do eixo Y remove ruido de ponto flutuante dos labels', () => {
+  it('formatter do eixo Y arredonda decimal longo e remove zeros a direita', () => {
+    // threshold 18..22 -> span pequeno (~5) -> 2 casas
     const opt = buildChartOption(hist, t) as any
     const fmt = opt.yAxis.axisLabel.formatter
-    // valor tipico com ruido de float (ex.: 29.65 - pad)
-    expect(fmt(29.650000000000002)).toBe('29.65')
-    expect(fmt(50.07)).toBe('50.07')
-    expect(fmt(0.1 + 0.2)).toBe('0.3')
-    expect(fmt(20)).toBe('20')
+    expect(fmt(29.650000000000002)).toBe('29.65') // ruido de float some
+    expect(fmt(0.1 + 0.2)).toBe('0.3') // idem
+    expect(fmt(20)).toBe('20') // inteiro sem .00
+    expect(fmt(19.999)).toBe('20') // arredonda p/ 2 casas
+  })
+
+  it('formatter usa menos casas quando o span do eixo e grande', () => {
+    // avg periodico longo num eixo de alcance medio (span ~39) -> 1 casa
+    const wide = { sensor_id: 'S', limite_min: 0, limite_max: 30, is_valor_padrao_regulatorio: true }
+    const opt = buildChartOption(hist, wide) as any
+    const fmt = opt.yAxis.axisLabel.formatter
+    expect(fmt(29.5343333333)).toBe('29.5')
   })
 
   it('estende o eixo Y para conter as linhas de limite (senao ficariam clipadas)', () => {

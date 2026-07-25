@@ -219,3 +219,12 @@ def test_assinatura_footer_corrompida_e_invalido_nao_exception(tmp_path):
     caminho.write_text('\n'.join(linhas))
     r = validador.validar_arquivo(str(caminho), registro)
     assert r.status_validacao == 'invalido'
+
+
+def test_validar_texto_aceita_chave_publica_resolvida(tmp_path):
+    caminho, registro = _preparar(tmp_path, selar=True)
+    chave_publica = registro_coletores.obter_chave_publica(registro, 'COL-1')
+    texto = caminho.read_text()
+    r = validador.validar_texto(texto, chave_publica)
+    assert r.status_validacao == 'valido'
+    assert r.total_linhas == 2

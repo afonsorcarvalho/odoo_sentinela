@@ -111,8 +111,7 @@ def _verificar_sig(chave_publica, sig_b64, hash_hex):
     chave_publica.verify(assinatura, hash_hex.encode(), ec.ECDSA(hashes.SHA256()))
 
 
-def validar_arquivo(caminho, registro_path):
-    texto = Path(caminho).read_text()
+def validar_texto(texto, chave_publica):
     metadados_cab, cabecalho_canonico, linhas_corpo, metadados_rod = parse_arquivo(texto)
     coletor_id = metadados_cab.get('coletor_id')
     tipo_arquivo = metadados_cab.get('tipo_arquivo')
@@ -135,11 +134,6 @@ def validar_arquivo(caminho, registro_path):
             else:
                 r.leituras = leituras
         return r
-
-    try:
-        chave_publica = registro_coletores.obter_chave_publica(registro_path, coletor_id)
-    except KeyError as exc:
-        return _res('invalido', str(exc))
 
     # 1. hdr_sig semeia a cadeia
     hash_atual = formato.hash_seed(cabecalho_canonico)
@@ -188,3 +182,23 @@ def validar_arquivo(caminho, registro_path):
     # sem footer: autêntico até a última sig válida, porém não fechado
     return _res('incompleto', 'arquivo sem rodapé (crash não-recuperado)',
                 leituras=validas, total=len(validas))
+
+
+def validar_arquivo(caminho, registro_path):
+    texto = Path(caminho).read_text()
+    metadados_cab, _, linhas_corpo, metadados_rod = parse_arquivo(texto)
+    coletor_id = metadados_cab.get('coletor_id')
+    try:
+        chave_publica = registro_coletores.obter_chave_publica(registro_path, coletor_id)
+    except KeyError as exc:
+        # header incompleto/coletor ausente: reproduz o resultado 'invalido' legado
+        return ResultadoValidacao(
+            status_validacao='invalido', motivo_rejeicao=str(exc),
+            total_linhas=len(linhas_corpo),
+            coletor_id=coletor_id, data_referencia=metadados_cab.get('data_referencia'),
+            hash_final=metadados_rod.get('hash_final'), assinatura=metadados_rod.get('assinatura'),
+            tipo_arquivo=metadados_cab.get('tipo_arquivo'), cliente_id=metadados_cab.get('cliente_id'),
+            site_id=metadados_cab.get('site_id'),
+            pubkey_fingerprint=metadados_cab.get('coletor_pubkey_fingerprint'),
+            timezone_offset=metadados_cab.get('timezone_offset'))
+    return validar_texto(texto, chave_publica)

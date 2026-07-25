@@ -19,13 +19,17 @@ def carregar_ou_criar_chave(caminho):
     return chave
 
 
-def fingerprint_publica(chave_privada):
-    chave_publica_der = chave_privada.public_key().public_bytes(
+def fingerprint_de_publica(chave_publica):
+    chave_publica_der = chave_publica.public_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     digest = hashlib.sha256(chave_publica_der).hexdigest().upper()
     return ':'.join(digest[i:i + 2] for i in range(0, len(digest), 2))
+
+
+def fingerprint_publica(chave_privada):
+    return fingerprint_de_publica(chave_privada.public_key())
 
 
 def assinar(chave_privada, dado_bytes):

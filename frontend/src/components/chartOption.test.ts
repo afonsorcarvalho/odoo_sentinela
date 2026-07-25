@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildChartOption, computeOutOfRangeBands } from './chartOption'
+import { buildChartOption, computeOutOfRangeBands, computeOfflineGaps } from './chartOption'
 import type { HistoryResponse, Threshold } from '../lib/types'
 
 const t: Threshold = { sensor_id: 'S', limite_min: 18, limite_max: 22, is_valor_padrao_regulatorio: true }
@@ -143,6 +143,29 @@ describe('buildChartOption', () => {
     expect(opt.series[0].markArea.emphasis.label.show).toBe(true)
   })
 
+  it('desenha faixa cinza nos buracos internos da serie (sensor offline e voltou)', () => {
+    const h: HistoryResponse = {
+      sensor_code: 'S', window: '1h', resolution: 'raw',
+      // cadencia mediana ~100; salto 300->2000 (gap 1700 >> 3x)
+      points: [{ ts: 0, value: 20 }, { ts: 100, value: 20 }, { ts: 200, value: 20 }, { ts: 300, value: 20 }, { ts: 2000, value: 20 }],
+    }
+    const opt = buildChartOption(h, t) as any
+    const areas = opt.series[0].markArea.data as any[]
+    const cinza = areas.filter((pair) => 'xAxis' in pair[0] && pair[0].name === 'sem dado' && pair[0].xAxis === 300 && pair[1].xAxis === 2000)
+    expect(cinza).toHaveLength(1)
+  })
+
+  it('marca buracos internos mesmo sem threshold configurado', () => {
+    const h: HistoryResponse = {
+      sensor_code: 'S', window: '1h', resolution: 'raw',
+      points: [{ ts: 0, value: 20 }, { ts: 100, value: 20 }, { ts: 200, value: 20 }, { ts: 2000, value: 20 }],
+    }
+    const opt = buildChartOption(h, null) as any
+    const areas = (opt.series[0].markArea?.data ?? []) as any[]
+    const cinza = areas.filter((pair) => 'xAxis' in pair[0] && pair[0].name === 'sem dado')
+    expect(cinza).toHaveLength(1)
+  })
+
   it('desenha faixa de silencio quando now esta muito alem do ultimo ponto', () => {
     const opt = buildChartOption(hist, t, undefined, undefined, [], 2000 + 6 * 60_000) as any
     const areas = opt.series[0].markArea.data as any[]
@@ -214,5 +237,28 @@ describe('computeOutOfRangeBands', () => {
 
   it('data vazia devolve []', () => {
     expect(computeOutOfRangeBands([], th)).toEqual([])
+  })
+})
+
+describe('computeOfflineGaps', () => {
+  it('gap > 3x mediana vira par [inicio, fim]', () => {
+    const data: [number, number][] = [[0, 20], [100, 20], [200, 20], [1000, 20]]
+    expect(computeOfflineGaps(data)).toEqual([[200, 1000]])
+  })
+
+  it('serie regular sem gaps devolve []', () => {
+    const data: [number, number][] = [[0, 20], [100, 20], [200, 20], [300, 20]]
+    expect(computeOfflineGaps(data)).toEqual([])
+  })
+
+  it('multiplos buracos viram multiplos pares', () => {
+    // cadencia regular 100 (median), dois saltos isolados: 300->1500 e 1700->4000
+    const data: [number, number][] = [[0, 20], [100, 20], [200, 20], [300, 20], [1500, 20], [1600, 20], [1700, 20], [4000, 20]]
+    expect(computeOfflineGaps(data)).toEqual([[300, 1500], [1700, 4000]])
+  })
+
+  it('menos de 2 pontos devolve []', () => {
+    expect(computeOfflineGaps([[0, 20]])).toEqual([])
+    expect(computeOfflineGaps([])).toEqual([])
   })
 })

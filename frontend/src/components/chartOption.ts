@@ -64,6 +64,26 @@ export function computeOutOfRangeBands(
   return bandas
 }
 
+// Detecta buracos internos na serie (sensor offline e depois voltou): pares
+// [inicio, fim] de gaps entre pontos consecutivos maiores que 3x o espacamento
+// mediano. Mesmo criterio adaptativo do breakGap em computeOutOfRangeBands --
+// ajusta a cadencia real de cada sensor em vez de um limite fixo. So gaps
+// INTERNOS: a ausencia final (ultimo ponto -> now) e tratada a parte, via `now`.
+export function computeOfflineGaps(data: [number, number][]): [number, number][] {
+  if (data.length < 2) return []
+  const deltas: number[] = []
+  for (let i = 1; i < data.length; i++) deltas.push(data[i][0] - data[i - 1][0])
+  const sorted = [...deltas].sort((a, b) => a - b)
+  const medianGap = sorted[Math.floor(sorted.length / 2)]
+  if (!medianGap) return []
+  const breakGap = medianGap * 3
+  const gaps: [number, number][] = []
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] - data[i - 1][0] > breakGap) gaps.push([data[i - 1][0], data[i][0]])
+  }
+  return gaps
+}
+
 export function buildChartOption(
   history: HistoryResponse | undefined,
   threshold: Threshold | null,
@@ -143,6 +163,17 @@ export function buildChartOption(
         { xAxis: b.fim },
       ])
     }
+  }
+
+  // Faixas cinza dos buracos INTERNOS (sensor offline e voltou). Independente de
+  // threshold -- ausencia de dado se marca mesmo sem limites configurados. Mesmo
+  // estilo/nome ('sem dado') da faixa de silencio final: um so vocabulario visual
+  // para "sem dado" em qualquer ponto do tempo.
+  for (const [ini, fim] of computeOfflineGaps(data)) {
+    areaData.push([
+      { xAxis: ini, itemStyle: { color: mutedColor, opacity: 0.2 }, name: 'sem dado' },
+      { xAxis: fim },
+    ])
   }
 
   // Faixa de silencio: do ultimo ponto ate `now`, se o silencio ja passou de

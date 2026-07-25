@@ -38,7 +38,7 @@ class _DriverFake:
     def __init__(self, valores=None, erro=False):
         self._valores = valores or [{"channel": 1, "value": 50.0, "unit": "C"}]
         self._erro = erro
-    def read_channels(self, maps=None):
+    def ler(self, maps=None):
         if self._erro:
             raise RuntimeError("sem resposta")
         return self._valores
@@ -81,7 +81,7 @@ class _DriverExplode:
     """Driver que estoura com uma exceção arbitrária (não RuntimeError)."""
     def __init__(self, exc):
         self._exc = exc
-    def read_channels(self, maps=None):
+    def ler(self, maps=None):
         raise self._exc
     def close(self):
         pass
@@ -259,7 +259,7 @@ class _DriverFalhaDepoisRecupera:
         self._n_falhas = n_falhas
         self._chamadas = 0
         self._valores = valores or [{"channel": 1, "value": 50.0, "unit": "C"}]
-    def read_channels(self, maps=None):
+    def ler(self, maps=None):
         self._chamadas += 1
         if self._chamadas <= self._n_falhas:
             raise RuntimeError("sem resposta")

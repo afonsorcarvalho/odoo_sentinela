@@ -61,7 +61,7 @@ class Leitor:
         leituras = []
         for disp in self._dispositivos:
             try:
-                lidos = disp.driver.read_channels(maps=self._specs(disp.canais))
+                lidos = disp.driver.ler(maps=self._specs(disp.canais))
                 por_canal = {e["channel"]: e for e in lidos}
                 leituras_disp = []
                 for canal in disp.canais:

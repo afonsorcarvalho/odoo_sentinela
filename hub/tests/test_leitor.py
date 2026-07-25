@@ -507,6 +507,81 @@ def test_valor_fora_da_faixa_vira_suspeito(tmp_path):
     assert leitura_sem_faixa["valor"] == 999.0
 
 
+CFG_FAIXA_CALIBRACAO = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-CORRIGIDO-FORA
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+                faixa_min: 0.1
+                faixa_max: 100
+                calibracao: {ganho: 10.0, offset: 5.0}
+              - ch: 2
+                sensor_id: SNR-CORRIGIDO-DENTRO
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+                faixa_min: 0.1
+                faixa_max: 100
+                calibracao: {ganho: 0.5, offset: 0}
+"""
+
+
+def _cfg_faixa_calibracao(tmp_path):
+    p = tmp_path / "c_faixa_cal.yaml"
+    p.write_text(textwrap.dedent(CFG_FAIXA_CALIBRACAO))
+    return config.carregar_config(p)
+
+
+def test_gate_de_faixa_atua_sobre_valor_corrigido_nao_sobre_bruto(tmp_path):
+    """O gate de faixa (`_fora_da_faixa`) tem que checar o valor JA calibrado
+    (ganho*bruto+offset), nao o bruto que veio do driver.
+
+    ch1: bruto=15.0 (dentro de [0.1,100] se olhado cru) mas calibracao
+    ganho=10.0/offset=5.0 -> corrigido = 10*15+5 = 155.0, fora da faixa ->
+    suspeito. Se o gate checasse o bruto, este caso passaria como "ok" --
+    errado.
+
+    ch2: bruto=150.0 (fora da faixa crua) mas calibracao ganho=0.5/offset=0
+    -> corrigido = 0.5*150 = 75.0, dentro da faixa -> ok. Prova o sentido
+    inverso: nao marcar suspeito so porque o bruto pareceria fora.
+    """
+    driver = _DriverFake([
+        {"channel": 1, "value": 15.0, "unit": "C"},
+        {"channel": 2, "value": 150.0, "unit": "C"},
+    ])
+    leitor = Leitor(_cfg_faixa_calibracao(tmp_path), backend=_BackendFake(driver))
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+    por_sensor = {r["sensor_id"]: r for r in leituras}
+
+    fora = por_sensor["SNR-CORRIGIDO-FORA"]
+    assert fora["status_leitura"] == "suspeito"
+    assert fora["valor"] == 155.0
+
+    dentro = por_sensor["SNR-CORRIGIDO-DENTRO"]
+    assert dentro["status_leitura"] == "ok"
+    assert dentro["valor"] == 75.0
+
+
 def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
     bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
     backend = _BackendConstrucaoFalha(bom)

@@ -2,6 +2,13 @@ import hashlib
 
 CARACTERES_PROIBIDOS = ('|', '\n', '\r')
 
+_COLUNAS = {
+    "leituras": ("seq|timestamp|sensor_id|area_id|tipo_medida|valor|unidade|"
+                 "protocolo_origem|status_leitura|cert_ver|cal_ganho|cal_offset|hash|sig"),
+    "alarmes": ("seq|timestamp|sensor_id|area_id|tipo_medida|tipo_evento|"
+                "tipo_violacao|valor|limite_min_vigente|limite_max_vigente|hash|sig"),
+}
+
 
 def validar_identificador(valor):
     if any(c in valor for c in CARACTERES_PROIBIDOS):
@@ -19,7 +26,7 @@ def montar_cabecalho(tipo_arquivo, coletor_id, hub_id, pubkey_fingerprint,
     for valor in (coletor_id, hub_id, cliente_id, site_id):
         validar_identificador(valor)
     linhas = [
-        "# schema_version: 2",
+        "# schema_version: 3",
         f"# tipo_arquivo: {tipo_arquivo}",
         f"# cliente_id: {cliente_id}",
         f"# site_id: {site_id}",
@@ -29,6 +36,7 @@ def montar_cabecalho(tipo_arquivo, coletor_id, hub_id, pubkey_fingerprint,
         f"# data_referencia: {data_referencia}",
         f"# timezone_offset: {timezone_offset}",
         f"# firmware_version: {firmware_version}",
+        f"# colunas: {_COLUNAS[tipo_arquivo]}",
     ]
     if tipo_arquivo == 'leituras':
         linhas.append("# dia_anterior_hash_final: N/A")

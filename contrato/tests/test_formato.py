@@ -55,11 +55,11 @@ def test_montar_rodape_leituras():
     assert '# assinatura: ZmFrZQ==' in rodape
 
 
-def test_cabecalho_v2_tem_tenant_e_schema_2():
+def test_cabecalho_v3_tem_tenant_e_schema_3():
     cab = formato.montar_cabecalho(
         'leituras', 'COL-1', 'HUB-1', '9F:3A', '2026-07-16', '-03:00', '2.3.1',
         'CLI-000123', 'SITE-0001')
-    assert '# schema_version: 2' in cab
+    assert '# schema_version: 3' in cab
     assert '# cliente_id: CLI-000123' in cab
     assert '# site_id: SITE-0001' in cab
     # hdr_sig NÃO é montado aqui (é anexado pelo escritor após assinar)
@@ -99,3 +99,18 @@ def test_validar_segmento_path_aceita_codigo_normal():
 def test_validar_segmento_path_rejeita_traversal(ruim):
     with pytest.raises(ValueError):
         formato.validar_segmento_path(ruim)
+
+
+def test_cabecalho_v3_tem_schema_e_legenda_de_colunas():
+    cab = formato.montar_cabecalho(
+        "leituras", "COL-1", "HUB-1", "fp", "2026-07-25", "-03:00", "0.1.0",
+        "CLI-1", "SITE-1")
+    assert "# schema_version: 3" in cab
+    assert ("# colunas: seq|timestamp|sensor_id|area_id|tipo_medida|valor|unidade|"
+            "protocolo_origem|status_leitura|cert_ver|cal_ganho|cal_offset|hash|sig") in cab
+    # alarmes tem legenda propria
+    cab_al = formato.montar_cabecalho(
+        "alarmes", "COL-1", "HUB-1", "fp", "2026-07-25", "-03:00", "0.1.0",
+        "CLI-1", "SITE-1")
+    assert ("# colunas: seq|timestamp|sensor_id|area_id|tipo_medida|tipo_evento|"
+            "tipo_violacao|valor|limite_min_vigente|limite_max_vigente|hash|sig") in cab_al

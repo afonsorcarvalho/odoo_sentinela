@@ -44,6 +44,7 @@ class Leitor:
                 out_min=c.map_out[0], out_max=c.map_out[1], unit=c.unidade,
             )
             for c in canais
+            if c.map_in is not None and c.map_out is not None
         ]
 
     def _normalizar(self, canal, valor, status, agora):
@@ -60,7 +61,7 @@ class Leitor:
         leituras = []
         for disp in self._dispositivos:
             try:
-                lidos = disp.driver.read_channels(maps=self._specs(disp.canais))
+                lidos = disp.driver.ler(maps=self._specs(disp.canais))
                 por_canal = {e["channel"]: e for e in lidos}
                 leituras_disp = []
                 for canal in disp.canais:

@@ -205,6 +205,43 @@ barramentos:
     assert canal.calibracao == {'cert_ver': 3, 'ganho': 0.965, 'offset': 0.33}
 
 
+def test_canal_sem_map_fica_com_map_none(tmp_path):
+    cfg_txt = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB1
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 2
+            driver: rs_ws_n01_2d
+            canais:
+              - ch: 2
+                sensor_id: TEMP-HENKE
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+    """
+    import textwrap
+    p = tmp_path / "c.yaml"
+    p.write_text(textwrap.dedent(cfg_txt))
+    from hub import config
+    cfg = config.carregar_config(p)
+    canal = cfg.barramentos[0].dispositivos[0].canais[0]
+    assert canal.map_in is None
+    assert canal.map_out is None
+    assert canal.ch == 2
+
+
 def test_canal_sem_calibracao_usa_identidade(tmp_path):
     from hub import config as config_mod
     yaml_txt = """

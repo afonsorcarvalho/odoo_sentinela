@@ -38,7 +38,7 @@ class _DriverFake:
     def __init__(self, valores=None, erro=False):
         self._valores = valores or [{"channel": 1, "value": 50.0, "unit": "C"}]
         self._erro = erro
-    def read_channels(self, maps=None):
+    def ler(self, maps=None):
         if self._erro:
             raise RuntimeError("sem resposta")
         return self._valores
@@ -81,7 +81,7 @@ class _DriverExplode:
     """Driver que estoura com uma exceção arbitrária (não RuntimeError)."""
     def __init__(self, exc):
         self._exc = exc
-    def read_channels(self, maps=None):
+    def ler(self, maps=None):
         raise self._exc
     def close(self):
         pass
@@ -90,6 +90,39 @@ class _DriverExplode:
 def _cfg(tmp_path):
     p = tmp_path / "c.yaml"
     p.write_text(textwrap.dedent(CFG))
+    return config.carregar_config(p)
+
+
+CFG_SEM_MAP = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 2
+                sensor_id: SNR-RS-NATIVO
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: modbus
+"""
+
+
+def _cfg_sem_map(tmp_path):
+    p = tmp_path / "c_sem_map.yaml"
+    p.write_text(textwrap.dedent(CFG_SEM_MAP))
     return config.carregar_config(p)
 
 
@@ -259,7 +292,7 @@ class _DriverFalhaDepoisRecupera:
         self._n_falhas = n_falhas
         self._chamadas = 0
         self._valores = valores or [{"channel": 1, "value": 50.0, "unit": "C"}]
-    def read_channels(self, maps=None):
+    def ler(self, maps=None):
         self._chamadas += 1
         if self._chamadas <= self._n_falhas:
             raise RuntimeError("sem resposta")
@@ -297,6 +330,42 @@ def test_log_de_falha_dedupe_e_recuperacao(tmp_path, capsys):
     leitor.ler_todos(agora)
     saida_extra = capsys.readouterr().out
     assert "leitura recuperada" not in saida_extra
+
+
+def test_canal_sem_map_preserva_valor_nativo(tmp_path):
+    from hub.config import CanalConfig
+    from hub.leitor import Leitor
+    canal = CanalConfig(
+        ch=2, sensor_id='TEMP-HENKE', area_id='AREA-EXPURGO',
+        tipo_medida='temperatura', unidade='C', protocolo_origem='modbus',
+        map_in=None, map_out=None,
+    )
+    leitor = object.__new__(Leitor)
+    from hub import modbus_backend
+    leitor._backend = modbus_backend
+    # _specs NÃO deve incluir o canal sem map:
+    assert leitor._specs([canal]) == []
+
+
+def test_ler_todos_canal_sem_map_reporta_valor_nativo_ok(tmp_path):
+    """Canal sem 'map:' (ex.: RS-485 nativo) tem que atravessar ler_todos com o
+    valor nativo intacto e status "ok" — sem passar por MapSpec algum.
+
+    Esta é a regressão do bug que motivou a branch: um map:[0,0] degenerado
+    zerava a leitura do sensor. _specs já exclui canais sem map (testado em
+    test_canal_sem_map_preserva_valor_nativo), mas nada garantia que
+    ler_todos, ao consumir a entrada crua do driver via por_canal, preservasse
+    o valor nativo em vez de zerá-lo.
+    """
+    driver = _DriverFake([{"channel": 2, "value": 25.9, "unit": "C"}])
+    leitor = Leitor(_cfg_sem_map(tmp_path), backend=_BackendFake(driver))
+    leituras = leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+
+    assert len(leituras) == 1
+    r = leituras[0]
+    assert r["sensor_id"] == "SNR-RS-NATIVO"
+    assert r["valor"] == 25.9
+    assert r["status_leitura"] == "ok"
 
 
 def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):

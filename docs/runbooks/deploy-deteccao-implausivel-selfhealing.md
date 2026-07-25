@@ -30,12 +30,32 @@ os hubs OU faz a ingestão rejeitar todo arquivo do hub.
 
 ### 1. Migrar o Odoo (destrava Gate A)
 ```bash
-# NÃO derruba o container; upgrade in-place do addon no DB de produção.
+# (1a) upgrade in-place do addon no DB de produção — adiciona os campos novos
+#      (aditivo, não-destrutivo). Roda como PROCESSO SEPARADO (--stop-after-init).
 docker exec odoo_sentinela-odoo-1 odoo -u afr_sentinela_sensor_monitor \
     -d sentinela --stop-after-init --http-port=8169
+
+# (1b) OBRIGATÓRIO: reiniciar o container Odoo pra recarregar o registry.
+docker compose restart odoo
 ```
-Adiciona os campos novos (aditivo, não-destrutivo). Depois confirme o Odoo vivo:
+**Por que (1b) é obrigatório (aprendido em campo 2026-07-25):** o `--stop-after-init`
+migra o SCHEMA do DB, mas o processo do servidor Odoo **em execução** continua com o
+registry ANTIGO em memória (carregado no boot, horas antes). O "Registry changed,
+signaling through the database" que aparece no log **NÃO** faz o servidor vivo
+recarregar de forma confiável — o resultado observado foi `ValueError: Invalid field
+'usa_faixa'` em toda chamada XML-RPC (MCP, e o próprio config-publish). Sem o restart
+do container, o Gate A parece migrado (colunas existem no DB via `psql`) mas o Odoo
+vivo não enxerga os campos. `docker compose restart odoo` força um registry fresco.
+
+Depois confirme o Odoo vivo (aguarde subir):
 `curl -s -o /dev/null -w "%{http_code}" http://localhost:8189/web/login` → `200`.
+E confirme que o campo aparece no runtime (não só no schema):
+```bash
+docker exec odoo_sentinela-db-1 psql -U odoo -d sentinela -tAc \
+  "SELECT column_name FROM information_schema.columns \
+   WHERE table_name='sensor_monitor_sensor' AND column_name='usa_faixa';"
+# → usa_faixa   (schema OK; o restart em 1b garante o runtime também)
+```
 Nota: `--http-port=8169` porque a 8069 do servidor vivo está ocupada no mesmo
 container; `--no-http` sozinho não basta em modo upgrade.
 

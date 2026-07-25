@@ -15,8 +15,8 @@ class CanalConfig:
     tipo_medida: str
     unidade: str
     protocolo_origem: str
-    map_in: tuple
-    map_out: tuple
+    map_in: tuple = None
+    map_out: tuple = None
     filtro: dict = None
     calibracao: dict = None
 
@@ -72,7 +72,12 @@ def _par(lista, nome):
 def _canal(bruto):
     for campo in ("sensor_id", "area_id"):
         validar_identificador(str(bruto[campo]))
-    mapa = bruto["map"]
+    mapa = bruto.get("map")
+    if mapa is not None:
+        map_in = _par(mapa["in"], "map.in")
+        map_out = _par(mapa["out"], "map.out")
+    else:
+        map_in = map_out = None
     cal = bruto.get("calibracao") or {}
     calibracao = {
         'cert_ver': int(cal.get('cert_ver', 0)),
@@ -86,8 +91,8 @@ def _canal(bruto):
         tipo_medida=bruto["tipo_medida"],
         unidade=bruto["unidade"],
         protocolo_origem=bruto.get("protocolo_origem", "4-20ma"),
-        map_in=_par(mapa["in"], "map.in"),
-        map_out=_par(mapa["out"], "map.out"),
+        map_in=map_in,
+        map_out=map_out,
         filtro=bruto.get("filtro"),
         calibracao=calibracao,
     )

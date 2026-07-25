@@ -299,6 +299,21 @@ def test_log_de_falha_dedupe_e_recuperacao(tmp_path, capsys):
     assert "leitura recuperada" not in saida_extra
 
 
+def test_canal_sem_map_preserva_valor_nativo(tmp_path):
+    from hub.config import CanalConfig
+    from hub.leitor import Leitor
+    canal = CanalConfig(
+        ch=2, sensor_id='TEMP-HENKE', area_id='AREA-EXPURGO',
+        tipo_medida='temperatura', unidade='C', protocolo_origem='modbus',
+        map_in=None, map_out=None,
+    )
+    leitor = object.__new__(Leitor)
+    from hub import modbus_backend
+    leitor._backend = modbus_backend
+    # _specs NÃO deve incluir o canal sem map:
+    assert leitor._specs([canal]) == []
+
+
 def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
     bom = _DriverFake([{"channel": 1, "value": 42.0, "unit": "C"}])
     backend = _BackendConstrucaoFalha(bom)

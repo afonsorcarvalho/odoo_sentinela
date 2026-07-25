@@ -20,6 +20,8 @@ class CanalConfig:
     filtro: dict = None
     calibracao: dict = None
     registro: dict = None
+    faixa_min: float = None
+    faixa_max: float = None
 
 
 @dataclass
@@ -27,6 +29,9 @@ class DispositivoConfig:
     endereco: int
     driver: str
     canais: list = field(default_factory=list)
+    reconexao_n: int = 3
+    reconexao_m: int = 5
+    reconexao_k: int = 10
 
 
 @dataclass
@@ -97,6 +102,8 @@ def _canal(bruto):
         filtro=bruto.get("filtro"),
         calibracao=calibracao,
         registro=bruto.get("registro"),
+        faixa_min=(float(bruto["faixa_min"]) if bruto.get("faixa_min") is not None else None),
+        faixa_max=(float(bruto["faixa_max"]) if bruto.get("faixa_max") is not None else None),
     )
 
 
@@ -166,6 +173,9 @@ def carregar_config(caminho):
                 _validar_canais_generico(endereco, canais)
             dispositivos.append(DispositivoConfig(
                 endereco=endereco, driver=driver, canais=canais,
+                reconexao_n=int(d.get("reconexao_n", 3)),
+                reconexao_m=int(d.get("reconexao_m", 5)),
+                reconexao_k=int(d.get("reconexao_k", 10)),
             ))
         barramentos.append(BarramentoConfig(
             porta=bus["porta"], baud=int(bus["baud"]),

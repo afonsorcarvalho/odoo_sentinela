@@ -301,6 +301,75 @@ def test_driver_generico_com_count_diferente_de_1_falha(tmp_path):
         config.carregar_config(_escrever(tmp_path, ruim))
 
 
+def test_canal_parseia_faixa_min_max(tmp_path):
+    from hub.config import _canal
+    c = _canal({"ch": 1, "sensor_id": "S1", "area_id": "A1",
+                "tipo_medida": "umidade_relativa", "unidade": "%RH",
+                "faixa_min": 0.1, "faixa_max": 100.0})
+    assert c.faixa_min == 0.1 and c.faixa_max == 100.0
+
+
+def test_canal_sem_faixa_e_none(tmp_path):
+    from hub.config import _canal
+    c = _canal({"ch": 1, "sensor_id": "S1", "area_id": "A1",
+                "tipo_medida": "temperatura", "unidade": "C"})
+    assert c.faixa_min is None and c.faixa_max is None
+
+
+DOIS_DISPOSITIVOS_RECONEXAO = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-EXP-TEMP-01
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [-50, 150]}
+          - endereco: 2
+            driver: n4aib16
+            reconexao_n: 2
+            reconexao_m: 4
+            reconexao_k: 8
+            canais:
+              - ch: 1
+                sensor_id: SNR-EXP-TEMP-02
+                area_id: AREA-EXPURGO
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                map: {in: [4, 20], out: [-50, 150]}
+"""
+
+
+def test_device_params_reconexao_com_default(tmp_path):
+    cfg = config.carregar_config(_escrever(tmp_path, DOIS_DISPOSITIVOS_RECONEXAO))
+    dispositivos = cfg.barramentos[0].dispositivos
+    sem_reconexao = dispositivos[0]
+    assert sem_reconexao.reconexao_n == 3
+    assert sem_reconexao.reconexao_m == 5
+    assert sem_reconexao.reconexao_k == 10
+    com_reconexao = dispositivos[1]
+    assert com_reconexao.reconexao_n == 2
+    assert com_reconexao.reconexao_m == 4
+    assert com_reconexao.reconexao_k == 8
+
+
 def test_canal_sem_calibracao_usa_identidade(tmp_path):
     from hub import config as config_mod
     yaml_txt = """

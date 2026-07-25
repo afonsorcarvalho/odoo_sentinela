@@ -9,3 +9,4 @@ from . import test_dashboard_config
 from . import test_config_fields
 from . import test_publicar_config
 from . import test_calibracao
+from . import test_faixa_plausivel

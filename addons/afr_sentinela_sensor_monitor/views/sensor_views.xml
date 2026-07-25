@@ -42,6 +42,9 @@
                                help="Valor de ENGENHARIA correspondente a ma_in_max (ex. 150 °C)."/>
                         <field name="filtro_tipo" invisible="protocolo_origem != 'rs485'"/>
                         <field name="filtro_alpha" invisible="protocolo_origem != 'rs485' or filtro_tipo == 'none'"/>
+                        <field name="usa_faixa"/>
+                        <field name="faixa_min" invisible="not usa_faixa"/>
+                        <field name="faixa_max" invisible="not usa_faixa"/>
                     </group>
                     <notebook>
                         <page string="Calibração">

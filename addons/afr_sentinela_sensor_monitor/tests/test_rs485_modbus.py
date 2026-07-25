@@ -67,3 +67,20 @@ class TestRs485Modbus(TransactionCase):
             'modbus_register_id': self.register.id,
         })
         self.assertEqual(sensor.modbus_register_id, self.register)
+
+    def test_modbus_device_reconexao_defaults(self):
+        device = self.env['sensor_monitor.modbus.device'].create({
+            'name': 'Transdutor Reconexao', 'rs485_bus_id': self.bus.id,
+            'slave_address': 2, 'profile_id': self.profile.id,
+        })
+        self.assertEqual(device.reconexao_n, 3)
+        self.assertEqual(device.reconexao_m, 5)
+        self.assertEqual(device.reconexao_k, 10)
+
+    def test_modbus_device_reconexao_nao_positivo_levanta_erro(self):
+        with self.assertRaises(ValidationError):
+            self.env['sensor_monitor.modbus.device'].create({
+                'name': 'Transdutor Reconexao Invalido', 'rs485_bus_id': self.bus.id,
+                'slave_address': 3, 'profile_id': self.profile.id,
+                'reconexao_n': 0,
+            })

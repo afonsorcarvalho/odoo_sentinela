@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
 
 from .calibracao import CONVERSOR_TIPOS
 from .common import validate_code
@@ -29,6 +30,15 @@ class Sensor(models.Model):
         help='Se marcado, o valor cru passa pelo mapeamento (ma_in→eng_out), '
              'ex.: sensor 4-20mA via N4AIB16. Se desmarcado, o sensor entrega o '
              'valor físico direto (ex.: RS-WS-N01-2D em °C/%RH) e nenhum map é aplicado.')
+    usa_faixa = fields.Boolean(
+        default=False,
+        help='Se marcado, faixa_min/faixa_max definem a janela de plausibilidade física. '
+             'Leituras fora da faixa são marcadas "suspeito". Se desmarcado, nenhum gate '
+             'de plausibilidade é aplicado.')
+    faixa_min = fields.Float(
+        help="Menor valor fisico plausivel; abaixo disso a leitura e marcada 'suspeito'.")
+    faixa_max = fields.Float(
+        help="Maior valor fisico plausivel; acima disso a leitura e marcada 'suspeito'.")
     calibracao_ids = fields.One2many(
         'sensor_monitor.calibracao', 'sensor_id', string='Certificados de Calibração')
     calibracao_vigente_id = fields.Many2one(
@@ -43,6 +53,12 @@ class Sensor(models.Model):
     def _check_sensor_code(self):
         for sensor in self:
             validate_code(sensor.sensor_code)
+
+    @api.constrains('usa_faixa', 'faixa_min', 'faixa_max')
+    def _check_faixa(self):
+        for sensor in self:
+            if sensor.usa_faixa and sensor.faixa_min >= sensor.faixa_max:
+                raise ValidationError(_("faixa_min deve ser menor que faixa_max."))
 
     @api.depends('conversor_tipo', 'calibracao_ids.validade_de',
                  'calibracao_ids.validade_ate', 'calibracao_ids.conversor_tipo_snapshot',

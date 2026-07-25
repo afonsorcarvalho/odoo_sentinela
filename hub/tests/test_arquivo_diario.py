@@ -98,7 +98,7 @@ def test_recuperar_pendentes_sela_arquivo_com_nome_legado(tmp_path):
     assert not novo.exists()                       # e nada foi criado no nome novo
 
 
-def test_arquivo_v2_tem_hdr_sig_e_sig_por_linha(tmp_path, assinador):
+def test_arquivo_v3_tem_hdr_sig_e_sig_por_linha(tmp_path, assinador):
     from hub.arquivo_diario import ArquivoDiario
     arq = ArquivoDiario('COL-1', 'HUB-1', '2.3.1', '-03:00', str(tmp_path), assinador,
                         cliente_id='CLI-1', site_id='SITE-1')
@@ -107,7 +107,7 @@ def test_arquivo_v2_tem_hdr_sig_e_sig_por_linha(tmp_path, assinador):
     texto = arq.caminho('2026-07-16').read_text()
     linhas = [l for l in texto.split('\n') if l]
 
-    assert '# schema_version: 2' in texto
+    assert '# schema_version: 3' in texto
     assert any(l.startswith('# hdr_sig: ') for l in linhas)
 
     corpo = [l for l in linhas if not l.startswith('#')]

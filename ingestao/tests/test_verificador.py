@@ -88,3 +88,30 @@ def test_bytes_nao_decodificaveis_e_indeterminado(tmp_path):
     lote = verificador.verificar_itens([('bin.txt', b'\xff\xfe\x00\x01')], registro_path=str(tmp_path / "reg.json"))
     assert lote.indeterminados == 1
     assert lote.itens[0].estado == 'indeterminado'
+
+
+def test_modo_b_pem_correto_valido_com_fingerprint_conferido(tmp_path):
+    caminho, _, assinador = _preparar(tmp_path, selar=True)
+    pem = assinador.chave_publica_pem().encode()
+    lote = verificador.verificar_itens([_bytes(caminho)], pem_bytes=pem)
+    item = lote.itens[0]
+    assert item.estado == 'valido'
+    assert item.fingerprint_conferido is True
+    assert lote.todos_ok is True
+
+
+def test_modo_b_pem_de_outra_chave_e_invalido(tmp_path):
+    caminho, _, _ = _preparar(tmp_path, selar=True)
+    outro = AssinadorSoftware(str(tmp_path / "outra.pem"))
+    lote = verificador.verificar_itens([_bytes(caminho)], pem_bytes=outro.chave_publica_pem().encode())
+    item = lote.itens[0]
+    assert item.estado == 'invalido'
+    assert item.fingerprint_conferido is False
+    assert 'fingerprint' in item.motivo
+
+
+def test_modo_b_pem_ilegivel_levanta_valueerror(tmp_path):
+    caminho, _, _ = _preparar(tmp_path, selar=True)
+    import pytest
+    with pytest.raises(ValueError):
+        verificador.verificar_itens([_bytes(caminho)], pem_bytes=b'nao eh pem')

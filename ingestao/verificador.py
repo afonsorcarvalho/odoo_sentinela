@@ -7,6 +7,9 @@ HTTP amanhã). Reusa a cripto de validador.validar_texto.
 from dataclasses import dataclass, field
 from typing import Iterable, List, Optional, Tuple
 
+from cryptography.hazmat.primitives import serialization
+
+from contrato import identidade
 from ingestao import registro_coletores, validador
 
 _MAPA_ESTADO = {'valido': 'valido', 'invalido': 'invalido', 'incompleto': 'incompleto'}
@@ -78,7 +81,9 @@ def _verificar_um(nome, dados, registro_path, chave_pem, fp_pem):
 def verificar_itens(itens: Iterable[Tuple[str, bytes]], *, registro_path=None, pem_bytes=None) -> VerificacaoLote:
     chave_pem = None
     fp_pem = None
-    # (modo B carregado na Task 4)
+    if pem_bytes is not None:
+        chave_pem = serialization.load_pem_public_key(pem_bytes)  # ValueError se ilegível
+        fp_pem = identidade.fingerprint_de_publica(chave_pem)
 
     lote = VerificacaoLote()
     for nome, dados in itens:

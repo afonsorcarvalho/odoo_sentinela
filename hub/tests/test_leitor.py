@@ -622,14 +622,33 @@ def _cfg_reconexao(tmp_path):
 
 class _DriverFaixa:
     """Devolve sempre o mesmo valor (bom ou ruim, conforme gate de faixa do
-    canal) e conta close()."""
-    def __init__(self, valor):
+    canal) e conta close(). Opcionalmente lança em close() (fd que nao fecha
+    limpo), pra testar que a reconexao engole essa excecao."""
+    def __init__(self, valor, erro_close=False):
         self._valor = valor
+        self._erro_close = erro_close
         self.closes = 0
     def ler(self, maps=None):
         return [{"channel": 1, "value": self._valor, "unit": "C"}]
     def close(self):
         self.closes += 1
+        if self._erro_close:
+            raise RuntimeError("close falhou (fd travado)")
+
+
+class _DriverPadrao:
+    """Cicla por uma sequencia fixa de valores a cada chamada de ler(),
+    repetindo do inicio ao esgotar. Usado pra simular flapping (ruim, ok,
+    ruim, ok, ...) no MESMO driver, sem depender de reconexao."""
+    def __init__(self, valores):
+        self._valores = valores
+        self._i = 0
+    def ler(self, maps=None):
+        v = self._valores[self._i % len(self._valores)]
+        self._i += 1
+        return [{"channel": 1, "value": v, "unit": "C"}]
+    def close(self):
+        pass
 
 
 class _DriverFechavel:
@@ -748,3 +767,47 @@ def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
     # dispositivo que não instanciou vira sensor_offline (visível no dashboard)
     assert por_sensor["SNR-RUIM"]["status_leitura"] == "sensor_offline"
     assert por_sensor["SNR-RUIM"]["valor"] == 0.0
+
+
+def test_flapping_bad_ok_bad_nao_reconecta(tmp_path):
+    """Device flapping: alterna ciclo ruim (fora de faixa) e ciclo ok, sem
+    nunca acumular N=2 ciclos ruins SEGUIDOS. O ciclo ok tem que zerar
+    falhas_seguidas (e reconexoes) — senão o acumulo atravessa os ciclos ok
+    e dispara reconexao espuria num sensor que so esta intermitente.
+
+    N=2 (config _cfg_reconexao). Padrao [ruim, ok, ruim, ok, ...]: cada ruim
+    isolado leva falhas_seguidas a 1 (< n=2, sem reconectar); o ok seguinte
+    zera. Sem o reset, o 2o ruim ve falhas_seguidas=1 residual do 1o ruim e
+    fecha 2 seguidos -> reconecta espuriamente.
+    """
+    driver = _DriverPadrao([0.0, 50.0])  # 0.0 fora de faixa (suspeito/ruim), 50.0 ok
+    backend = _BackendReconexao([driver])
+    leitor = Leitor(_cfg_reconexao(tmp_path), backend=backend)
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+    assert backend.criacoes == 1  # construcao inicial
+
+    for _ in range(8):  # 4x (ruim, ok)
+        leitor.ler_todos(agora)
+
+    assert backend.criacoes == 1  # nenhuma reconexao espuria — flapping nao acumula
+
+
+def test_close_que_lanca_e_engolido_reconexao_prossegue(tmp_path):
+    """close() que lanca (fd travado) durante uma reconexao (apos N ruins)
+    tem que ser engolido: ler_todos nao propaga a excecao e a recriacao do
+    driver acontece normalmente."""
+    ruim = _DriverFaixa(0.0, erro_close=True)
+    bom = _DriverFaixa(50.0)
+    backend = _BackendReconexao([ruim, bom])
+    leitor = Leitor(_cfg_reconexao(tmp_path), backend=backend)
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+    assert backend.criacoes == 1
+
+    leitor.ler_todos(agora)  # ciclo 1: ruim, falhas_seguidas=1
+    leituras2 = leitor.ler_todos(agora)  # ciclo 2: ruim -> reconecta; close() lanca, engolido
+    assert leituras2[0]["status_leitura"] == "suspeito"  # ainda leu do driver antigo, antes do close
+    assert backend.criacoes == 2  # recriacao ocorreu apesar do close() ter lancado
+    assert ruim.closes == 1  # close() foi chamado (e lancou, mas foi engolido)
+
+    leituras3 = leitor.ler_todos(agora)  # ciclo 3: driver novo (bom) -> confirma reconexao completa
+    assert leituras3[0]["status_leitura"] == "ok"

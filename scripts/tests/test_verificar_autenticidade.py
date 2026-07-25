@@ -34,17 +34,19 @@ def test_arquivo_unico_valido_exit_0(tmp_path, capsys):
     assert 'valido' in capsys.readouterr().out.lower()
 
 
-def test_diretorio_com_invalido_exit_1(tmp_path):
+def test_diretorio_com_invalido_exit_1(tmp_path, capsys):
     registro = str(tmp_path / "reg.json")
     raiz = tmp_path / "arvore"
-    bom = _dia(tmp_path, "arvore/ok", registro=registro)  # noqa: F841
-    ruim = _dia(tmp_path, "arvore/ruim", registro=registro)
+    bom = _dia(tmp_path, "arvore/ok", coletor='COL-OK', registro=registro)  # noqa: F841
+    ruim = _dia(tmp_path, "arvore/ruim", coletor='COL-RUIM', registro=registro)
     linhas = ruim.read_text().split('\n')
     i = next(i for i, l in enumerate(linhas) if l and not l.startswith('#'))
     campos = linhas[i].split('|'); campos[5] = '1.23'; linhas[i] = '|'.join(campos)
     ruim.write_text('\n'.join(linhas))
-    rc = cli.main([str(raiz), '--registro', registro])
+    rc = cli.main([str(raiz), '--registro', registro, '--json'])
     assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload['validos'] == 1 and payload['invalidos'] == 1
 
 
 def test_json_output(tmp_path, capsys):

@@ -3,7 +3,7 @@
 Adaptador fino sobre ingestao.verificador: lê arquivo/diretório do disco,
 alimenta o núcleo (nome, bytes) e imprime veredito humano ou JSON. Exit codes:
 0 todos válidos · 1 ≥1 inválido · 2 ≥1 incompleto · 3 ≥1 indeterminado ·
-4 erro de uso. Precedência 4 > 1 > 3 > 2 > 0.
+4 erro de uso. Precedência 4 > 1 > 2 > 3 > 0.
 """
 import argparse
 import json

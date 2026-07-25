@@ -69,3 +69,9 @@ def test_pem_ilegivel_exit_4(tmp_path):
     pem = tmp_path / "ruim.pem"; pem.write_text("nao eh pem")
     rc = cli.main([str(caminho), '--pem', str(pem)])
     assert rc == 4
+
+
+def test_diretorio_sem_txt_exit_4(tmp_path):
+    vazio = tmp_path / "vazio"; vazio.mkdir()
+    rc = cli.main([str(vazio), '--registro', str(tmp_path / "r.json")])
+    assert rc == 4

@@ -56,6 +56,10 @@ def _verificar_um(nome, dados, registro_path, chave_pem, fp_pem):
     fingerprint_conferido = None
     if chave_pem is not None:  # modo B — preenchido na Task 4
         fp_header = metadados_cab.get('coletor_pubkey_fingerprint')
+        if not fp_header:
+            return _indeterminado(
+                nome, 'header sem coletor_pubkey_fingerprint (não confrontável com a chave fornecida)',
+                coletor_id=coletor_id)
         if fp_pem != fp_header:
             return VerificacaoItem(
                 nome=nome, estado='invalido', coletor_id=coletor_id,
@@ -94,5 +98,6 @@ def verificar_itens(itens: Iterable[Tuple[str, bytes]], *, registro_path=None, p
     lote.invalidos = sum(1 for i in lote.itens if i.estado == 'invalido')
     lote.incompletos = sum(1 for i in lote.itens if i.estado == 'incompleto')
     lote.indeterminados = sum(1 for i in lote.itens if i.estado == 'indeterminado')
-    lote.todos_ok = lote.invalidos == 0 and lote.incompletos == 0 and lote.indeterminados == 0
+    lote.todos_ok = (lote.total > 0 and lote.invalidos == 0
+                     and lote.incompletos == 0 and lote.indeterminados == 0)
     return lote

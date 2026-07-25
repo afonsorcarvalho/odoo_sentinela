@@ -115,3 +115,48 @@ def test_modo_b_pem_ilegivel_levanta_valueerror(tmp_path):
     import pytest
     with pytest.raises(ValueError):
         verificador.verificar_itens([_bytes(caminho)], pem_bytes=b'nao eh pem')
+
+
+def test_lote_vazio_nao_e_todos_ok():
+    lote = verificador.verificar_itens([], registro_path='qualquer.json')
+    assert lote.total == 0
+    assert lote.todos_ok is False
+
+
+def test_modo_b_header_sem_fingerprint_e_indeterminado(tmp_path):
+    """Header assinado (hdr_sig) mas sem a linha coletor_pubkey_fingerprint —
+    formato malformado/legado, não confrontável com a chave fornecida. Não
+    deve ser tratado como adulteração (invalido)."""
+    import base64
+
+    from contrato import formato
+
+    assinador = AssinadorSoftware(str(tmp_path / "k2.pem"))
+    cabecalho = (
+        "# schema_version: 2\n"
+        "# tipo_arquivo: leituras\n"
+        "# cliente_id: CLI-1\n"
+        "# site_id: SITE-1\n"
+        "# coletor_id: COL-2\n"
+        "# hub_id: HUB-1\n"
+        "# data_referencia: 2026-07-16\n"
+        "# timezone_offset: -03:00\n"
+        "# firmware_version: 2.3.1\n"
+        "# dia_anterior_hash_final: N/A\n"
+    )  # sem coletor_pubkey_fingerprint de propósito
+    hash_atual = formato.hash_seed(cabecalho)
+    hdr_sig = base64.b64encode(assinador.assinar(hash_atual.encode())).decode()
+    texto = cabecalho + f"# hdr_sig: {hdr_sig}\n"
+    linha, hash_atual = formato.gerar_linha_leitura(
+        hash_atual, 1, '2026-07-16T00:01:00', 'SNR-1', 'EXPURGO', 'temperatura',
+        96.83, 'C', '4-20ma', 'ok', 3, 0.965, 0.33)
+    sig = base64.b64encode(assinador.assinar(hash_atual.encode())).decode()
+    texto += linha + "|" + sig + "\n"
+    texto += formato.montar_rodape(1, hash_atual,
+        base64.b64encode(assinador.assinar(hash_atual.encode())).decode(), "total_linhas")
+
+    pem = assinador.chave_publica_pem().encode()
+    lote = verificador.verificar_itens([('arquivo.txt', texto.encode())], pem_bytes=pem)
+    item = lote.itens[0]
+    assert item.estado == 'indeterminado'
+    assert 'coletor_pubkey_fingerprint' in item.motivo

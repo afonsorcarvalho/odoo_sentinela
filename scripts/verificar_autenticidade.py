@@ -69,6 +69,10 @@ def main(argv=None):
         print(f"erro: {exc}", file=sys.stderr)
         return 4
 
+    if not itens:
+        print(f"erro: nenhum arquivo de leitura encontrado em {args.caminho}", file=sys.stderr)
+        return 4
+
     pem_bytes = None
     if args.pem:
         try:

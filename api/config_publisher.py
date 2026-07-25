@@ -77,7 +77,8 @@ def serializar_config_hub(cliente, hub_code, version=None):
     for bus in buses:
         devices = ex('sensor_monitor.modbus.device', 'search_read',
                      [('rs485_bus_id', '=', bus['id'])],
-                     fields=['id', 'slave_address', 'profile_id'])
+                     fields=['id', 'slave_address', 'profile_id',
+                             'reconexao_n', 'reconexao_m', 'reconexao_k'])
         dispositivos = []
         for dev in devices:
             profile_id = dev['profile_id'][0]
@@ -97,7 +98,8 @@ def serializar_config_hub(cliente, hub_code, version=None):
                           fields=['sensor_code', 'modbus_channel', 'ma_in_min', 'ma_in_max',
                                   'eng_out_min', 'eng_out_max', 'filtro_tipo', 'filtro_alpha',
                                   'unidade', 'protocolo_origem', 'area_id', 'measurement_type_id',
-                                  'calibracao_vigente_id', 'usa_map', 'modbus_register_id'])
+                                  'calibracao_vigente_id', 'usa_map', 'modbus_register_id',
+                                  'usa_faixa', 'faixa_min', 'faixa_max'])
 
             # area_id/measurement_type_id vêm como (id, display_name) via search_read;
             # o Hub espera os CÓDIGOS (area_code / measurement_type.code), não o nome
@@ -138,6 +140,13 @@ def serializar_config_hub(cliente, hub_code, version=None):
                             f"(in=[{s['ma_in_min']},{s['ma_in_max']}] out=[{s['eng_out_min']},{s['eng_out_max']}])")
                     canal['map'] = {'in': [s['ma_in_min'], s['ma_in_max']],
                                     'out': [s['eng_out_min'], s['eng_out_max']]}
+                if s.get('usa_faixa'):
+                    if s['faixa_min'] >= s['faixa_max']:
+                        raise ConfigInvalida(
+                            f"sensor {s['sensor_code']}: usa_faixa=True mas faixa_min "
+                            f">= faixa_max ({s['faixa_min']} >= {s['faixa_max']})")
+                    canal['faixa_min'] = s['faixa_min']
+                    canal['faixa_max'] = s['faixa_max']
                 if s['filtro_tipo'] != 'none':
                     canal['filtro'] = {'tipo': s['filtro_tipo'], 'alpha': s['filtro_alpha']}
                 cert = certs_por_id.get(s['calibracao_vigente_id'][0]) if s.get('calibracao_vigente_id') else None
@@ -164,7 +173,12 @@ def serializar_config_hub(cliente, hub_code, version=None):
                     }
                 canais.append(canal)
 
-            dispositivos.append({'endereco': dev['slave_address'], 'driver': driver, 'canais': canais})
+            dispositivos.append({
+                'endereco': dev['slave_address'], 'driver': driver, 'canais': canais,
+                'reconexao_n': dev.get('reconexao_n') or 3,
+                'reconexao_m': dev.get('reconexao_m') or 5,
+                'reconexao_k': dev.get('reconexao_k') or 10,
+            })
 
         barramentos.append({
             'porta': bus['serial_port'], 'baud': bus['baud_rate'],

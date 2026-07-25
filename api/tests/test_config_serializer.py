@@ -308,3 +308,77 @@ def test_exigir_driver_conhecido_aceita_conhecidos():
     from api.config_publisher import _exigir_driver_conhecido
     _exigir_driver_conhecido('n4aib16', 1, 'HUB-X')      # não levanta
     _exigir_driver_conhecido('rs_ws_n01_2d', 2, 'HUB-X')  # não levanta
+
+
+def test_usa_faixa_true_emite_faixa_min_max():
+    cliente = get_cliente_servico()
+    _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    sid = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
+    ex('sensor_monitor.sensor', 'write', [sid], {
+        'usa_faixa': True, 'faixa_min': 0.1, 'faixa_max': 100.0})
+    try:
+        cfg = serializar_config_hub(cliente, provisionar_demo.HUB_CODE)
+        canal = cfg['barramentos'][0]['dispositivos'][0]['canais'][0]
+        assert canal['faixa_min'] == 0.1
+        assert canal['faixa_max'] == 100.0
+    finally:
+        ex('sensor_monitor.sensor', 'write', [sid], {'usa_faixa': False})
+
+
+def test_usa_faixa_false_omite_faixa():
+    cliente = get_cliente_servico()
+    _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    sid = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
+    ex('sensor_monitor.sensor', 'write', [sid], {'usa_faixa': False})
+    cfg = serializar_config_hub(cliente, provisionar_demo.HUB_CODE)
+    canal = cfg['barramentos'][0]['dispositivos'][0]['canais'][0]
+    assert 'faixa_min' not in canal
+    assert 'faixa_max' not in canal
+
+
+def test_usa_faixa_true_faixa_invalida_levanta(monkeypatch):
+    """O Odoo já bloqueia faixa_min>=faixa_max no próprio model (constraint
+    `_check_faixa` da Task 6) — não dá pra chegar nesse estado via write()
+    normal. O serializer guarda essa mesma invariante em defesa de segunda
+    camada (dado que possa chegar por outra via: migração, escrita direta em
+    SQL, XML-RPC de outro cliente sem o constraint). Simula via monkeypatch
+    no `search_read` de sensores o dado que o serializer efetivamente recebe,
+    sem precisar burlar o Odoo real."""
+    cliente = get_cliente_servico()
+    _prov_hub_modbus(cliente)
+
+    executar_real = odoo_cliente.executar
+
+    def executar_fake(cli, model, metodo, *args, **kwargs):
+        resultado = executar_real(cli, model, metodo, *args, **kwargs)
+        if model == 'sensor_monitor.sensor' and metodo == 'search_read':
+            for s in resultado:
+                if s['sensor_code'] == SENSOR_CODE:
+                    s['usa_faixa'] = True
+                    s['faixa_min'] = 100.0
+                    s['faixa_max'] = 0.1
+        return resultado
+
+    monkeypatch.setattr(odoo_cliente, 'executar', executar_fake)
+    with pytest.raises(ConfigInvalida):
+        serializar_config_hub(cliente, provisionar_demo.HUB_CODE)
+
+
+def test_dispositivo_carrega_reconexao_n_customizado_m_k_default():
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    dev_id = ex('sensor_monitor.modbus.device', 'search',
+               [('slave_address', '=', 1)])[0]
+    ex('sensor_monitor.modbus.device', 'write', [dev_id], {'reconexao_n': 2})
+    try:
+        cfg = serializar_config_hub(cliente, hub_code)
+        bus = next(b for b in cfg['barramentos'] if b['porta'] == '/dev/ttyUSB0')
+        disp = next(d for d in bus['dispositivos'] if d['endereco'] == 1)
+        assert disp['reconexao_n'] == 2
+        assert disp['reconexao_m'] == 5
+        assert disp['reconexao_k'] == 10
+    finally:
+        ex('sensor_monitor.modbus.device', 'write', [dev_id], {'reconexao_n': 3})

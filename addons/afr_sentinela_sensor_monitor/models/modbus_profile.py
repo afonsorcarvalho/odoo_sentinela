@@ -9,7 +9,7 @@ class ModbusProfile(models.Model):
     fabricante = fields.Char()
     modelo = fields.Char()
     driver = fields.Selection(
-        [('n4aib16', 'N4AIB16'), ('rs_ws_n01_2d', 'RS-WS-N01-2D')],
+        [('n4aib16', 'N4AIB16'), ('rs_ws_n01_2d', 'RS-WS-N01-2D'), ('generico', 'Genérico (register-driven)')],
         default='n4aib16', required=True,
         help='Driver que o Hub usa para ler este perfil (define a família do dispositivo).')
     register_ids = fields.One2many('sensor_monitor.modbus.profile.register', 'profile_id')

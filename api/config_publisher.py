@@ -21,7 +21,10 @@ class ConfigInvalida(ValueError):
     """Config rejeitada na publicação (falha no Odoo/API, não no Pi)."""
 
 
-_DRIVERS_CONHECIDOS = {'n4aib16', 'rs_ws_n01_2d'}
+_DRIVERS_CONHECIDOS = {'n4aib16', 'rs_ws_n01_2d', 'generico'}
+
+_FUNCAO_MODBUS = {'03_holding': 3, '04_input': 4}
+_DATATYPES_GENERICO_V1 = {'int16', 'uint16'}
 
 
 def _exigir_driver_conhecido(driver, endereco, hub_code):
@@ -83,12 +86,18 @@ def serializar_config_hub(cliente, hub_code, version=None):
             _exigir_driver_conhecido(driver, dev['slave_address'], hub_code)
             regs = ex('sensor_monitor.modbus.profile.register', 'search',
                       [('profile_id', '=', profile_id)])
+            registers_por_id = {}
+            if driver == 'generico' and regs:
+                registers = ex('sensor_monitor.modbus.profile.register', 'read', regs,
+                               fields=['function_code', 'register_address', 'register_count',
+                                       'data_type', 'scale', 'offset'])
+                registers_por_id = {r['id']: r for r in registers}
             sensores = ex('sensor_monitor.sensor', 'search_read',
                           [('modbus_register_id', 'in', regs)],
                           fields=['sensor_code', 'modbus_channel', 'ma_in_min', 'ma_in_max',
                                   'eng_out_min', 'eng_out_max', 'filtro_tipo', 'filtro_alpha',
                                   'unidade', 'protocolo_origem', 'area_id', 'measurement_type_id',
-                                  'calibracao_vigente_id', 'usa_map'])
+                                  'calibracao_vigente_id', 'usa_map', 'modbus_register_id'])
 
             # area_id/measurement_type_id vêm como (id, display_name) via search_read;
             # o Hub espera os CÓDIGOS (area_code / measurement_type.code), não o nome
@@ -137,6 +146,22 @@ def serializar_config_hub(cliente, hub_code, version=None):
                     'ganho': cert['cal_ganho'] if cert else 1.0,
                     'offset': cert['cal_offset'] if cert else 0.0,
                 }
+                if driver == 'generico':
+                    reg = registers_por_id.get(s['modbus_register_id'][0]) if s.get('modbus_register_id') else None
+                    if reg is None:
+                        raise ConfigInvalida(
+                            f"sensor {s['sensor_code']}: driver generico requer modbus_register_id")
+                    if reg['data_type'] not in _DATATYPES_GENERICO_V1 or reg['register_count'] != 1:
+                        raise ConfigInvalida(
+                            f"sensor {s['sensor_code']}: driver generico v1 só suporta "
+                            f"int16/uint16 e 1 registrador (veio {reg['data_type']}, "
+                            f"count {reg['register_count']})")
+                    canal['registro'] = {
+                        'address': reg['register_address'],
+                        'function': _FUNCAO_MODBUS.get(reg['function_code'], 3),
+                        'data_type': reg['data_type'],
+                        'scale': reg['scale'], 'offset': reg['offset'], 'count': reg['register_count'],
+                    }
                 canais.append(canal)
 
             dispositivos.append({'endereco': dev['slave_address'], 'driver': driver, 'canais': canais})

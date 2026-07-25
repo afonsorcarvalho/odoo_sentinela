@@ -100,3 +100,42 @@ def test_criar_driver_desconhecido_levanta():
     import pytest
     with pytest.raises(ValueError):
         mb.criar_driver("driver_inexistente", "/dev/x", 9600, "N", 1, 1)
+
+
+class _VendorGenericoFake:
+    """Simula Generico.read_measurements: entries já têm 'channel'."""
+    def __init__(self):
+        self.fechado = False
+        self.maps_recebido = "NAO_CHAMADO"
+    def read_measurements(self, maps=None):
+        self.maps_recebido = maps
+        return [{"channel": 1, "value": 5.1, "unit": "%RH"}]
+    def close(self):
+        self.fechado = True
+
+
+def test_adaptador_generico_repassa_entries_e_maps():
+    from hub.modbus_backend import AdaptadorGenerico
+    vendor = _VendorGenericoFake()
+    ad = AdaptadorGenerico(vendor)
+    entries = ad.ler(maps=["SPEC"])
+    assert vendor.maps_recebido == ["SPEC"]
+    assert entries[0]["channel"] == 1
+    assert entries[0]["value"] == 5.1
+
+
+def test_criar_driver_despacha_generico(monkeypatch):
+    import hub.modbus_backend as mb, sys, types
+
+    class _GenericoFake:
+        def __init__(self, **kw): self.kw = kw
+
+    mod = types.ModuleType("drivers.generico")
+    mod.Generico = _GenericoFake
+    monkeypatch.setitem(sys.modules, "drivers.generico", mod)
+    registros = [{"ch": 1, "address": 1, "function": 3, "data_type": "int16",
+                  "scale": 0.1, "offset": 0.0, "count": 1}]
+    ad = mb.criar_driver("generico", "/dev/ttyUSB2", 9600, "N", 1, 3, registros=registros)
+    assert isinstance(ad, mb.AdaptadorGenerico)
+    assert ad._driver.kw["address"] == 3 and ad._driver.kw["baud"] == 9600
+    assert ad._driver.kw["registros"] == registros

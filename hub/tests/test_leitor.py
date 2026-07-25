@@ -51,7 +51,19 @@ class _BackendFake:
         self._driver = driver
         from hub.modbus_backend import MapSpec
         self.MapSpec = MapSpec
-    def criar_driver(self, *a, **k):
+    def criar_driver(self, *a, registros=None, **k):
+        return self._driver
+
+
+class _BackendRegistrosFake:
+    """Backend fake que grava o `registros` recebido em criar_driver."""
+    def __init__(self, driver):
+        self._driver = driver
+        self.registros_recebido = "NAO_CHAMADO"
+        from hub.modbus_backend import MapSpec
+        self.MapSpec = MapSpec
+    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco, registros=None):
+        self.registros_recebido = registros
         return self._driver
 
 
@@ -61,7 +73,7 @@ class _BackendMulti:
         self._por_endereco = por_endereco  # dict[int, driver]
         from hub.modbus_backend import MapSpec
         self.MapSpec = MapSpec
-    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco):
+    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco, registros=None):
         return self._por_endereco[endereco]
 
 
@@ -71,7 +83,7 @@ class _BackendConstrucaoFalha:
         self._bom = driver_bom
         from hub.modbus_backend import MapSpec
         self.MapSpec = MapSpec
-    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco):
+    def criar_driver(self, driver_nome, porta, baud, paridade, stopbits, endereco, registros=None):
         if endereco == 2:
             raise ValueError(f"driver Modbus desconhecido: {driver_nome!r}")
         return self._bom
@@ -366,6 +378,57 @@ def test_ler_todos_canal_sem_map_reporta_valor_nativo_ok(tmp_path):
     assert r["sensor_id"] == "SNR-RS-NATIVO"
     assert r["valor"] == 25.9
     assert r["status_leitura"] == "ok"
+
+
+CFG_GENERICO = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 3
+            driver: generico
+            canais:
+              - ch: 1
+                sensor_id: SNR-GEN-01
+                area_id: AREA-EXPURGO
+                tipo_medida: umidade
+                unidade: '%RH'
+                protocolo_origem: modbus
+                registro: {address: 1, function: 3, data_type: int16, scale: 0.1, offset: 0.0, count: 1}
+"""
+
+
+def _cfg_generico(tmp_path):
+    p = tmp_path / "c_generico.yaml"
+    p.write_text(textwrap.dedent(CFG_GENERICO))
+    return config.carregar_config(p)
+
+
+def test_leitor_deriva_registros_dos_canais_e_repassa_a_criar_driver(tmp_path):
+    driver = _DriverFake([{"channel": 1, "value": 5.1, "unit": "%RH"}])
+    backend = _BackendRegistrosFake(driver)
+    Leitor(_cfg_generico(tmp_path), backend=backend)
+    assert backend.registros_recebido == [
+        {'ch': 1, 'address': 1, 'function': 3, 'data_type': 'int16',
+         'scale': 0.1, 'offset': 0.0, 'count': 1},
+    ]
+
+
+def test_leitor_com_driver_sem_registro_passa_registros_none(tmp_path):
+    driver = _DriverFake()
+    backend = _BackendRegistrosFake(driver)
+    Leitor(_cfg(tmp_path), backend=backend)
+    assert backend.registros_recebido is None
 
 
 def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):

@@ -29,6 +29,7 @@
                         <field name="unidade"/>
                         <field name="ativo"/>
                         <field name="conversor_tipo"/>
+                        <field name="usa_map" invisible="protocolo_origem != 'rs485'"/>
                         <field name="modbus_register_id" invisible="protocolo_origem != 'rs485'"/>
                         <field name="modbus_channel" invisible="protocolo_origem != 'rs485'"/>
                         <field name="ma_in_min" invisible="protocolo_origem != 'rs485'"

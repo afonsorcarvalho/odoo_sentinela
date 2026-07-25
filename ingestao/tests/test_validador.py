@@ -1,7 +1,8 @@
+import base64
 from datetime import date, datetime
 
 from coletor_simulado import gerador as gerador_simulado
-from contrato import identidade as identidade_simulado
+from contrato import formato, identidade as identidade_simulado
 from hub.arquivo_diario import ArquivoDiario
 from hub.assinador import AssinadorSoftware
 from ingestao import registro_coletores, validador
@@ -113,12 +114,56 @@ def _preparar(tmp_path, selar=True):
     return arq.caminho('2026-07-16'), registro
 
 
-def test_arquivo_v2_selado_valido(tmp_path):
+def test_arquivo_v3_selado_valido(tmp_path):
     caminho, registro = _preparar(tmp_path, selar=True)
     r = validador.validar_arquivo(str(caminho), registro)
     assert r.status_validacao == 'valido'
     assert r.total_linhas == 2
     assert r.cliente_id == 'CLI-1' and r.site_id == 'SITE-1'
+
+
+def test_arquivo_v2_legado_sem_colunas_ainda_valida(tmp_path):
+    # Monta um cabecalho v2 legado A MAO (schema_version 2, sem linha
+    # '# colunas:'), fiel ao formato que contrato.formato.montar_cabecalho
+    # emitia antes da Task 1 -- nao usa ArquivoDiario/montar_cabecalho atuais,
+    # que so emitem v3. Prova que 'colunas' em HEADER_KEYS nao quebra o acervo
+    # real de producao (arquivos v2 gerados pelo hub antes deste trabalho).
+    assinador = AssinadorSoftware(str(tmp_path / "k.pem"))
+    cabecalho = "\n".join([
+        "# schema_version: 2",
+        "# tipo_arquivo: leituras",
+        "# cliente_id: CLI-1",
+        "# site_id: SITE-1",
+        "# coletor_id: COL-1",
+        "# hub_id: HUB-1",
+        f"# coletor_pubkey_fingerprint: {assinador.fingerprint()}",
+        "# data_referencia: 2026-07-16",
+        "# timezone_offset: -03:00",
+        "# firmware_version: 2.3.1",
+        "# dia_anterior_hash_final: N/A",
+    ]) + "\n"
+
+    h = formato.hash_seed(cabecalho)
+    hdr_sig = base64.b64encode(assinador.assinar(h.encode())).decode()
+    texto = cabecalho + f"# hdr_sig: {hdr_sig}\n"
+
+    linha, h = formato.gerar_linha_leitura(
+        h, 1, "2026-07-16T00:01:00", "SNR-1", "EXPURGO", "temperatura",
+        96.83, "C", "4-20ma", "ok", 3, 0.965, 0.33,
+    )
+    sig = base64.b64encode(assinador.assinar(h.encode())).decode()
+    texto += linha + "|" + sig + "\n"
+    assinatura = base64.b64encode(assinador.assinar(h.encode())).decode()
+    texto += formato.montar_rodape(1, h, assinatura, "total_linhas")
+
+    caminho = tmp_path / "v2_legado.txt"
+    caminho.write_text(texto)
+    registro = str(tmp_path / "reg.json")
+    registro_coletores.registrar_coletor(registro, "COL-1", assinador.chave_publica_pem())
+
+    r = validador.validar_arquivo(str(caminho), registro)
+    assert r.status_validacao == "valido"
+    assert r.total_linhas == 1
 
 
 def test_valida_arquivo_v3_com_legenda_de_colunas(tmp_path):

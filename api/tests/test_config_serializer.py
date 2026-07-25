@@ -1,6 +1,8 @@
+import pytest
+
 from ingestao import odoo_cliente, provisionar_demo
 
-from api.config_publisher import serializar_config_hub
+from api.config_publisher import ConfigInvalida, serializar_config_hub
 from api.odoo import get_cliente_servico
 
 BUS_CODE = 'BUS-CFG-0'
@@ -46,7 +48,8 @@ def _prov_hub_modbus(cliente):
     ex('sensor_monitor.sensor', 'write', [sensor_id], {
         'modbus_register_id': reg_id, 'modbus_channel': 1, 'ma_in_min': 4.0,
         'ma_in_max': 20.0, 'eng_out_min': -50.0, 'eng_out_max': 150.0,
-        'filtro_tipo': 'ewma', 'filtro_alpha': 0.3, 'protocolo_origem': 'rs485'})
+        'filtro_tipo': 'ewma', 'filtro_alpha': 0.3, 'protocolo_origem': 'rs485',
+        'usa_map': True})  # N4AIB16 é analógico 4-20mA: precisa do map in/out
 
     return hub_code
 
@@ -74,7 +77,7 @@ def test_serializar_hub_produz_yaml_operacional():
     assert canal['ch'] == 1
     assert canal['area_id'] == 'AREA-EXPURGO'
     assert canal['tipo_medida'] == 'temperatura'
-    assert canal['protocolo_origem'] == '4-20ma'
+    assert canal['protocolo_origem'] == 'rs485'  # vem do campo, não hardcode
     assert canal['map'] == {'in': [4.0, 20.0], 'out': [-50.0, 150.0]}
     assert canal['filtro'] == {'tipo': 'ewma', 'alpha': 0.3}
 
@@ -143,3 +146,51 @@ def test_config_traz_tenant_no_topo():
     cfg = serializar_config_hub(cliente, hub_code)
     assert cfg['site_id']  # site_code do site do hub
     assert cfg['cliente_id']  # partner.ref ou CLI-<id>
+
+
+def test_usa_map_true_emite_map():
+    cliente = get_cliente_servico()
+    _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    sid = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
+    ex('sensor_monitor.sensor', 'write', [sid], {'usa_map': True})
+    cfg = serializar_config_hub(cliente, provisionar_demo.HUB_CODE)
+    canal = cfg['barramentos'][0]['dispositivos'][0]['canais'][0]
+    assert 'map' in canal
+    assert canal['protocolo_origem'] == 'rs485'   # vem do campo, não hardcode
+
+
+def test_usa_map_false_omite_map():
+    cliente = get_cliente_servico()
+    _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    sid = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
+    ex('sensor_monitor.sensor', 'write', [sid], {'usa_map': False,
+        'eng_out_min': 0.0, 'eng_out_max': 0.0})   # map degenerado, mas nativo → OK
+    cfg = serializar_config_hub(cliente, provisionar_demo.HUB_CODE)
+    canal = cfg['barramentos'][0]['dispositivos'][0]['canais'][0]
+    assert 'map' not in canal
+
+
+def test_usa_map_true_map_degenerado_levanta():
+    from api.config_publisher import ConfigInvalida
+    cliente = get_cliente_servico()
+    _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    sid = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE)])[0]
+    ex('sensor_monitor.sensor', 'write', [sid], {'usa_map': True,
+        'eng_out_min': 0.0, 'eng_out_max': 0.0})
+    with pytest.raises(ConfigInvalida):
+        serializar_config_hub(cliente, provisionar_demo.HUB_CODE)
+
+
+def test_exigir_driver_conhecido_rejeita_desconhecido():
+    from api.config_publisher import _exigir_driver_conhecido, ConfigInvalida
+    with pytest.raises(ConfigInvalida):
+        _exigir_driver_conhecido('driver_inexistente', 2, 'HUB-X')
+
+
+def test_exigir_driver_conhecido_aceita_conhecidos():
+    from api.config_publisher import _exigir_driver_conhecido
+    _exigir_driver_conhecido('n4aib16', 1, 'HUB-X')      # não levanta
+    _exigir_driver_conhecido('rs_ws_n01_2d', 2, 'HUB-X')  # não levanta

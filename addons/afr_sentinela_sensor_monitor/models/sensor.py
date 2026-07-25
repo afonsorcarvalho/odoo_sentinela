@@ -24,6 +24,11 @@ class Sensor(models.Model):
         CONVERSOR_TIPOS, default='nenhum', required=True,
         help='Conversor da malha (atributo, não peça rastreada). "Nenhum" = o sensor '
              'entrega o valor direto. Trocar o conversor invalida a calibração vigente.')
+    usa_map = fields.Boolean(
+        default=False,
+        help='Se marcado, o valor cru passa pelo mapeamento (ma_in→eng_out), '
+             'ex.: sensor 4-20mA via N4AIB16. Se desmarcado, o sensor entrega o '
+             'valor físico direto (ex.: RS-WS-N01-2D em °C/%RH) e nenhum map é aplicado.')
     calibracao_ids = fields.One2many(
         'sensor_monitor.calibracao', 'sensor_id', string='Certificados de Calibração')
     calibracao_vigente_id = fields.Many2one(

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from . import mqtt as api_mqtt
-from .config_publisher import escrever_config_sftp, serializar_config_hub
+from .config_publisher import ConfigInvalida, escrever_config_sftp, serializar_config_hub
 from .odoo import get_cliente_servico
 from .presenca import RASTREADOR
 
@@ -25,7 +25,10 @@ def publicar_config(hub_code: str, body: PublicarConfigBody = PublicarConfigBody
     if not _SECRET or x_config_secret != _SECRET:
         raise HTTPException(status_code=401, detail='secret inválido')
     cliente = get_cliente_servico()
-    cfg = serializar_config_hub(cliente, hub_code, version=body.version)
+    try:
+        cfg = serializar_config_hub(cliente, hub_code, version=body.version)
+    except ConfigInvalida as e:
+        raise HTTPException(status_code=422, detail=str(e))
     versao = cfg['version']
     remoto = escrever_config_sftp(hub_code, versao, yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True))
     api_mqtt.publicar(

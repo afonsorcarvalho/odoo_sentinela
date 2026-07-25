@@ -25,8 +25,12 @@ class Leitor:
         for bus in config.barramentos:
             for disp in bus.dispositivos:
                 try:
+                    registros = [
+                        {'ch': c.ch, **c.registro} for c in disp.canais if c.registro
+                    ] or None
                     driver = backend.criar_driver(
                         disp.driver, bus.porta, bus.baud, bus.paridade, bus.stop_bits, disp.endereco,
+                        registros=registros,
                     )
                 except Exception as e:
                     print(f"[hub] dispositivo nao instanciou, degradado: "

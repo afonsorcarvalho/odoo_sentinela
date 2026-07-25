@@ -11,3 +11,9 @@ def test_rs_ws_n01_2d_importavel():
 def test_n4aib16_continua_importavel():
     from drivers.n4aib16 import N4AIB16
     assert hasattr(N4AIB16, "read_channels")
+
+
+def test_generico_importavel():
+    from drivers.generico import Generico, decode_registro
+    assert decode_registro([65516], 'int16') == -20
+    assert hasattr(Generico, 'read_measurements')

@@ -43,7 +43,13 @@ class AdaptadorRS(_AdaptadorDriver):
         return entries
 
 
-def criar_driver(driver_nome, porta, baud, paridade, stopbits, endereco):
+class AdaptadorGenerico(_AdaptadorDriver):
+    """Driver genérico: read_measurements já devolve entries com 'channel'."""
+    def ler(self, maps=None):
+        return self._driver.read_measurements(maps=maps)
+
+
+def criar_driver(driver_nome, porta, baud, paridade, stopbits, endereco, registros=None):
     """Instancia o adapter do dispositivo. Raise ValueError se desconhecido."""
     if driver_nome == "n4aib16":
         from drivers.n4aib16 import N4AIB16
@@ -57,4 +63,9 @@ def criar_driver(driver_nome, porta, baud, paridade, stopbits, endereco):
             port=porta, baud=baud, address=endereco,
             parity=_PARIDADE.get(paridade, "N"), stopbits=stopbits,
         ))
+    if driver_nome == "generico":
+        from drivers.generico import Generico
+        return AdaptadorGenerico(Generico(
+            port=porta, baud=baud, address=endereco,
+            parity=_PARIDADE.get(paridade, "N"), stopbits=stopbits, registros=registros))
     raise ValueError(f"driver Modbus desconhecido: {driver_nome!r}")

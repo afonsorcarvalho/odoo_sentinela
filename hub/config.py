@@ -19,6 +19,7 @@ class CanalConfig:
     map_out: tuple = None
     filtro: dict = None
     calibracao: dict = None
+    registro: dict = None
 
 
 @dataclass
@@ -95,6 +96,7 @@ def _canal(bruto):
         map_out=map_out,
         filtro=bruto.get("filtro"),
         calibracao=calibracao,
+        registro=bruto.get("registro"),
     )
 
 
@@ -120,6 +122,31 @@ def _validar_segmento(nome_campo, valor, motivo_extra=''):
             f"ele vira um diretório no caminho do arquivo.{motivo_extra}")
 
 
+_DATA_TYPES_SUPORTADOS = {"int16", "uint16"}
+
+
+def _validar_canais_generico(endereco, canais):
+    """Driver 'generico' é data-driven: cada canal PRECISA de 'registro' válido,
+    senão o driver não sabe o que ler — falhar aqui é falhar no boot, não em
+    tempo de varredura."""
+    for canal in canais:
+        if not canal.registro:
+            raise ValueError(
+                f"dispositivo endereco={endereco} driver=generico: canal ch={canal.ch} "
+                f"sem 'registro' — obrigatório para o driver genérico.")
+        data_type = canal.registro.get("data_type")
+        if data_type not in _DATA_TYPES_SUPORTADOS:
+            raise ValueError(
+                f"dispositivo endereco={endereco} driver=generico: canal ch={canal.ch} "
+                f"registro.data_type={data_type!r} inválido — suportados: "
+                f"{sorted(_DATA_TYPES_SUPORTADOS)}.")
+        count = canal.registro.get("count")
+        if count != 1:
+            raise ValueError(
+                f"dispositivo endereco={endereco} driver=generico: canal ch={canal.ch} "
+                f"registro.count={count!r} inválido — só 1 é suportado na v1.")
+
+
 def carregar_config(caminho):
     dados = yaml.safe_load(Path(caminho).read_text())
     for campo in ("hub_id", "coletor_id"):
@@ -130,14 +157,16 @@ def carregar_config(caminho):
         _validar_segmento(campo, dados[campo])
     barramentos = []
     for bus in dados["barramentos"]:
-        dispositivos = [
-            DispositivoConfig(
-                endereco=int(d["endereco"]),
-                driver=d["driver"],
-                canais=[_canal(c) for c in d["canais"]],
-            )
-            for d in bus["dispositivos"]
-        ]
+        dispositivos = []
+        for d in bus["dispositivos"]:
+            endereco = int(d["endereco"])
+            driver = d["driver"]
+            canais = [_canal(c) for c in d["canais"]]
+            if driver == "generico":
+                _validar_canais_generico(endereco, canais)
+            dispositivos.append(DispositivoConfig(
+                endereco=endereco, driver=driver, canais=canais,
+            ))
         barramentos.append(BarramentoConfig(
             porta=bus["porta"], baud=int(bus["baud"]),
             paridade=bus.get("paridade", "N"), stop_bits=int(bus.get("stop_bits", 1)),

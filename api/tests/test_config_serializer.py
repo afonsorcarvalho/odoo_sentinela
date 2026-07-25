@@ -8,6 +8,9 @@ from api.odoo import get_cliente_servico
 BUS_CODE = 'BUS-CFG-0'
 SENSOR_CODE = 'SNR-EXP-TEMP-01'  # já criado por provisionar_demo, área AREA-EXPURGO
 
+BUS_CODE_GEN = 'BUS-CFG-GEN-0'
+SENSOR_CODE_GEN = 'SNR-EXP-PRES-01'  # já criado por provisionar_demo, área AREA-EXPURGO
+
 
 def _prov_hub_modbus(cliente):
     """Reusa provisionar_demo (site/hub/coletor/área/sensor válidos) e completa
@@ -52,6 +55,117 @@ def _prov_hub_modbus(cliente):
         'usa_map': True})  # N4AIB16 é analógico 4-20mA: precisa do map in/out
 
     return hub_code
+
+
+def _prov_hub_generico(cliente, data_type='int16', register_count=1, scale=0.1, offset=0.0):
+    """Cria (idempotente por códigos) um device com perfil driver='generico' num
+    bus próprio, um registrador (03_holding, addr 1) e o sensor SNR-EXP-PRES-01
+    linkado, para testar a emissão de `registro` no canal.
+
+    Reusa `_prov_hub_modbus` (em vez de chamar `provisionar_demo.provisionar`
+    direto) para também deixar o bus/sensor N4 num estado válido — o hub demo
+    é compartilhado entre todos os testes deste módulo, e qualquer teste pode
+    ser o primeiro a rodar `serializar_config_hub` (que itera TODOS os
+    barramentos do hub, N4 incluso)."""
+    hub_code = _prov_hub_modbus(cliente)
+    ex = lambda *a, **k: odoo_cliente.executar(cliente, *a, **k)
+    hub_id = ex('sensor_monitor.hub', 'search', [('hub_code', '=', hub_code)])[0]
+
+    bus = ex('sensor_monitor.rs485.bus', 'search', [('bus_code', '=', BUS_CODE_GEN)]) or [
+        ex('sensor_monitor.rs485.bus', 'create', {
+            'hub_id': hub_id, 'name': 'Bus Generico Cfg', 'bus_code': BUS_CODE_GEN,
+            'serial_port': '/dev/ttyUSB1', 'baud_rate': 9600, 'parity': 'none',
+            'stop_bits': '1', 'data_bits': 8})]
+    bus_id = bus[0]
+
+    prof = ex('sensor_monitor.modbus.profile', 'search', [('name', '=', 'Generico Cfg')]) or [
+        ex('sensor_monitor.modbus.profile', 'create', {'name': 'Generico Cfg', 'driver': 'generico'})]
+    prof_id = prof[0]
+
+    tipo_pres_id = ex('sensor_monitor.measurement.type', 'search',
+                      [('code', '=', 'pressao_diferencial')])[0]
+
+    reg_vals = {
+        'profile_id': prof_id, 'name': 'CH1 Generico Cfg',
+        'measurement_type_id': tipo_pres_id,
+        'function_code': '03_holding', 'register_address': 1, 'register_count': register_count,
+        'data_type': data_type, 'scale': scale, 'offset': offset,
+    }
+    reg_existente = ex('sensor_monitor.modbus.profile.register', 'search',
+                       [('name', '=', 'CH1 Generico Cfg')])
+    if reg_existente:
+        reg_id = reg_existente[0]
+        ex('sensor_monitor.modbus.profile.register', 'write', [reg_id], reg_vals)
+    else:
+        reg_id = ex('sensor_monitor.modbus.profile.register', 'create', reg_vals)
+
+    ex('sensor_monitor.modbus.device', 'search',
+       [('rs485_bus_id', '=', bus_id), ('slave_address', '=', 2)]) or \
+        ex('sensor_monitor.modbus.device', 'create', {
+            'name': 'Generico Cfg', 'rs485_bus_id': bus_id, 'slave_address': 2, 'profile_id': prof_id})
+
+    sensor_id = ex('sensor_monitor.sensor', 'search', [('sensor_code', '=', SENSOR_CODE_GEN)])[0]
+    ex('sensor_monitor.sensor', 'write', [sensor_id], {
+        'modbus_register_id': reg_id, 'modbus_channel': 1, 'protocolo_origem': 'rs485',
+        'usa_map': False, 'filtro_tipo': 'none'})
+
+    return hub_code
+
+
+def test_serializar_driver_generico_emite_registro():
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_generico(cliente)
+
+    cfg = serializar_config_hub(cliente, hub_code)
+
+    bus = next(b for b in cfg['barramentos'] if b['porta'] == '/dev/ttyUSB1')
+    disp = next(d for d in bus['dispositivos'] if d['endereco'] == 2)
+    assert disp['driver'] == 'generico'
+    canal = next(c for c in disp['canais'] if c['sensor_id'] == SENSOR_CODE_GEN)
+    assert canal['registro'] == {
+        'address': 1, 'function': 3, 'data_type': 'int16',
+        'scale': 0.1, 'offset': 0.0, 'count': 1,
+    }
+
+
+def test_serializar_driver_generico_data_type_invalido_levanta():
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_generico(cliente, data_type='float32')
+
+    try:
+        with pytest.raises(ConfigInvalida):
+            serializar_config_hub(cliente, hub_code)
+    finally:
+        # o bus/device genérico é compartilhado com o hub demo — devolve o
+        # registrador a um estado válido para não quebrar os testes seguintes
+        # que também iteram sobre todos os barramentos do hub.
+        _prov_hub_generico(cliente)
+
+
+def test_serializar_driver_generico_count_invalido_levanta():
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_generico(cliente, register_count=2)
+
+    try:
+        with pytest.raises(ConfigInvalida):
+            serializar_config_hub(cliente, hub_code)
+    finally:
+        _prov_hub_generico(cliente)
+
+
+def test_serializar_n4_nao_emite_registro():
+    """Regressão: perfil N4AIB16 (register-based mas driver != generico) não
+    deve ganhar `registro` no canal — só o driver genérico emite isso."""
+    cliente = get_cliente_servico()
+    hub_code = _prov_hub_modbus(cliente)
+
+    cfg = serializar_config_hub(cliente, hub_code)
+
+    bus = next(b for b in cfg['barramentos'] if b['porta'] == '/dev/ttyUSB0')
+    disp = next(d for d in bus['dispositivos'] if d['endereco'] == 1)
+    assert disp['driver'] == 'n4aib16'
+    canal = next(c for c in disp['canais'] if c['sensor_id'] == SENSOR_CODE)
+    assert 'registro' not in canal
 
 
 def test_serializar_hub_produz_yaml_operacional():

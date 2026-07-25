@@ -242,6 +242,65 @@ def test_canal_sem_map_fica_com_map_none(tmp_path):
     assert canal.ch == 2
 
 
+GENERICO = """
+    hub_id: HUB-0001
+    coletor_id: COL-RS485-BUS0
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 60
+    caminho_chave: /tmp/coletor.pem
+    caminho_dados: /tmp/dados
+    mqtt: {host: localhost, port: 1883}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        paridade: N
+        stop_bits: 1
+        dispositivos:
+          - endereco: 3
+            driver: generico
+            canais:
+              - ch: 1
+                sensor_id: SNR-GEN-01
+                area_id: AREA-EXPURGO
+                tipo_medida: umidade
+                unidade: '%RH'
+                protocolo_origem: modbus
+                registro: {address: 1, function: 3, data_type: int16, scale: 0.1, offset: 0.0, count: 1}
+"""
+
+
+def test_carrega_registro_do_canal_generico(tmp_path):
+    cfg = config.carregar_config(_escrever(tmp_path, GENERICO))
+    canal = cfg.barramentos[0].dispositivos[0].canais[0]
+    assert canal.registro == {
+        'address': 1, 'function': 3, 'data_type': 'int16',
+        'scale': 0.1, 'offset': 0.0, 'count': 1,
+    }
+
+
+def test_driver_generico_sem_registro_no_canal_falha(tmp_path):
+    ruim = GENERICO.replace(
+        "                registro: {address: 1, function: 3, data_type: int16, "
+        "scale: 0.1, offset: 0.0, count: 1}\n",
+        "",
+    )
+    with pytest.raises(ValueError, match="registro"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_driver_generico_com_data_type_invalido_falha(tmp_path):
+    ruim = GENERICO.replace("data_type: int16", "data_type: float32")
+    with pytest.raises(ValueError, match="data_type"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
+def test_driver_generico_com_count_diferente_de_1_falha(tmp_path):
+    ruim = GENERICO.replace("count: 1", "count: 2")
+    with pytest.raises(ValueError, match="count"):
+        config.carregar_config(_escrever(tmp_path, ruim))
+
+
 def test_canal_sem_calibracao_usa_identidade(tmp_path):
     from hub import config as config_mod
     yaml_txt = """

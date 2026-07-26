@@ -10,8 +10,8 @@
     'depends': ['website', 'afr_sentinela_sensor_monitor'],
     'data': [
         'views/portal_templates.xml',
-        # 'report/laudo_report.xml',        # criado no Stage 5 (deixar comentado até lá)
-        # 'report/laudo_templates.xml',
+        'report/laudo_report.xml',
+        'report/laudo_templates.xml',
     ],
     'assets': {
         'web.assets_frontend': [

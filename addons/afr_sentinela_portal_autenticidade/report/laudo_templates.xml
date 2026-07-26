@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="laudo">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="page">
+                    <h2>Laudo de Verificação de Autenticidade</h2>
+                    <p class="text-muted">
+                        Gerado em: <span t-esc="o.gerado_em"/>
+                    </p>
+
+                    <table class="table table-sm" style="width: auto;">
+                        <tbody>
+                            <tr><td>Total</td><td><strong t-esc="o.total"/></td></tr>
+                            <tr><td>Válidos</td><td t-esc="o.validos"/></tr>
+                            <tr><td>Inválidos</td><td t-esc="o.invalidos"/></tr>
+                            <tr><td>Incompletos</td><td t-esc="o.incompletos"/></tr>
+                            <tr><td>Indeterminados</td><td t-esc="o.indeterminados"/></tr>
+                            <tr>
+                                <td>Veredito</td>
+                                <td>
+                                    <span t-if="o.todos_ok" class="text-success">
+                                        Todos os arquivos autênticos
+                                    </span>
+                                    <span t-else="" class="text-danger">
+                                        Um ou mais arquivos falharam a verificação
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <table class="table table-bordered table-sm">
+                        <thead>
+                            <tr>
+                                <th>Arquivo</th>
+                                <th>Estado</th>
+                                <th>Motivo</th>
+                                <th>Coletor</th>
+                                <th>Data de referência</th>
+                                <th>Linhas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="o.linha_ids" t-as="linha">
+                                <td t-esc="linha.nome"/>
+                                <td>
+                                    <span t-if="linha.estado == 'valido'" class="text-success">
+                                        <t t-esc="linha.estado"/>
+                                    </span>
+                                    <span t-elif="linha.estado == 'invalido'" class="text-danger">
+                                        <t t-esc="linha.estado"/>
+                                    </span>
+                                    <span t-else="" class="text-warning">
+                                        <t t-esc="linha.estado"/>
+                                    </span>
+                                </td>
+                                <td t-esc="linha.motivo"/>
+                                <td t-esc="linha.coletor_id"/>
+                                <td t-esc="linha.data_referencia"/>
+                                <td t-esc="linha.total_linhas"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

@@ -51,5 +51,41 @@ class PortalAutenticidade(http.Controller):
             s = _client().status(job_id)
         except Exception:
             s = {'estado': 'indisponivel'}
-        # No Stage 5 este método passa a renderizar o relatório quando pronto.
-        return request.make_json_response(s)
+        if s.get('estado') == 'pronto':
+            laudo = request.env['sensor_monitor.verificacao.laudo'].sudo().criar_de_lote(s['lote'])
+            return request.render('afr_sentinela_portal_autenticidade.relatorio',
+                                  {'laudo': laudo, 'job_id': job_id})
+        if request.httprequest.headers.get('Accept', '').startswith('application/json') or kw.get('json'):
+            return request.make_json_response(s)
+        # ainda processando (ou erro/expirado): página com polling
+        return request.render('afr_sentinela_portal_autenticidade.processando',
+                              {'job_id': job_id, 'posicao': s.get('posicao', 0)})
+
+    @http.route('/verificar-autenticidade/<job_id>/relatorio.json', type='http',
+                auth='public', website=True, methods=['GET'], csrf=False)
+    def download_json(self, job_id, **kw):
+        try:
+            s = _client().status(job_id)
+        except Exception:
+            s = {'estado': 'indisponivel'}
+        return request.make_json_response(s.get('lote', s))
+
+    @http.route('/verificar-autenticidade/<job_id>/laudo.pdf', type='http',
+                auth='public', website=True, methods=['GET'], csrf=False)
+    def download_pdf(self, job_id, **kw):
+        try:
+            s = _client().status(job_id)
+        except Exception:
+            s = {'estado': 'indisponivel'}
+        if s.get('estado') != 'pronto':
+            return request.not_found()
+        laudo = request.env['sensor_monitor.verificacao.laudo'].sudo().criar_de_lote(s['lote'])
+        # force_report_rendering: sem isso, em modo de teste (--test-enable)
+        # o Odoo cai para render HTML (sem workers/wkhtmltopdf disponíveis),
+        # e o download deixa de ser um PDF de fato.
+        pdf, _ = request.env['ir.actions.report'].sudo().with_context(
+            force_report_rendering=True)._render_qweb_pdf(
+            'afr_sentinela_portal_autenticidade.laudo', res_ids=laudo.ids)
+        return request.make_response(pdf, headers=[
+            ('Content-Type', 'application/pdf'),
+            ('Content-Disposition', f'attachment; filename="laudo-{job_id}.pdf"')])

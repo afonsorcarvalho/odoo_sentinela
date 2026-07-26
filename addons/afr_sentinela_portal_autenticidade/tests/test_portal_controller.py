@@ -28,11 +28,15 @@ class TestPortalController(HttpCase):
         self.assertIn('muito grande', r.text.lower())
 
     def test_status_proxy(self):
+        # Stage 5: o polling (JS) pede JSON explicitamente via header Accept;
+        # sem esse header, a rota renderiza a página de "processando" (HTML)
+        # para navegação direta no navegador.
         with patch(
             'odoo.addons.afr_sentinela_portal_autenticidade.models.verificacao_client'
             '.VerificacaoClient.status',
             return_value={'estado': 'processando', 'posicao': 2},
         ):
-            r = self.url_open('/verificar-autenticidade/JID')
+            r = self.url_open('/verificar-autenticidade/JID',
+                              headers={'Accept': 'application/json'})
             self.assertEqual(r.status_code, 200)
             self.assertIn('processando', r.text)

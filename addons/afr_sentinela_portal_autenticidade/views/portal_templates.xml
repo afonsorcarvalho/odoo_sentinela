@@ -65,4 +65,78 @@
         </t>
     </template>
 
+    <template id="relatorio" name="Verificar Autenticidade — Relatório">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <section class="s_text_block pt48 pb48">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <h1>Relatório de verificação</h1>
+                                <p class="text-muted">
+                                    Gerado em: <span t-esc="laudo.gerado_em"/>
+                                </p>
+
+                                <div class="alert" t-attf-class="alert-#{'success' if laudo.todos_ok else 'danger'}">
+                                    <span t-if="laudo.todos_ok">
+                                        Todos os arquivos autênticos.
+                                    </span>
+                                    <span t-else="">
+                                        Um ou mais arquivos falharam a verificação.
+                                    </span>
+                                </div>
+
+                                <ul class="list-inline mb-4">
+                                    <li class="list-inline-item">Total: <strong t-esc="laudo.total"/></li>
+                                    <li class="list-inline-item">Válidos: <strong t-esc="laudo.validos"/></li>
+                                    <li class="list-inline-item">Inválidos: <strong t-esc="laudo.invalidos"/></li>
+                                    <li class="list-inline-item">Incompletos: <strong t-esc="laudo.incompletos"/></li>
+                                    <li class="list-inline-item">Indeterminados: <strong t-esc="laudo.indeterminados"/></li>
+                                </ul>
+
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Arquivo</th>
+                                            <th>Estado</th>
+                                            <th>Motivo</th>
+                                            <th>Coletor</th>
+                                            <th>Data de referência</th>
+                                            <th>Linhas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="laudo.linha_ids" t-as="linha">
+                                            <td t-esc="linha.nome"/>
+                                            <td>
+                                                <span t-attf-class="badge bg-#{'success' if linha.estado == 'valido' else ('danger' if linha.estado == 'invalido' else 'warning')}">
+                                                    <t t-esc="linha.estado"/>
+                                                </span>
+                                            </td>
+                                            <td t-esc="linha.motivo"/>
+                                            <td t-esc="linha.coletor_id"/>
+                                            <td t-esc="linha.data_referencia"/>
+                                            <td t-esc="linha.total_linhas"/>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <div class="mt-4">
+                                    <a t-attf-href="/verificar-autenticidade/#{job_id}/laudo.pdf"
+                                       class="btn btn-primary" target="_blank">
+                                        Baixar PDF
+                                    </a>
+                                    <a t-attf-href="/verificar-autenticidade/#{job_id}/relatorio.json"
+                                       class="btn btn-outline-secondary" target="_blank">
+                                        Baixar JSON
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
 </odoo>

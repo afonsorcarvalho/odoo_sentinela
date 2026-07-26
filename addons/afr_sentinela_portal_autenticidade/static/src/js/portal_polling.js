@@ -20,20 +20,41 @@ publicWidget.registry.PortalAutenticidadePolling = publicWidget.Widget.extend({
      * @override
      */
     destroy() {
+        this._parar();
+        this._super(...arguments);
+    },
+
+    _parar() {
         if (this.pollTimer) {
             clearInterval(this.pollTimer);
             this.pollTimer = null;
         }
-        this._super(...arguments);
     },
 
     async _poll() {
-        let data;
+        let resp;
         try {
-            const resp = await fetch(`/verificar-autenticidade/${this.jobId}`);
-            data = await resp.json();
+            resp = await fetch(`/verificar-autenticidade/${this.jobId}`, {
+                headers: { Accept: "application/json" },
+            });
         } catch (e) {
             // rede instável: tenta de novo no próximo tick
+            return;
+        }
+        // Quando o job fica 'pronto' o controller renderiza o relatório
+        // (HTML) mesmo com Accept: application/json — nesse caso o
+        // Content-Type da resposta deixa de ser JSON e basta recarregar
+        // a página para exibi-lo.
+        const contentType = resp.headers.get("Content-Type") || "";
+        if (!contentType.includes("application/json")) {
+            this._parar();
+            window.location.reload();
+            return;
+        }
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
             return;
         }
         if (data.estado === "fila" || data.estado === "processando") {
@@ -42,12 +63,8 @@ publicWidget.registry.PortalAutenticidadePolling = publicWidget.Widget.extend({
                 posEl.textContent = data.posicao;
             }
         } else {
-            // pronto / erro / expirado: recarrega para o controller
-            // renderizar o relatório (Stage 5)
-            if (this.pollTimer) {
-                clearInterval(this.pollTimer);
-                this.pollTimer = null;
-            }
+            // erro / expirado: recarrega
+            this._parar();
             window.location.reload();
         }
     },

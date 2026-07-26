@@ -22,7 +22,7 @@ function SingleSelect<T>({ items, config, value, onChange, label, placeholder }:
   const filtered = useMemo(() => {
     const q = input.trim().toLowerCase()
     if (!q) return items
-    return items.filter((i) => matchesWordStart(config.getLabel(i), q))
+    return items.filter((i) => matchesInline(config.getLabel(i), q))
   }, [items, config, input])
 
   const {
@@ -104,7 +104,7 @@ function MultiSelect<T>({ items, config, value, onChange, label, placeholder }: 
     const q = input.trim().toLowerCase()
     const base = items.filter((i) => !value.includes(config.getId(i)))
     if (!q) return base
-    return base.filter((i) => matchesWordStart(config.getLabel(i), q))
+    return base.filter((i) => matchesInline(config.getLabel(i), q))
   }, [items, config, value, input])
 
   const { getDropdownProps } = useMultipleSelection<T>({
@@ -197,12 +197,8 @@ function MultiSelect<T>({ items, config, value, onChange, label, placeholder }: 
   )
 }
 
-// Filtro do dropdown: casa por início de palavra (não substring qualquer),
-// senão "lav" também acertaria "Autoclave" (contém "lav" no meio) além de
-// "Lavadora" — ruído que a busca por digitação não deve mostrar.
-function matchesWordStart(label: string, query: string): boolean {
-  return label
-    .toLowerCase()
-    .split(/\s+/)
-    .some((word) => word.startsWith(query))
+// Filtro do dropdown: substring em qualquer posição do rótulo (mais permissivo,
+// UX padrão de combobox). `query` já vem trim+lowercase do chamador.
+function matchesInline(label: string, query: string): boolean {
+  return label.toLowerCase().includes(query)
 }

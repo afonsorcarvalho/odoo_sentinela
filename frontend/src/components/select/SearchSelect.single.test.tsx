@@ -21,9 +21,12 @@ describe('SearchSelect single', () => {
   it('digitar filtra as opções pelo nome', async () => {
     render(<SearchSelect items={items} config={sensorConfig} value={null} onChange={vi.fn()} />)
     await userEvent.click(screen.getByRole('combobox'))
-    await userEvent.type(screen.getByRole('combobox'), 'lav')
-    expect(screen.getByText('Lavadora')).toBeInTheDocument()
+    // substring (não word-start): "mara" casa no meio de "Camara Fria" e não
+    // aparece em "Autoclave 1"/"Lavadora"
+    await userEvent.type(screen.getByRole('combobox'), 'mara')
+    expect(screen.getByText('Camara Fria')).toBeInTheDocument()
     expect(screen.queryByText('Autoclave 1')).toBeNull()
+    expect(screen.queryByText('Lavadora')).toBeNull()
   })
 
   it('escolher uma opção chama onChange com o id', async () => {

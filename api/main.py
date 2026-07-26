@@ -3,7 +3,8 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import alarmes, auth, config, config_publish_router, config_report, historico, live, live_listener, meta, presenca
+from . import (alarmes, auth, config, config_publish_router, config_report, historico, live,
+               live_listener, meta, presenca, verificacao_router)
 
 app = FastAPI(title='Sentinela API')
 
@@ -27,6 +28,17 @@ app.include_router(config_publish_router.router)
 app.include_router(meta.router)
 app.include_router(historico.router)
 app.include_router(live.router)
+app.include_router(verificacao_router.router)
+
+
+@app.on_event('startup')
+async def _iniciar_gestor_verificacao():
+    await verificacao_router.gestor.start()
+
+
+@app.on_event('shutdown')
+async def _parar_gestor_verificacao():
+    await verificacao_router.gestor.stop()
 
 
 @app.on_event('startup')

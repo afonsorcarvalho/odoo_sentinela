@@ -27,6 +27,8 @@
                         <field name="hardware_modelo"/>
                         <field name="status"/>
                         <field name="firmware_version"/>
+                        <field name="pubkey_pem"/>
+                        <field name="pubkey_fingerprint" readonly="1"/>
                     </group>
                 </sheet>
             </form>

@@ -1,31 +1,23 @@
-import { useState } from 'react'
-import { useFloating, offset, flip, shift, autoUpdate, FloatingPortal, useDismiss, useInteractions } from '@floating-ui/react'
 import type { WidgetInstance } from '../lib/layout/schema'
 import { WIDGET_REGISTRY } from '../lib/widgets/registry'
-import { WidgetConfigPopover } from './WidgetConfigPopover'
 import { WidgetErrorBoundary } from './WidgetErrorBoundary'
 import { WidgetPlaceholder } from './widgets/WidgetPlaceholder'
 
-export function WidgetFrame({ widget, editing, onChange, onRemove }: {
+export function WidgetFrame({ widget, editing, selected, onConfigure, onRemove }: {
   widget: WidgetInstance
   editing: boolean
-  onChange?: (w: WidgetInstance) => void
+  // Widget atualmente selecionado para config (drawer aberto nele). Realça a
+  // tile para o admin saber qual está editando na aba lateral.
+  selected?: boolean
+  // Abre a config deste widget na aba lateral (drawer no DashboardEditor). A
+  // config em si NÃO mora mais aqui (era um popover flutuante) -- o frame só
+  // reporta "quero configurar este widget"; o editor decide/renderiza o drawer.
+  onConfigure?: () => void
   onRemove?: () => void
 }) {
   // widget.type pode ser um tipo que nao existe mais no registry (layout
   // salvo antes de o tipo ser removido) -- descriptor fica undefined.
   const descriptor = WIDGET_REGISTRY[widget.type]
-  const [open, setOpen] = useState(false)
-  const { refs, floatingStyles, context } = useFloating({
-    open,
-    onOpenChange: setOpen,
-    placement: 'bottom-end',
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
-    whileElementsMounted: autoUpdate,
-  })
-
-  const dismiss = useDismiss(context)
-  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss])
 
   if (!descriptor) {
     // Sem descriptor nao ha .render nem .label para usar -- so o chrome de
@@ -48,12 +40,14 @@ export function WidgetFrame({ widget, editing, onChange, onRemove }: {
   }
 
   return (
-    <div data-testid="widget-frame" className="@container relative flex h-full w-full flex-col overflow-hidden">
+    <div
+      data-testid="widget-frame"
+      className={`@container relative flex h-full w-full flex-col overflow-hidden${selected ? ' ring-2 ring-[var(--color-primary)] rounded' : ''}`}
+    >
       {editing && (
         <div className="absolute right-1 top-1 z-10 flex gap-1">
-          <button ref={refs.setReference} type="button" onClick={() => setOpen((o) => !o)}
-                  aria-label="Configurar widget" aria-haspopup="dialog" aria-expanded={open}
-                  className="rounded bg-black/40 px-1.5 text-xs text-white" {...getReferenceProps()}>⚙</button>
+          <button type="button" onClick={onConfigure} aria-label="Configurar widget" aria-haspopup="dialog"
+                  className="rounded bg-black/40 px-1.5 text-xs text-white">⚙</button>
           <button type="button" onClick={onRemove} aria-label="Remover widget"
                   className="rounded bg-black/40 px-1.5 text-xs text-white">✕</button>
         </div>
@@ -76,14 +70,6 @@ export function WidgetFrame({ widget, editing, onChange, onRemove }: {
           {descriptor.render(widget)}
         </WidgetErrorBoundary>
       </div>
-      {editing && open && onChange && (
-        <FloatingPortal>
-          <div ref={refs.setFloating} style={floatingStyles} className="z-50 w-60"
-               role="dialog" aria-label="Configuração do widget" {...getFloatingProps()}>
-            <WidgetConfigPopover widget={widget} onChange={onChange} onClose={() => setOpen(false)} />
-          </div>
-        </FloatingPortal>
-      )}
     </div>
   )
 }

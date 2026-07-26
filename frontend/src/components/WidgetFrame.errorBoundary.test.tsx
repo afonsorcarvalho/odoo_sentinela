@@ -100,7 +100,7 @@ describe('WidgetFrame + WidgetErrorBoundary (integração)', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     kpiRender = () => <Boom />
     const onRemove = vi.fn()
-    wrap(<WidgetFrame widget={kpiWidget} editing onChange={vi.fn()} onRemove={onRemove} />)
+    wrap(<WidgetFrame widget={kpiWidget} editing onRemove={onRemove} />)
     expect(screen.getByText('Widget indisponível')).toBeInTheDocument()
 
     await userEvent.click(screen.getByLabelText('Remover widget'))

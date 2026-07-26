@@ -37,10 +37,10 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
   const limiteMin = widget.options?.limiteMin as number | undefined
   const limiteMax = widget.options?.limiteMax as number | undefined
   const limitesInvalidos = limiteMin != null && limiteMax != null && limiteMin > limiteMax
-  // id sufixado por widget.id: vários popovers podem estar abertos ao mesmo
-  // tempo (cada WidgetFrame tem seu próprio estado `open`, sem exclusividade
-  // entre widgets) — sem o sufixo, dois KPIs inválidos abertos juntos
-  // colidiriam no id e quebrariam o aria-describedby (HTML inválido).
+  // id sufixado por widget.id: mantém o aria-describedby único por widget. Hoje
+  // só há um drawer de config aberto por vez, mas o sufixo é barato e à prova de
+  // futuro (ex.: comparação lado a lado) — sem ele, dois KPIs inválidos no mesmo
+  // DOM colidiriam no id (HTML inválido).
   const limitesErroId = `kpi-limites-erro-${widget.id}`
 
   // Toda edição flui por onChange (nunca escrita direta no servidor); grava
@@ -119,7 +119,10 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
   )
 
   return (
-    <div className="rounded-lg border p-3" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-muted)' }}>
+    // Container sem chrome de cartão: hoje este corpo é renderizado dentro do
+    // WidgetConfigDrawer (aba lateral), cuja .drawer-panel já é a superfície.
+    // Um border/bg próprio aqui viraria cartão-dentro-de-cartão.
+    <div>
       <div className="mb-2 text-xs font-bold">{WIDGET_REGISTRY[widget.type].label}</div>
 
       <div className="mb-1 text-xs font-semibold" style={sectionLabelStyle}>Binding</div>

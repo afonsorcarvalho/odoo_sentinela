@@ -30,4 +30,15 @@ describe('DashboardEditor', () => {
     await userEvent.click(screen.getByRole('button', { name: /cancelar/i }))
     expect(onExit).toHaveBeenCalled()
   })
+  it('clicar em ⚙ abre a config na aba lateral (drawer), e ✕ fecha', async () => {
+    renderWithClient(<DashboardEditor layout={layout} onExit={() => {}} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await userEvent.click(screen.getByLabelText('Configurar widget'))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog.className).toMatch(/drawer-panel/)
+    // fecha pelo ✕ do drawer
+    await userEvent.click(screen.getByLabelText('Fechar'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
 })

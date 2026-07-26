@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Responsive, WidthProvider, type Layout, type Layouts } from 'react-grid-layout'
-import type { DashboardLayout, WidgetInstance, WidgetType } from '../lib/layout/schema'
+import type { DashboardLayout, WidgetType } from '../lib/layout/schema'
 import { WIDGET_REGISTRY } from '../lib/widgets/registry'
 import { WidgetFrame } from './WidgetFrame'
 import 'react-grid-layout/css/styles.css'
@@ -43,7 +43,8 @@ export function DashboardGrid({
   layout,
   editing,
   onLayoutChange,
-  onWidgetChange,
+  selectedId,
+  onConfigure,
   onRemove,
   droppingType,
   onDropWidget,
@@ -51,7 +52,11 @@ export function DashboardGrid({
   layout: DashboardLayout
   editing: boolean
   onLayoutChange?: (l: DashboardLayout) => void
-  onWidgetChange?: (w: WidgetInstance) => void
+  // Widget selecionado para config (drawer aberto nele) + callback do ⚙. A
+  // config abre na aba lateral (WidgetConfigDrawer, montado no DashboardEditor),
+  // não mais num popover por widget -- ver DashboardEditor.
+  selectedId?: string | null
+  onConfigure?: (id: string) => void
   onRemove?: (id: string) => void
   droppingType?: WidgetType | null
   onDropWidget?: (pos: { x: number; y: number }) => void
@@ -149,7 +154,8 @@ export function DashboardGrid({
               <WidgetFrame
                 widget={w}
                 editing={editing}
-                onChange={onWidgetChange}
+                selected={selectedId === w.id}
+                onConfigure={onConfigure ? () => onConfigure(w.id) : undefined}
                 onRemove={onRemove ? () => onRemove(w.id) : undefined}
               />
             </div>

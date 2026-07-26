@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { DashboardGrid } from './DashboardGrid'
 import { WidgetPalette } from './WidgetPalette'
+import { WidgetConfigDrawer } from './WidgetConfigDrawer'
 import { newWidget } from '../lib/widgets/newWidget'
 import { useSaveLayout } from '../lib/queries'
 import type { DashboardLayout, WidgetInstance, WidgetType } from '../lib/layout/schema'
@@ -8,6 +9,12 @@ import type { DashboardLayout, WidgetInstance, WidgetType } from '../lib/layout/
 export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; onExit: () => void }) {
   const [draft, setDraft] = useState<DashboardLayout>(layout)
   const [droppingType, setDroppingType] = useState<WidgetType | null>(null)
+  // Widget cuja config está aberta na aba lateral (null = drawer fechado).
+  // Mesmo padrão do selectedSensorCode na DashboardPage (drill-down): o estado
+  // "o que está aberto na lateral" mora aqui, no dono do draft, e o drawer é
+  // montado condicionalmente (não fica sempre no DOM) para que o clique no ⚙
+  // que o abre não seja lido como outside-press e o feche na hora.
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const save = useSaveLayout()
 
   function addWidget(type: WidgetType) {
@@ -20,10 +27,17 @@ export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; o
   }
   function removeWidget(id: string) {
     setDraft((d) => ({ ...d, widgets: d.widgets.filter((w) => w.id !== id) }))
+    // Se o widget removido era o que estava aberto na lateral, fecha o drawer.
+    setSelectedId((cur) => (cur === id ? null : cur))
   }
   function updateWidget(w: WidgetInstance) {
     setDraft((d) => ({ ...d, widgets: d.widgets.map((x) => (x.id === w.id ? w : x)) }))
   }
+
+  // Widget selecionado resolvido do draft (não guardado em estado próprio) para
+  // que edições via updateWidget se reflitam ao vivo no drawer. undefined quando
+  // nada selecionado ou o id não existe mais.
+  const selectedWidget = selectedId ? draft.widgets.find((w) => w.id === selectedId) : undefined
 
   return (
     <div>
@@ -47,11 +61,23 @@ export function DashboardEditor({ layout, onExit }: { layout: DashboardLayout; o
         layout={draft}
         editing
         onLayoutChange={setDraft}
-        onWidgetChange={updateWidget}
+        selectedId={selectedId}
+        onConfigure={setSelectedId}
         onRemove={removeWidget}
         droppingType={droppingType}
         onDropWidget={dropWidget}
       />
+
+      {/* Drawer de config na aba lateral direita (mesmo shell do detalhe de
+          sensor no modo normal). Montado só quando há widget selecionado -- ver
+          comentário do selectedId. */}
+      {selectedWidget && (
+        <WidgetConfigDrawer
+          widget={selectedWidget}
+          onChange={updateWidget}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   )
 }

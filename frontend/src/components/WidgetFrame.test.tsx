@@ -18,19 +18,28 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe('WidgetFrame edição', () => {
-  it('abre o popover de config ao clicar no botão configurar', async () => {
-    wrap(<WidgetFrame widget={w} editing onChange={vi.fn()} onRemove={vi.fn()} />)
-    expect(screen.queryByText('KPI (valor único)')).toBeNull()
+  it('clicar em configurar dispara onConfigure (config abre na aba lateral, não inline)', async () => {
+    const onConfigure = vi.fn()
+    wrap(<WidgetFrame widget={w} editing onConfigure={onConfigure} onRemove={vi.fn()} />)
     await userEvent.click(screen.getByLabelText('Configurar widget'))
-    // WidgetConfigPopover mostra o label do tipo no header
-    expect(screen.getByText('KPI (valor único)')).toBeInTheDocument()
+    expect(onConfigure).toHaveBeenCalledTimes(1)
+    // O form de config NÃO é renderizado pelo frame (mora no drawer do editor).
+    expect(screen.queryByText('KPI (valor único)')).toBeNull()
   })
 
-  it('fecha o popover ao pressionar Escape', async () => {
-    wrap(<WidgetFrame widget={w} editing onChange={vi.fn()} onRemove={vi.fn()} />)
-    await userEvent.click(screen.getByLabelText('Configurar widget'))
-    expect(screen.getByText('KPI (valor único)')).toBeInTheDocument()
-    await userEvent.keyboard('{Escape}')
-    expect(screen.queryByText('KPI (valor único)')).toBeNull()
+  it('realça a tile quando selected', () => {
+    const { rerender } = wrap(<WidgetFrame widget={w} editing selected={false} onConfigure={vi.fn()} onRemove={vi.fn()} />)
+    expect(screen.getByTestId('widget-frame').className).not.toMatch(/ring-2/)
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <WidgetFrame widget={w} editing selected onConfigure={vi.fn()} onRemove={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    expect(screen.getByTestId('widget-frame').className).toMatch(/ring-2/)
+  })
+
+  it('em modo leitura não mostra o botão configurar', () => {
+    wrap(<WidgetFrame widget={w} editing={false} />)
+    expect(screen.queryByLabelText('Configurar widget')).toBeNull()
   })
 })

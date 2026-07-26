@@ -58,7 +58,8 @@ class EnviadorSftp:
 
     def varrer(self):
         enviados_agora = []
-        for caminho in sorted(self._dir.glob("*_leituras.txt")):
+        arquivos = sorted([*self._dir.glob("*_leituras.txt"), *self._dir.glob("*_alarmes.txt")])
+        for caminho in arquivos:
             nome = caminho.name
             if nome in self._enviados or not _esta_selado(caminho):
                 continue

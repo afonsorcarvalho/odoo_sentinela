@@ -10,8 +10,10 @@ from pathlib import Path
 from threading import Event
 
 from hub import config as config_mod
+from hub.arquivo_alarmes import ArquivoAlarmes
 from hub.arquivo_diario import ArquivoDiario
 from hub.assinador import AssinadorSoftware
+from hub.detector_alarme import DetectorAlarme
 from hub.leitor import Leitor
 from hub.publicador_mqtt import PublicadorMqtt
 
@@ -22,8 +24,19 @@ def _tz(offset):
     return timezone(sinal * timedelta(hours=horas, minutes=minutos))
 
 
+def montar_limites(config):
+    limites = {}
+    for bus in config.barramentos:
+        for disp in bus.dispositivos:
+            for canal in disp.canais:
+                if canal.limite_min is not None or canal.limite_max is not None:
+                    limites[canal.sensor_id] = {"min": canal.limite_min, "max": canal.limite_max}
+    return limites
+
+
 def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=None,
-             enviador=None, reconfigurar=None, caminho_config=None, arquivo_factory=None):
+             enviador=None, reconfigurar=None, caminho_config=None, arquivo_factory=None,
+             detector=None, arquivo_alarmes=None):
     intervalo = config.intervalo_leitura_s
 
     def _recarregar():
@@ -47,6 +60,8 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
         reconfigurar.clear()
 
     arquivo.recuperar_pendentes(agora_fn().date())
+    if arquivo_alarmes is not None:
+        arquivo_alarmes.recuperar_pendentes(agora_fn().date())
     publicador.conectar()
     ciclos = 0
     data_corrente = None
@@ -63,6 +78,11 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
         for leitura in leitor.ler_todos(agora):
             arquivo.registrar(leitura)
             publicador.publicar(config.hub_id, config.coletor_id, leitura)
+            if detector is not None:
+                for evento in detector.avaliar(leitura):
+                    if arquivo_alarmes is not None:
+                        arquivo_alarmes.registrar_evento(evento)
+                    publicador.publicar_alarme(config.hub_id, config.coletor_id, evento)
         if enviador is not None:
             enviador.varrer()
         ciclos += 1
@@ -72,6 +92,8 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
             break
         parar.wait(intervalo)
     arquivo.selar(data_corrente)
+    if arquivo_alarmes is not None:
+        arquivo_alarmes.selar(data_corrente)
     if enviador is not None:
         enviador.varrer()
     leitor.fechar()
@@ -92,7 +114,16 @@ def main(argv=None):
                              c.timezone_offset, c.caminho_dados, assinador,
                              cliente_id=c.cliente_id, site_id=c.site_id)
 
+    def _novo_arquivo_alarmes(c):
+        return ArquivoAlarmes(c.coletor_id, c.hub_id, c.firmware_version,
+                              c.timezone_offset, c.caminho_dados, assinador,
+                              cliente_id=c.cliente_id, site_id=c.site_id)
+
     arquivo = _novo_arquivo(cfg)
+    arquivo_alarmes = _novo_arquivo_alarmes(cfg)
+    estado_alarme_path = str(Path(cfg.caminho_dados).expanduser() / cfg.coletor_id / "estado_alarme.json")
+    detector = DetectorAlarme(montar_limites(cfg), n=cfg.alarme_n, margem=cfg.alarme_margem,
+                              estado_path=estado_alarme_path)
     leitor = Leitor(cfg)
     publicador = PublicadorMqtt(cfg.mqtt_host, cfg.mqtt_port)
     enviador = None
@@ -133,7 +164,8 @@ def main(argv=None):
         executar(cfg, leitor, arquivo, publicador,
                  agora_fn=lambda: datetime.now(tz), parar=parar, enviador=enviador,
                  reconfigurar=reconfigurar, caminho_config=args.config,
-                 arquivo_factory=_novo_arquivo)
+                 arquivo_factory=_novo_arquivo,
+                 detector=detector, arquivo_alarmes=arquivo_alarmes)
     finally:
         if agente is not None:
             agente.parar()

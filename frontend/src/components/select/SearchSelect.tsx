@@ -26,7 +26,7 @@ function SingleSelect<T>({ items, config, value, onChange, label, placeholder }:
   }, [items, config, input])
 
   const {
-    isOpen, getMenuProps, getInputProps, getItemProps, highlightedIndex,
+    isOpen, getMenuProps, getInputProps, getItemProps, highlightedIndex, getLabelProps,
   } = useCombobox({
     items: filtered,
     inputValue: input === '' ? selectedLabel : input,
@@ -47,7 +47,12 @@ function SingleSelect<T>({ items, config, value, onChange, label, placeholder }:
 
   return (
     <div className="relative">
-      {label && <span className="block text-xs" style={{ color: 'var(--color-muted)' }}>{label}</span>}
+      {/* label sempre renderizado via getLabelProps: o getInputProps do Downshift
+          injeta aria-labelledby apontando p/ este id; sem o elemento, o input
+          ficava sem nome acessível. Sem texto visível, fica sr-only. */}
+      <label {...getLabelProps()} className={label ? 'block text-xs' : 'sr-only'} style={{ color: 'var(--color-muted)' }}>
+        {label ?? 'Selecionar'}
+      </label>
       <div className="relative mt-1 flex items-center">
         <input
           {...getInputProps()}
@@ -121,7 +126,7 @@ function MultiSelect<T>({ items, config, value, onChange, label, placeholder }: 
     },
   })
 
-  const { isOpen, getMenuProps, getInputProps, getItemProps, highlightedIndex } = useCombobox({
+  const { isOpen, getMenuProps, getInputProps, getItemProps, highlightedIndex, getLabelProps } = useCombobox({
     items: filtered,
     inputValue: input,
     itemToString: (i) => (i ? config.getLabel(i) : ''),
@@ -141,16 +146,22 @@ function MultiSelect<T>({ items, config, value, onChange, label, placeholder }: 
 
   return (
     <div className="relative">
-      {label && <span className="block text-xs" style={{ color: 'var(--color-muted)' }}>{label}</span>}
-      {selectedItems.length > 0 && (
-        <div className="mb-1 flex flex-wrap gap-1">
-          {selectedItems.map((it) => {
-            const id = config.getId(it)
+      <label {...getLabelProps()} className={label ? 'block text-xs' : 'sr-only'} style={{ color: 'var(--color-muted)' }}>
+        {label ?? 'Adicionar'}
+      </label>
+      {value.length > 0 && (
+        <div className="mb-1 mt-1 flex flex-wrap gap-1">
+          {/* Itera VALUE (não selectedItems): um id órfão — que não existe mais
+              em items — ainda ganha chip (com o id cru como rótulo), então dá p/
+              ver e remover; senão ficaria preso no binding, invisível. */}
+          {value.map((id) => {
+            const it = items.find((i) => config.getId(i) === id)
+            const txt = it ? config.getLabel(it) : id
             return (
               <span key={id} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--color-line)' }}>
-                {config.getLabel(it)}
-                <button type="button" aria-label={`Remover ${config.getLabel(it)}`} className="leading-none"
+                {txt}
+                <button type="button" aria-label={`Remover ${txt}`} className="leading-none"
                   onClick={() => onChange(value.filter((v) => v !== id))}>×</button>
               </span>
             )
@@ -159,7 +170,6 @@ function MultiSelect<T>({ items, config, value, onChange, label, placeholder }: 
       )}
       <input
         {...getInputProps(getDropdownProps({ preventKeyAction: isOpen }))}
-        role="combobox"
         placeholder={placeholder ?? 'Adicionar…'}
         className="w-full rounded border px-2 py-1 text-xs"
         style={{ borderColor: 'var(--color-muted)' }}

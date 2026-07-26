@@ -29,6 +29,11 @@ describe('SearchSelect single', () => {
     expect(screen.queryByText('Lavadora')).toBeNull()
   })
 
+  it('o combobox tem nome acessível vindo do label', () => {
+    render(<SearchSelect items={items} config={sensorConfig} value={null} onChange={vi.fn()} label="Sensor" />)
+    expect(screen.getByRole('combobox', { name: 'Sensor' })).toBeInTheDocument()
+  })
+
   it('escolher uma opção chama onChange com o id', async () => {
     const onChange = vi.fn()
     render(<SearchSelect items={items} config={sensorConfig} value={null} onChange={onChange} />)

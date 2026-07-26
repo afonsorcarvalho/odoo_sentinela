@@ -25,6 +25,15 @@ describe('SearchSelect multi', () => {
     expect(onChange).toHaveBeenCalledWith(['A1', 'A2'])
   })
 
+  it('id órfão (não existe mais em items) ainda vira chip removível', async () => {
+    const onChange = vi.fn()
+    render(<SearchSelect multiple items={areas} config={areaConfig} value={['A1', 'AX']} onChange={onChange} />)
+    // AX não está em `areas` — mostra o id cru como rótulo, com botão de remover
+    expect(screen.getByText('AX')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Remover AX' }))
+    expect(onChange).toHaveBeenCalledWith(['A1'])
+  })
+
   it('remover chip chama onChange sem o id', async () => {
     const onChange = vi.fn()
     render(<SearchSelect multiple items={areas} config={areaConfig} value={['A1', 'A3']} onChange={onChange} />)

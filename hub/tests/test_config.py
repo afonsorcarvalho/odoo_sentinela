@@ -399,3 +399,60 @@ barramentos:
     cfg = config_mod.carregar_config(str(p))
     canal = cfg.barramentos[0].dispositivos[0].canais[0]
     assert canal.calibracao == {'cert_ver': 0, 'ganho': 1.0, 'offset': 0.0}
+
+
+def _yaml_base(extra_canal="", extra_top=""):
+    return textwrap.dedent(f"""
+    hub_id: HUB-T
+    coletor_id: COL-T
+    firmware_version: 0.1.0
+    timezone_offset: "-03:00"
+    intervalo_leitura_s: 5
+    caminho_chave: /tmp/k.pem
+    caminho_dados: /tmp/dados
+    {extra_top}
+    barramentos:
+      - porta: /dev/ttyUSB0
+        baud: 9600
+        dispositivos:
+          - endereco: 1
+            driver: n4aib16
+            canais:
+              - ch: 1
+                sensor_id: SNR-T-01
+                area_id: AREA-T
+                tipo_medida: temperatura
+                unidade: C
+                protocolo_origem: 4-20ma
+                {extra_canal}
+    """)
+
+
+def test_limite_por_canal(tmp_path):
+    p = tmp_path / "c.yaml"
+    p.write_text(_yaml_base(extra_canal="limite_min: 18.0\n                limite_max: 25.0"))
+    cfg = config.carregar_config(str(p))
+    canal = cfg.barramentos[0].dispositivos[0].canais[0]
+    assert canal.limite_min == 18.0
+    assert canal.limite_max == 25.0
+
+
+def test_limite_ausente_vira_none(tmp_path):
+    p = tmp_path / "c.yaml"
+    p.write_text(_yaml_base())
+    cfg = config.carregar_config(str(p))
+    canal = cfg.barramentos[0].dispositivos[0].canais[0]
+    assert canal.limite_min is None
+    assert canal.limite_max is None
+
+
+def test_params_histerese_default_e_override(tmp_path):
+    p1 = tmp_path / "d.yaml"; p1.write_text(_yaml_base())
+    cfg = config.carregar_config(str(p1))
+    assert cfg.alarme_n == 3
+    assert cfg.alarme_margem == 0.0
+    p2 = tmp_path / "o.yaml"
+    p2.write_text(_yaml_base(extra_top="alarme_n: 5\n    alarme_margem: 0.25"))
+    cfg2 = config.carregar_config(str(p2))
+    assert cfg2.alarme_n == 5
+    assert cfg2.alarme_margem == 0.25

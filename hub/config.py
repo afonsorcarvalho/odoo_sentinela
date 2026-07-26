@@ -22,6 +22,8 @@ class CanalConfig:
     registro: dict = None
     faixa_min: float = None
     faixa_max: float = None
+    limite_min: float = None
+    limite_max: float = None
 
 
 @dataclass
@@ -67,6 +69,8 @@ class HubConfig:
     sftp: object = None
     cliente_id: str = ''
     site_id: str = ''
+    alarme_n: int = 3
+    alarme_margem: float = 0.0
 
 
 def _par(lista, nome):
@@ -104,6 +108,8 @@ def _canal(bruto):
         registro=bruto.get("registro"),
         faixa_min=(float(bruto["faixa_min"]) if bruto.get("faixa_min") is not None else None),
         faixa_max=(float(bruto["faixa_max"]) if bruto.get("faixa_max") is not None else None),
+        limite_min=(float(bruto["limite_min"]) if bruto.get("limite_min") is not None else None),
+        limite_max=(float(bruto["limite_max"]) if bruto.get("limite_max") is not None else None),
     )
 
 
@@ -211,4 +217,6 @@ def carregar_config(caminho):
         mqtt_host=mqtt.get("host", "localhost"), mqtt_port=int(mqtt.get("port", 1883)),
         barramentos=barramentos, sftp=sftp,
         cliente_id=dados.get("cliente_id", ""), site_id=dados.get("site_id", ""),
+        alarme_n=int(dados.get("alarme_n", 3)),
+        alarme_margem=float(dados.get("alarme_margem", 0.0)),
     )

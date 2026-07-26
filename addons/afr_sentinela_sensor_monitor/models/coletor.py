@@ -1,3 +1,7 @@
+import hashlib
+
+from cryptography.hazmat.primitives import serialization
+
 from odoo import api, fields, models
 
 from .common import validate_code
@@ -18,7 +22,8 @@ class Coletor(models.Model):
     ], required=True)
     is_hub_embutido = fields.Boolean(compute='_compute_is_hub_embutido', store=True)
     hardware_modelo = fields.Char()
-    pubkey_fingerprint = fields.Char()
+    pubkey_pem = fields.Text(help='Chave pública (PEM) do coletor, usada na verificação de autenticidade.')
+    pubkey_fingerprint = fields.Char(compute='_compute_pubkey_fingerprint', store=True)
     firmware_version = fields.Char()
     status = fields.Selection([
         ('online', 'Online'),
@@ -42,3 +47,20 @@ class Coletor(models.Model):
     def _check_coletor_code(self):
         for coletor in self:
             validate_code(coletor.coletor_code)
+
+    @api.depends('pubkey_pem')
+    def _compute_pubkey_fingerprint(self):
+        for coletor in self:
+            fp = False
+            if coletor.pubkey_pem:
+                try:
+                    chave = serialization.load_pem_public_key(coletor.pubkey_pem.encode())
+                    der = chave.public_bytes(
+                        encoding=serialization.Encoding.DER,
+                        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                    )
+                    d = hashlib.sha256(der).hexdigest().upper()
+                    fp = ':'.join(d[i:i + 2] for i in range(0, len(d), 2))
+                except (ValueError, TypeError):
+                    fp = False
+            coletor.pubkey_fingerprint = fp

@@ -80,11 +80,7 @@ class PortalAutenticidade(http.Controller):
         if s.get('estado') != 'pronto':
             return request.not_found()
         laudo = request.env['sensor_monitor.verificacao.laudo'].sudo().criar_de_lote(s['lote'])
-        # force_report_rendering: sem isso, em modo de teste (--test-enable)
-        # o Odoo cai para render HTML (sem workers/wkhtmltopdf disponíveis),
-        # e o download deixa de ser um PDF de fato.
-        pdf, _ = request.env['ir.actions.report'].sudo().with_context(
-            force_report_rendering=True)._render_qweb_pdf(
+        pdf, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
             'afr_sentinela_portal_autenticidade.laudo', res_ids=laudo.ids)
         return request.make_response(pdf, headers=[
             ('Content-Type', 'application/pdf'),

@@ -39,7 +39,18 @@ class TestPortalRelatorio(HttpCase):
             self.assertIn('"total": 2', r.text)
 
     def test_laudo_pdf_nao_vazio(self):
-        with self._patch():
-            r = self.url_open('/verificar-autenticidade/JID/laudo.pdf')
-            self.assertEqual(r.status_code, 200)
-            self.assertTrue(r.content[:4] == b'%PDF')
+        # Mocka o renderer de PDF: wkhtmltopdf real, dentro de --test-enable,
+        # faz um callback HTTP de volta ao mesmo servidor Odoo single-thread
+        # para header/footer, e isso trava (deadlock) contra a transacao de
+        # teste aberta. Renderizacao real de PDF funciona no servidor ao
+        # vivo (multi-request); aqui so verificamos a fiacao do controller.
+        with patch(
+            'odoo.addons.base.models.ir_actions_report.IrActionsReport'
+            '._render_qweb_pdf',
+            return_value=(b'%PDF-1.4 laudo-fake', 'pdf'),
+        ):
+            with self._patch():
+                r = self.url_open('/verificar-autenticidade/JID/laudo.pdf')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('application/pdf', r.headers.get('Content-Type', ''))
+        self.assertTrue(r.content.startswith(b'%PDF'))

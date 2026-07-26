@@ -21,6 +21,13 @@ describe('AlarmItem', () => {
     expect(screen.getByText('Valor lido -1.7 (limite -2.5)')).toBeInTheDocument()
   })
 
+  it('detecção mostra data além do horário (DD/MM HH:MM:SS) — alarme antigo não pode parecer de hoje', () => {
+    render(<AlarmItem alarm={makeAlarm()} areaName="Expurgo" />)
+    // Cabeçalho: TIPO + carimbo com data e hora. Sem a data, um alarme de
+    // dias atrás lê como se fosse agora (contexto CME).
+    expect(screen.getByText(/^\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/)).toBeInTheDocument()
+  })
+
   it('alarme ainda aberto (sem timestamp_resolucao_sensor) nao mostra nenhuma linha de resolucao', () => {
     render(<AlarmItem alarm={makeAlarm()} areaName="Expurgo" />)
     expect(screen.queryByText(/Sensor normalizado/)).not.toBeInTheDocument()

@@ -11,10 +11,13 @@ const BORDER_COLOR: Record<AlarmEvent['status'], string> = {
   resolvido: 'var(--color-good)',
 }
 
-function formatTime(ts: number): string {
+// Carimbo com DATA + hora (DD/MM HH:MM:SS). O painel guarda alarmes ainda
+// abertos por dias; sem a data um evento antigo lê como se fosse de hoje
+// (perigoso num CME). Mantém os segundos: precisão importa na deteccao.
+function formatDataHora(ts: number): string {
   const d = new Date(ts)
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function formatDataResolucao(ts: number): string {
@@ -39,7 +42,7 @@ export function AlarmItem({
     >
       <div className="flex items-center justify-between gap-2 text-xs font-bold" style={{ color: BORDER_COLOR[alarm.status] }}>
         <span>{TIPO_LABEL[alarm.status]}</span>
-        <span className="font-mono" style={{ color: 'var(--color-muted)' }}>{formatTime(alarm.timestamp_deteccao)}</span>
+        <span className="font-mono" style={{ color: 'var(--color-muted)' }}>{formatDataHora(alarm.timestamp_deteccao)}</span>
       </div>
       <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--color-ink)' }}>
         {areaName} · {alarm.sensor_code}
@@ -49,7 +52,7 @@ export function AlarmItem({
       </p>
       {alarm.timestamp_resolucao_sensor && (
         <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>
-          Sensor normalizado às {formatTime(alarm.timestamp_resolucao_sensor)}
+          Sensor normalizado às {formatDataHora(alarm.timestamp_resolucao_sensor)}
         </p>
       )}
       {alarm.status === 'resolvido' && alarm.usuario_responsavel && alarm.data_resolucao && (

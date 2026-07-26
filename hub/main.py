@@ -36,11 +36,12 @@ def montar_limites(config):
 
 def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=None,
              enviador=None, reconfigurar=None, caminho_config=None, arquivo_factory=None,
-             detector=None, arquivo_alarmes=None):
+             detector=None, arquivo_alarmes=None, detector_factory=None,
+             arquivo_alarmes_factory=None):
     intervalo = config.intervalo_leitura_s
 
     def _recarregar():
-        nonlocal config, leitor, arquivo, intervalo
+        nonlocal config, leitor, arquivo, intervalo, detector, arquivo_alarmes
         # Constrói a config/leitor NOVOS antes de tocar no leitor antigo: se
         # carregar_config/Leitor levantar (ex. serial /dev/ttyUSB0 ocupada),
         # o leitor antigo continua aberto e funcionando (não vira brick).
@@ -57,6 +58,14 @@ def executar(config, leitor, arquivo, publicador, agora_fn, parar, max_ciclos=No
         intervalo = config.intervalo_leitura_s
         if arquivo_factory is not None:
             arquivo = arquivo_factory(nova_config)
+        if arquivo_alarmes_factory is not None:
+            arquivo_alarmes = arquivo_alarmes_factory(nova_config)
+        if detector_factory is not None:
+            # Construído DEPOIS do arquivo_alarmes acima e a partir da config
+            # nova: um DetectorAlarme novo relê seu estado por sensor de
+            # estado_path na própria construção, então o reload aplica os
+            # limiares novos sem perder o estado de histerese em curso.
+            detector = detector_factory(nova_config)
         reconfigurar.clear()
 
     arquivo.recuperar_pendentes(agora_fn().date())
@@ -119,11 +128,17 @@ def main(argv=None):
                               c.timezone_offset, c.caminho_dados, assinador,
                               cliente_id=c.cliente_id, site_id=c.site_id)
 
+    def _novo_detector(c):
+        # estado_path fixo por coletor_id/caminho_dados (não muda com o
+        # reload): o detector novo relê o estado de histerese em curso do
+        # detector antigo, em vez de reiniciar do zero a cada reconfigurar.
+        estado_alarme_path = str(Path(c.caminho_dados).expanduser() / c.coletor_id / "estado_alarme.json")
+        return DetectorAlarme(montar_limites(c), n=c.alarme_n, margem=c.alarme_margem,
+                              estado_path=estado_alarme_path)
+
     arquivo = _novo_arquivo(cfg)
     arquivo_alarmes = _novo_arquivo_alarmes(cfg)
-    estado_alarme_path = str(Path(cfg.caminho_dados).expanduser() / cfg.coletor_id / "estado_alarme.json")
-    detector = DetectorAlarme(montar_limites(cfg), n=cfg.alarme_n, margem=cfg.alarme_margem,
-                              estado_path=estado_alarme_path)
+    detector = _novo_detector(cfg)
     leitor = Leitor(cfg)
     publicador = PublicadorMqtt(cfg.mqtt_host, cfg.mqtt_port)
     enviador = None
@@ -165,7 +180,9 @@ def main(argv=None):
                  agora_fn=lambda: datetime.now(tz), parar=parar, enviador=enviador,
                  reconfigurar=reconfigurar, caminho_config=args.config,
                  arquivo_factory=_novo_arquivo,
-                 detector=detector, arquivo_alarmes=arquivo_alarmes)
+                 detector=detector, arquivo_alarmes=arquivo_alarmes,
+                 detector_factory=_novo_detector,
+                 arquivo_alarmes_factory=_novo_arquivo_alarmes)
     finally:
         if agente is not None:
             agente.parar()

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useCombobox } from 'downshift'
+import { useCombobox, useMultipleSelection } from 'downshift'
 import type { EntityConfig } from './types'
 import { SearchMoreDialog } from './SearchMoreDialog'
 
@@ -94,9 +94,107 @@ function SingleSelect<T>({ items, config, value, onChange, label, placeholder }:
   )
 }
 
-// Placeholder até a Task 4 (o galho multi é implementado lá).
-function MultiSelect<T>(_props: MultiProps<T>): never {
-  throw new Error('SearchSelect multi: implementado na Task 4')
+function MultiSelect<T>({ items, config, value, onChange, label, placeholder }: MultiProps<T>) {
+  const [input, setInput] = useState('')
+  const [dialog, setDialog] = useState(false)
+
+  const selectedItems = value.map((id) => items.find((i) => config.getId(i) === id)).filter(Boolean) as T[]
+
+  const filtered = useMemo(() => {
+    const q = input.trim().toLowerCase()
+    const base = items.filter((i) => !value.includes(config.getId(i)))
+    if (!q) return base
+    return base.filter((i) => matchesWordStart(config.getLabel(i), q))
+  }, [items, config, value, input])
+
+  const { getDropdownProps } = useMultipleSelection<T>({
+    selectedItems,
+    onStateChange: ({ selectedItems: si, type }) => {
+      // remoções via teclado (Backspace) do Downshift refletem no onChange
+      if (
+        type === useMultipleSelection.stateChangeTypes.SelectedItemKeyDownBackspace ||
+        type === useMultipleSelection.stateChangeTypes.SelectedItemKeyDownDelete ||
+        type === useMultipleSelection.stateChangeTypes.FunctionRemoveSelectedItem
+      ) {
+        onChange((si ?? []).map((i) => config.getId(i)))
+      }
+    },
+  })
+
+  const { isOpen, getMenuProps, getInputProps, getItemProps, highlightedIndex } = useCombobox({
+    items: filtered,
+    inputValue: input,
+    itemToString: (i) => (i ? config.getLabel(i) : ''),
+    onInputValueChange: ({ inputValue }) => setInput(inputValue ?? ''),
+    stateReducer: (_state, { changes, type }) => {
+      // manter aberto e limpar o texto após escolher, p/ facilitar múltipla adição
+      if (type === useCombobox.stateChangeTypes.ItemClick || type === useCombobox.stateChangeTypes.InputKeyDownEnter) {
+        return { ...changes, isOpen: true, inputValue: '' }
+      }
+      return changes
+    },
+    onSelectedItemChange: ({ selectedItem }) => {
+      if (selectedItem) { onChange([...value, config.getId(selectedItem)]); setInput('') }
+    },
+    selectedItem: null,
+  })
+
+  return (
+    <div className="relative">
+      {label && <span className="block text-xs" style={{ color: 'var(--color-muted)' }}>{label}</span>}
+      {selectedItems.length > 0 && (
+        <div className="mb-1 flex flex-wrap gap-1">
+          {selectedItems.map((it) => {
+            const id = config.getId(it)
+            return (
+              <span key={id} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+                style={{ background: 'var(--color-panel)', border: '1px solid var(--color-line)' }}>
+                {config.getLabel(it)}
+                <button type="button" aria-label={`Remover ${config.getLabel(it)}`} className="leading-none"
+                  onClick={() => onChange(value.filter((v) => v !== id))}>×</button>
+              </span>
+            )
+          })}
+        </div>
+      )}
+      <input
+        {...getInputProps(getDropdownProps({ preventKeyAction: isOpen }))}
+        role="combobox"
+        placeholder={placeholder ?? 'Adicionar…'}
+        className="w-full rounded border px-2 py-1 text-xs"
+        style={{ borderColor: 'var(--color-muted)' }}
+      />
+      {/* Enquanto a modal "Pesquisar mais" está aberta, o dropdown fica
+          escondido — mesma razão do modo single (evitar duplicados no DOM). */}
+      <ul {...getMenuProps()} className={`absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded border text-xs ${isOpen && !dialog ? '' : 'hidden'}`}
+        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-line)' }}>
+        {isOpen && !dialog && filtered.map((item, index) => (
+          <li key={config.getId(item)} {...getItemProps({ item, index })}
+            className={`cursor-pointer px-2 py-1 ${highlightedIndex === index ? 'bg-black/10' : ''}`}>
+            <div>{config.getLabel(item)}</div>
+            {config.getSecondary && <div style={{ color: 'var(--color-muted)' }}>{config.getSecondary(item)}</div>}
+          </li>
+        ))}
+        {isOpen && !dialog && (
+          <li>
+            <button type="button" onClick={() => setDialog(true)}
+              className="w-full px-2 py-1 text-left font-semibold" style={{ color: 'var(--color-primary)' }}>
+              Pesquisar mais…
+            </button>
+          </li>
+        )}
+      </ul>
+      {dialog && (
+        <SearchMoreDialog
+          items={items} config={config} multiple
+          initialSelectedIds={value}
+          title={label ? `Pesquisar ${label}` : 'Pesquisar'}
+          onConfirm={(ids) => onChange(ids)}
+          onClose={() => setDialog(false)}
+        />
+      )}
+    </div>
+  )
 }
 
 // Filtro do dropdown: casa por início de palavra (não substring qualquer),

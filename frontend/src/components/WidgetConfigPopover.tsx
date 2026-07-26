@@ -192,7 +192,11 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
         </>
       )}
 
-      <button type="button" onClick={onClose} className="mt-2 text-xs underline">Fechar</button>
+      <button type="button" onClick={onClose}
+        className="mt-3 rounded border px-3 py-1 text-xs font-semibold"
+        style={{ borderColor: 'var(--color-muted)', color: 'var(--color-ink)' }}>
+        Fechar
+      </button>
     </div>
   )
 }

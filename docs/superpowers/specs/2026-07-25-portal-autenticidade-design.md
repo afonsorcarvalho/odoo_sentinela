@@ -27,8 +27,9 @@ com backpressure** ("aguarde") em vez de estourar o servidor.
 - **Jobs:** em memória no api (pool com concorrência N + fila limitada). Efêmeros.
 - **Sinalização de término:** polling via proxy Odoo (browser → Odoo → `GET` no api).
   Sem webhook, sem SSE público.
-- **Chave (trust):** só modo A (registro do servidor `coletores_conhecidos.json`).
-  Coletor desconhecido → `indeterminado`.
+- **Chave (trust):** só modo A. **Fonte das chaves = Odoo** (fix durável em escopo):
+  `sensor_monitor.coletor.pubkey_pem`; o api resolve a chave a partir do Odoo.
+  Coletor desconhecido/sem PEM → `indeterminado`.
 - **Zip:** o api descompacta (não o Odoo). Guards: upload ≤ 25 MB, total
   descomprimido ≤ 200 MB, ≤ 500 arquivos, zip aninhado ignorado, todo arquivo regular
   é verificado e entra no relatório.
@@ -37,22 +38,37 @@ com backpressure** ("aguarde") em vez de estourar o servidor.
 
 ## Riscos e constraints (verificados)
 
-### RISCO #1 — completude do registro (bloqueia utilidade)
+### Fonte das chaves — Odoo como fonte única (fix durável, EM ESCOPO)
 
-`coletores_conhecidos.json` hoje tem **1 coletor** (`COL-RS485-BUS0`). O modelo Odoo
-`sensor_monitor.coletor` guarda só `pubkey_fingerprint`, **não o PEM**. Sem popular o
-registro com as chaves públicas dos coletores de produção, todo upload real vira
-`indeterminado` e o portal parece quebrado.
+Problema original: `coletores_conhecidos.json` tem **1 coletor** e o modelo Odoo
+`sensor_monitor.coletor` guarda só `pubkey_fingerprint`, **não o PEM**. Um registro
+JSON manual desincroniza fácil → uploads reais viram `indeterminado`.
 
-**Pré-requisito operacional (MVP):** o registro que o api usa
-(`SENTINELA_REGISTRO`, default `ingestao/coletores_conhecidos.json`) deve conter o PEM
-de cada coletor de produção (via `ingestao/registro_coletores.py`).
+**Solução (Stage 1, em escopo):** o Odoo passa a ser a fonte única das chaves
+públicas dos coletores, e o portal verifica contra ela:
 
-**Fix durável (stage posterior, recomendado, fora do MVP):** adicionar campo
-`pubkey_pem` a `sensor_monitor.coletor` e fazer o api resolver a chave a partir do
-Odoo (o api já fala com o Odoo via `api/odoo.py`), tornando o Odoo a fonte única e
-eliminando o JSON manual. Este design **não** implementa o fix durável; apenas o
-registra e mantém o portal usando o registro atual.
+1. **Odoo** — novo campo `pubkey_pem` (Text) em `sensor_monitor.coletor`, com o PEM da
+   chave pública. `pubkey_fingerprint` passa a ser **computed** (store=True) a partir
+   do PEM — consistência garantida. A imagem odoo:18 **tem `cryptography` 41.0.7**
+   (verificado), então a derivação é inline (`hashlib`+`cryptography`, mesma fórmula
+   de `contrato.identidade.fingerprint_de_publica`: SHA256 do DER SubjectPublicKeyInfo,
+   hex uppercase, pares `:`). `contrato` não é montado no odoo → a fórmula é
+   reimplementada em ~5 linhas no modelo (fingerprint vazio se PEM inválido/ausente).
+2. **Form + backfill** — campo no form do coletor; script/data para **backfill** do
+   `coletores_conhecidos.json` atual (1 coletor) para dentro do Odoo.
+3. **api resolve do Odoo** — `api/verificacao_chaves.py` busca `{coletor_id:
+   pubkey_pem}` via o cliente Odoo existente (`api/odoo.py`), com **cache de TTL
+   curto** (coletores mudam pouco). Monta um dict em memória e passa ao core.
+4. **Core** — `verificar_itens` ganha parâmetro `chaves_pem: dict[str,str]` (registro
+   em memória), alternativa a `registro_path`. Modo A resolve `coletor_id` nesse
+   dict; ausente → `indeterminado`. `registro_path` (JSON/CLI) permanece p/
+   retrocompat.
+
+**Fora deste fix:** o pipeline de **ingestão** (`receber_upload`, `confronto`)
+continua usando o `coletores_conhecidos.json`. Unificar ingestão + portal numa fonte
+só é follow-up separado (não mexe no pipeline em produção). A escrita automática do
+`pubkey_pem` no provisionamento/enrollment também é follow-up; por ora o PEM entra por
+form/backfill.
 
 ### CONSTRAINT — api single-worker
 
@@ -89,8 +105,9 @@ Pronto → Odoo renderiza relatório (QWeb website) + botões PDF/JSON ◄──
   `Retry-After`. Senão cria `job_id`, enfileira, responde `{job_id, posicao}`.
 - **Worker pool** (asyncio, concorrência N via `asyncio.Semaphore`): consome a fila.
   Para cada job: se zip → descompacta em memória com guards (tamanho total, contagem,
-  sem aninhado) → coleção `(nome, bytes)`; senão item único. Chama
-  `verificador.verificar_itens(itens, registro_path=SENTINELA_REGISTRO)`.
+  sem aninhado) → coleção `(nome, bytes)`; senão item único. Resolve as chaves via
+  `verificacao_chaves.chaves_do_odoo()` (dict cacheado `{coletor_id: pem}` vindo do
+  Odoo) e chama `verificador.verificar_itens(itens, chaves_pem=chaves)`.
 - **Store de jobs em memória:** `dict[job_id] -> Job(estado, posicao, criado_em,
   lote|erro, expira_em)`. Estados: `fila` → `processando` → `pronto` | `erro`.
 - **TTL / lifecycle (RISCO #4 do review):** job concluído fica disponível por
@@ -152,7 +169,10 @@ Novo addon (não altera `afr_sentinela_sensor_monitor`), depende de
 
 | Unidade | Faz | Depende de |
 |---|---|---|
-| `api/verificacao.py` (core fila) | job store, pool, TTL, descompactar zip, chamar `verificar_itens` | `ingestao.verificador`, stdlib `zipfile`/`asyncio` |
+| `ingestao/verificador.py` (core) | +param `chaves_pem` (registro em memória) | — |
+| coletor Odoo `pubkey_pem` | fonte única das chaves públicas | `afr_sentinela_sensor_monitor` |
+| `api/verificacao_chaves.py` | busca `{coletor_id: pem}` do Odoo, cache TTL | `api/odoo.py` |
+| `api/verificacao.py` (core fila) | job store, pool, TTL, descompactar zip, chamar `verificar_itens` | `ingestao.verificador`, `verificacao_chaves`, stdlib `zipfile`/`asyncio` |
 | `api/verificacao_router.py` | rotas HTTP, rate-limit por-IP, 429 | `verificacao.py` |
 | Odoo controller | página pública, throttle borda, proxy, polling, downloads | website, `verificacao_client` |
 | `verificacao_client` | fala com api | `requests`, ir.config |
@@ -160,6 +180,13 @@ Novo addon (não altera `afr_sentinela_sensor_monitor`), depende de
 
 ## Testes
 
+- **core chaves (pytest, puro):** `verificar_itens(chaves_pem={...})` resolve modo A
+  do dict; coletor ausente no dict → `indeterminado`; `chaves_pem` e `registro_path`
+  mutuamente exclusivos/compatíveis. Reusa fixtures de arquivo assinado.
+- **Odoo coletor (`TransactionCase`):** `pubkey_pem` gravado; fingerprint consistente
+  com o PEM; backfill importa o coletor do JSON.
+- **api chaves (TestClient/unit):** `chaves_do_odoo()` monta o dict a partir do Odoo
+  (mockado) e respeita o cache TTL.
 - **api core (pytest, puro):** fila enfileira/ordena; concorrência respeita N; 429
   quando fila cheia e quando IP estoura; zip válido → N itens; zip-bomb (total >
   limite) → erro; contagem > limite → erro; job TTL expira → 404; `verificar_itens`
@@ -174,15 +201,20 @@ Novo addon (não altera `afr_sentinela_sensor_monitor`), depende de
 
 ## Staging (subsistemas independentes)
 
-1. **api verify+zip** — endpoint síncrono `verificar_itens` + descompactação com
-   guards (sem fila ainda). Shippable/testável sozinho.
-2. **api fila + rate-limit + backpressure** — job store, pool, 429, TTL, status.
-3. **Odoo página pública + upload + proxy/polling** — controller + templates + JS.
-4. **Relatório na tela + laudo PDF (QWeb) + JSON.**
+1. **Fonte das chaves (fix durável)** — core `verificar_itens(chaves_pem=...)`;
+   Odoo `pubkey_pem` no coletor + form + backfill do JSON; `api/verificacao_chaves.py`
+   (dict do Odoo, cache). Testável: core com dict; api resolve do Odoo (mockado).
+2. **api verify+zip** — endpoint síncrono usando `chaves_do_odoo()` + descompactação
+   com guards (sem fila ainda). Shippable/testável sozinho.
+3. **api fila + rate-limit + backpressure** — job store, pool, 429, TTL, status.
+4. **Odoo página pública + upload + proxy/polling** — controller + templates + JS.
+5. **Relatório na tela + laudo PDF (QWeb) + JSON.**
 
-Cada stage tem entregável testável. Um spec, plano em 4 estágios.
+Cada stage tem entregável testável. Um spec, plano em 5 estágios.
 
 ## Não-escopo
 
 - Modo B (PEM do usuário), histórico/auditoria persistente de verificações, login/
-  portal autenticado, Redis/multi-worker, o fix durável de `pubkey_pem` no Odoo.
+  portal autenticado, Redis/multi-worker.
+- Unificar a fonte de chaves da **ingestão** (`receber_upload`/`confronto` seguem no
+  JSON) e a escrita automática do `pubkey_pem` no provisionamento/enrollment.

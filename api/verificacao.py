@@ -82,6 +82,7 @@ class Gestor:
         self._rodando = False
 
     def enfileirar(self, nome, dados):
+        self.varrer_expirados()
         pendentes = sum(1 for j in self._jobs.values() if j.estado == 'fila')
         if pendentes >= FILA_MAX:
             raise FilaCheia('fila cheia')
@@ -91,7 +92,13 @@ class Gestor:
         return job
 
     def obter(self, job_id):
-        return self._jobs.get(job_id)
+        job = self._jobs.get(job_id)
+        if job is None:
+            return None
+        if job.expira_em is not None and job.expira_em <= self._agora():
+            del self._jobs[job_id]
+            return None
+        return job
 
     def varrer_expirados(self):
         agora = self._agora()
@@ -100,6 +107,8 @@ class Gestor:
             del self._jobs[jid]
 
     async def start(self):
+        if self._rodando:
+            return
         self._rodando = True
         self._tarefas = [asyncio.create_task(self._loop()) for _ in range(CONCORRENCIA_N)]
 
@@ -107,6 +116,7 @@ class Gestor:
         self._rodando = False
         for t in self._tarefas:
             t.cancel()
+        await asyncio.gather(*self._tarefas, return_exceptions=True)
         self._tarefas = []
 
     async def _loop(self):

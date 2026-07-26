@@ -50,3 +50,36 @@ def test_job_expira(monkeypatch):
     relogio['t'] += 11
     g.varrer_expirados()
     assert g.obter(job.id) is None
+
+
+def test_obter_expira_lazy_sem_sweep_explicito():
+    relogio = {'t': 1000.0}
+    g = verificacao.Gestor(agora=lambda: relogio['t'])
+    job = g.enfileirar('a.txt', b'x')
+    job.estado = 'pronto'; job.lote = 'X'; job.expira_em = relogio['t'] + 10
+    assert g.obter(job.id) is not None
+    relogio['t'] += 11
+    assert g.obter(job.id) is None
+
+
+def test_enfileirar_varre_expirados():
+    relogio = {'t': 1000.0}
+    g = verificacao.Gestor(agora=lambda: relogio['t'])
+    job_a = g.enfileirar('a.txt', b'x')
+    job_a.estado = 'pronto'; job_a.lote = 'A'; job_a.expira_em = relogio['t'] + 10
+    relogio['t'] += 11
+    g.enfileirar('b.txt', b'x')
+    # verifica o store diretamente (sem passar por obter, que também expira
+    # lazy) para isolar o sweep feito por enfileirar em si
+    assert job_a.id not in g._jobs
+
+
+def test_start_idempotente():
+    g = verificacao.Gestor()
+    _run(g.start())
+    try:
+        tarefas1 = list(g._tarefas)
+        _run(g.start())
+        assert g._tarefas == tarefas1  # mesmas tasks: não respawnou um 2º lote
+    finally:
+        _run(g.stop())

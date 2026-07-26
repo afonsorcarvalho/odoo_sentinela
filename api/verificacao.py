@@ -28,10 +28,13 @@ def coletar(nome_upload, dados):
         if len(infos) > ARQUIVOS_MAX:
             raise LimiteExcedido(f'zip com mais de {ARQUIVOS_MAX} arquivos')
         for info in infos:
-            total += info.file_size
-            if total > DESCOMPRIMIDO_MAX:
+            restante = DESCOMPRIMIDO_MAX - total
+            with z.open(info) as f:
+                conteudo = f.read(restante + 1)  # leitura limitada: nunca decomprime alem do orcamento
+            if len(conteudo) > restante:
                 raise LimiteExcedido('conteúdo descomprimido excede o limite')
-            itens.append((info.filename, z.read(info)))
+            total += len(conteudo)
+            itens.append((info.filename, conteudo))
     return itens
 
 

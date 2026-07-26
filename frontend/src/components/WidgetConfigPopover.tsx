@@ -1,26 +1,22 @@
-import { useSensors, useThreshold } from '../lib/queries'
+import { useThreshold } from '../lib/queries'
 import { WIDGET_REGISTRY } from '../lib/widgets/registry'
 import { WindowSelector } from './WindowSelector'
 import { statusTextColor } from './statusVisuals'
+import { AreaSelect } from './select/AreaSelect'
+import { SensorSelect } from './select/SensorSelect'
 import type { WidgetInstance } from '../lib/layout/schema'
 import type { Window } from '../lib/types'
 
 const sectionLabelStyle = { color: 'var(--color-muted)' } as const
 const selectClass = 'mt-1 block w-full rounded border px-2 py-1 text-xs'
 const inputStyle = { borderColor: 'var(--color-muted)' } as const
-// Visual de chip reaproveitado do padrão badge/StatusChip do projeto (rounded-full,
-// text-xs font-bold) — sem usar o componente StatusChip em si, que é tipado a
-// StatusResult['state'] (ok/warn/crit/unknown) e não se aplica a nomes de área.
-const chipStyle = { background: 'var(--color-panel)', border: '1px solid var(--color-line)' } as const
 
 export function WidgetConfigPopover({ widget, onChange, onClose }: {
   widget: WidgetInstance
   onChange: (w: WidgetInstance) => void
   onClose: () => void
 }) {
-  const sensors = useSensors().data ?? []
   const needs = WIDGET_REGISTRY[widget.type].needs
-  const areas = Array.from(new Map(sensors.map((s) => [s.area.area_code, s.area])).values())
   const scope = (widget.options?.scope as 'site' | 'area' | undefined) ?? 'site'
   // Regra dos hooks: sempre chamado, mesmo sem sensor vinculado ainda (código
   // vazio) ou em widgets que não são kpi. O guard `enabled: code !== ''` vive
@@ -50,72 +46,33 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
     onChange({ ...widget, options: { ...widget.options, ...patch } })
   }
 
-  // Dropdown único de área, usado pelo binding de widgets needs==='area' (tipo
-  // 'area'). Grava em binding.areaCode (single) — não confundir com o multi-área
-  // do alarms logo abaixo, que é outro caminho de escrita (binding.areaCodes).
+  // Combobox pesquisável de área, usado pelo binding de widgets needs==='area'
+  // (tipo 'area'). Grava em binding.areaCode (single) — não confundir com o
+  // multi-área do alarms logo abaixo, que é outro caminho de escrita
+  // (binding.areaCodes).
   const areaSelect = (
-    <label className="block text-xs">Área
-      <select
-        className={selectClass}
-        style={inputStyle}
-        value={widget.binding.areaCode ?? ''}
-        onChange={(e) => onChange({ ...widget, binding: { ...widget.binding, areaCode: e.target.value } })}
-      >
-        <option value="">—</option>
-        {areas.map((a) => <option key={a.area_code} value={a.area_code}>{a.name}</option>)}
-      </select>
-    </label>
+    <AreaSelect
+      label="Área"
+      value={widget.binding.areaCode ?? null}
+      onChange={(code) => onChange({ ...widget, binding: { ...widget.binding, areaCode: code ?? undefined } })}
+    />
   )
 
-  // Multi-área do alarms (scope==='area'): dropdown "Adicionar área" + chips,
-  // gravando em binding.areaCodes. Regra de resolução p/ exibição (mesma do
-  // registry): areaCodes ?? (areaCode ? [areaCode] : []) — cobre widget legado
-  // que só tem binding.areaCode. Na primeira edição (add/remove), passa a
-  // gravar em areaCodes; o areaCode legado, se houver, fica como está (não é
-  // limpo — a resolução no registry já prefere areaCodes quando presente).
+  // Multi-área do alarms (scope==='area'): combobox multi (chips + Pesquisar
+  // mais), gravando em binding.areaCodes. Regra de resolução p/ exibição
+  // (mesma do registry): areaCodes ?? (areaCode ? [areaCode] : []) — cobre
+  // widget legado que só tem binding.areaCode. Na primeira edição
+  // (add/remove), passa a gravar em areaCodes; o areaCode legado, se houver,
+  // fica como está (não é limpo — a resolução no registry já prefere
+  // areaCodes quando presente).
   const areaCodesEfetivos = widget.binding.areaCodes ?? (widget.binding.areaCode ? [widget.binding.areaCode] : [])
-  const areasDisponiveis = areas.filter((a) => !areaCodesEfetivos.includes(a.area_code))
-  function nomeArea(code: string): string {
-    return areas.find((a) => a.area_code === code)?.name ?? code
-  }
   const alarmsAreaSection = (
-    <div className="flex flex-col gap-2">
-      <label className="block text-xs">Adicionar área
-        <select
-          className={selectClass}
-          style={inputStyle}
-          value=""
-          onChange={(e) => {
-            const areaCode = e.target.value
-            if (areaCode === '') return
-            onChange({ ...widget, binding: { ...widget.binding, areaCodes: [...areaCodesEfetivos, areaCode] } })
-          }}
-        >
-          <option value="">—</option>
-          {areasDisponiveis.map((a) => <option key={a.area_code} value={a.area_code}>{a.name}</option>)}
-        </select>
-      </label>
-      {areaCodesEfetivos.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {areaCodesEfetivos.map((code) => (
-            <span key={code} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold" style={chipStyle}>
-              {nomeArea(code)}
-              <button
-                type="button"
-                aria-label={`Remover área ${nomeArea(code)}`}
-                className="leading-none"
-                onClick={() => onChange({
-                  ...widget,
-                  binding: { ...widget.binding, areaCodes: areaCodesEfetivos.filter((c) => c !== code) },
-                })}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
+    <AreaSelect
+      multiple
+      label="Áreas"
+      value={areaCodesEfetivos}
+      onChange={(codes) => onChange({ ...widget, binding: { ...widget.binding, areaCodes: codes } })}
+    />
   )
 
   return (
@@ -128,17 +85,11 @@ export function WidgetConfigPopover({ widget, onChange, onClose }: {
       <div className="mb-1 text-xs font-semibold" style={sectionLabelStyle}>Binding</div>
       {needs === 'area' && areaSelect}
       {needs === 'sensor' && (
-        <label className="block text-xs">Sensor
-          <select
-            className={selectClass}
-            style={inputStyle}
-            value={widget.binding.sensorCode ?? ''}
-            onChange={(e) => onChange({ ...widget, binding: { ...widget.binding, sensorCode: e.target.value } })}
-          >
-            <option value="">—</option>
-            {sensors.map((s) => <option key={s.sensor_code} value={s.sensor_code}>{s.name}</option>)}
-          </select>
-        </label>
+        <SensorSelect
+          label="Sensor"
+          value={widget.binding.sensorCode ?? null}
+          onChange={(code) => onChange({ ...widget, binding: { ...widget.binding, sensorCode: code ?? undefined } })}
+        />
       )}
       {needs === 'none' && (
         <div className="text-xs" style={sectionLabelStyle}>Sem configuração de binding.</div>

@@ -8,8 +8,16 @@ import type { WidgetInstance } from '../lib/layout/schema'
 vi.mock('../lib/queries', () => ({
   useSensors: () => ({
     data: [
-      { sensor_code: 'S1', name: 'Sensor Um', area: { area_code: 'A1', name: 'Área Um' } },
-      { sensor_code: 'S2', name: 'Sensor Dois', area: { area_code: 'A2', name: 'Área Dois' } },
+      {
+        sensor_code: 'S1', name: 'Sensor Um', unidade: '°C', protocolo_origem: '4-20ma',
+        measurement_type: { code: 'temp', name: 'Temperatura' },
+        area: { area_code: 'A1', name: 'Área Um', category: 'c' },
+      },
+      {
+        sensor_code: 'S2', name: 'Sensor Dois', unidade: '°C', protocolo_origem: '4-20ma',
+        measurement_type: { code: 'temp', name: 'Temperatura' },
+        area: { area_code: 'A2', name: 'Área Dois', category: 'c' },
+      },
     ],
   }),
   // default: sem threshold herdado (sensor sem cadastro, ou ainda carregando) —
@@ -30,7 +38,28 @@ const alarmsWidget: WidgetInstance = {
   binding: {}, options: { scope: 'site' },
 }
 
+// O <select> nativo "Escopo" também carrega role="combobox" implícito (mapping
+// ARIA de <select> single), então screen.getByRole('combobox') sozinho é
+// ambíguo nos testes de alarms. Escopar pelo container do AreaSelect (via o
+// label "Áreas") isola o combobox da seção multi-área.
+function areaCombobox(): HTMLElement {
+  const container = screen.getByText('Áreas').closest('div') as HTMLElement
+  return within(container).getByRole('combobox')
+}
+
 describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
+  describe('binding — sensor', () => {
+    it('escolher sensor no combobox grava binding.sensorCode', async () => {
+      const onChange = vi.fn()
+      render(<WidgetConfigPopover widget={tsWidget} onChange={onChange} onClose={vi.fn()} />)
+
+      await userEvent.click(screen.getByRole('combobox'))
+      await userEvent.click(screen.getByText('Sensor Dois'))
+
+      expect(onChange).toHaveBeenLastCalledWith({ ...tsWidget, binding: { ...tsWidget.binding, sensorCode: 'S2' } })
+    })
+  })
+
   describe('timeseries', () => {
     it('mostra o WindowSelector e escolher janela grava options.defaultWindow', async () => {
       const onChange = vi.fn()
@@ -118,11 +147,11 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
   })
 
   describe('alarms — escopo', () => {
-    it('trocar escopo para Área revela a seção multi-área (dropdown "Adicionar área")', async () => {
+    it('trocar escopo para Área revela a seção multi-área (combobox de área)', async () => {
       const onChange = vi.fn()
       const { rerender } = render(<WidgetConfigPopover widget={alarmsWidget} onChange={onChange} onClose={vi.fn()} />)
 
-      expect(screen.queryByLabelText('Adicionar área')).toBeNull()
+      expect(screen.queryByText('Áreas')).toBeNull()
 
       await userEvent.selectOptions(screen.getByLabelText('Escopo'), 'area')
       expect(onChange).toHaveBeenLastCalledWith({
@@ -132,7 +161,7 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
 
       const widgetComEscopoArea: WidgetInstance = { ...alarmsWidget, options: { scope: 'area' } }
       rerender(<WidgetConfigPopover widget={widgetComEscopoArea} onChange={onChange} onClose={vi.fn()} />)
-      expect(screen.getByLabelText('Adicionar área')).toBeInTheDocument()
+      expect(areaCombobox()).toBeInTheDocument()
     })
 
     it('voltar para Site mantém scope: site (e a seção de áreas some, sem limpar areaCodes)', async () => {
@@ -149,25 +178,27 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
 
     it('scope=site: seção de áreas ausente do DOM', () => {
       render(<WidgetConfigPopover widget={alarmsWidget} onChange={vi.fn()} onClose={vi.fn()} />)
-      expect(screen.queryByLabelText('Adicionar área')).toBeNull()
+      expect(screen.queryByText('Áreas')).toBeNull()
     })
   })
 
-  describe('alarms — multi-área (dropdown + chips)', () => {
+  describe('alarms — multi-área (combobox + chips)', () => {
     const alarmsAreaScope: WidgetInstance = { ...alarmsWidget, options: { scope: 'area' } }
 
-    it('dropdown "Adicionar área" lista todas as áreas do site quando nenhuma foi escolhida ainda', () => {
+    it('combobox de área lista todas as áreas do site quando nenhuma foi escolhida ainda', async () => {
       render(<WidgetConfigPopover widget={alarmsAreaScope} onChange={vi.fn()} onClose={vi.fn()} />)
-      const select = screen.getByLabelText('Adicionar área')
-      expect(within(select).getByRole('option', { name: 'Área Um' })).toBeInTheDocument()
-      expect(within(select).getByRole('option', { name: 'Área Dois' })).toBeInTheDocument()
+      await userEvent.click(areaCombobox())
+      const listbox = screen.getByRole('listbox')
+      expect(within(listbox).getByText('Área Um')).toBeInTheDocument()
+      expect(within(listbox).getByText('Área Dois')).toBeInTheDocument()
     })
 
-    it('escolher uma área no dropdown adiciona chip e grava binding.areaCodes via onChange', async () => {
+    it('escolher área no combobox grava binding.areaCodes', async () => {
       const onChange = vi.fn()
       const { rerender } = render(<WidgetConfigPopover widget={alarmsAreaScope} onChange={onChange} onClose={vi.fn()} />)
 
-      await userEvent.selectOptions(screen.getByLabelText('Adicionar área'), 'A2')
+      await userEvent.click(areaCombobox())
+      await userEvent.click(screen.getByText('Área Dois'))
 
       expect(onChange).toHaveBeenLastCalledWith({
         ...alarmsAreaScope,
@@ -175,23 +206,27 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
       })
 
       // Round-trip: com o pai reaplicando o widget atualizado (como o onChange real
-      // faria), a chip aparece, a opção some do dropdown e o select volta ao "—".
+      // faria), a chip aparece e a área some das opções do combobox.
       const widgetComA2: WidgetInstance = { ...alarmsAreaScope, binding: { areaCodes: ['A2'] } }
       rerender(<WidgetConfigPopover widget={widgetComA2} onChange={onChange} onClose={vi.fn()} />)
 
-      expect(screen.getByRole('button', { name: 'Remover área Área Dois' })).toBeInTheDocument()
-      const select = screen.getByLabelText('Adicionar área') as HTMLSelectElement
-      expect(select.value).toBe('')
-      expect(within(select).queryByRole('option', { name: 'Área Dois' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Remover Área Dois' })).toBeInTheDocument()
+      // O combobox permanece aberto após a escolha (stateReducer do MultiSelect
+      // força isOpen:true no ItemClick, p/ facilitar adicionar em sequência) —
+      // sem precisar reabrir, a lista já reflete o filtro (Área Dois some).
+      const listbox = screen.getByRole('listbox')
+      expect(within(listbox).queryByText('Área Dois')).toBeNull()
+      expect(within(listbox).getByText('Área Um')).toBeInTheDocument()
     })
 
-    it('área já escolhida some das opções do dropdown "Adicionar área"', () => {
+    it('área já escolhida some das opções do combobox', async () => {
       const widgetComA2: WidgetInstance = { ...alarmsAreaScope, binding: { areaCodes: ['A2'] } }
       render(<WidgetConfigPopover widget={widgetComA2} onChange={vi.fn()} onClose={vi.fn()} />)
 
-      const select = screen.getByLabelText('Adicionar área')
-      expect(within(select).queryByRole('option', { name: 'Área Dois' })).toBeNull()
-      expect(within(select).getByRole('option', { name: 'Área Um' })).toBeInTheDocument()
+      await userEvent.click(areaCombobox())
+      const listbox = screen.getByRole('listbox')
+      expect(within(listbox).queryByText('Área Dois')).toBeNull()
+      expect(within(listbox).getByText('Área Um')).toBeInTheDocument()
     })
 
     it('remover chip (×) tira a área de binding.areaCodes', async () => {
@@ -199,7 +234,7 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
       const widgetComDuasAreas: WidgetInstance = { ...alarmsAreaScope, binding: { areaCodes: ['A1', 'A2'] } }
       render(<WidgetConfigPopover widget={widgetComDuasAreas} onChange={onChange} onClose={vi.fn()} />)
 
-      await userEvent.click(screen.getByRole('button', { name: 'Remover área Área Um' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Remover Área Um' }))
 
       expect(onChange).toHaveBeenLastCalledWith({
         ...widgetComDuasAreas,
@@ -212,9 +247,10 @@ describe('WidgetConfigPopover — config por tipo (B2 T3)', () => {
       const widgetLegado: WidgetInstance = { ...alarmsAreaScope, binding: { areaCode: 'A1' } }
       render(<WidgetConfigPopover widget={widgetLegado} onChange={onChange} onClose={vi.fn()} />)
 
-      expect(screen.getByRole('button', { name: 'Remover área Área Um' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Remover Área Um' })).toBeInTheDocument()
 
-      await userEvent.selectOptions(screen.getByLabelText('Adicionar área'), 'A2')
+      await userEvent.click(areaCombobox())
+      await userEvent.click(screen.getByText('Área Dois'))
 
       expect(onChange).toHaveBeenLastCalledWith({
         ...widgetLegado,

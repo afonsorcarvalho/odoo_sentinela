@@ -2,28 +2,43 @@
 <odoo>
 
     <template id="laudo">
-        <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="o">
-                <div class="page">
-                    <h2>Laudo de Verificação de Autenticidade</h2>
-                    <p class="text-muted">
+        <t t-foreach="docs" t-as="o">
+            <t t-call="web.basic_layout">
+                <div class="page" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #000000;">
+                    <h2 style="margin-bottom: 4px;">Laudo de Verificação de Autenticidade</h2>
+                    <p style="color: #666666; margin-top: 0;">
                         Gerado em: <span t-esc="o.gerado_em"/>
                     </p>
 
-                    <table class="table table-sm" style="width: auto;">
+                    <table style="border-collapse: collapse; margin-bottom: 16px;">
                         <tbody>
-                            <tr><td>Total</td><td><strong t-esc="o.total"/></td></tr>
-                            <tr><td>Válidos</td><td t-esc="o.validos"/></tr>
-                            <tr><td>Inválidos</td><td t-esc="o.invalidos"/></tr>
-                            <tr><td>Incompletos</td><td t-esc="o.incompletos"/></tr>
-                            <tr><td>Indeterminados</td><td t-esc="o.indeterminados"/></tr>
                             <tr>
-                                <td>Veredito</td>
-                                <td>
-                                    <span t-if="o.todos_ok" class="text-success">
+                                <td style="padding: 2px 8px 2px 0;">Total</td>
+                                <td style="padding: 2px 0;"><strong t-esc="o.total"/></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 2px 8px 2px 0;">Válidos</td>
+                                <td style="padding: 2px 0;" t-esc="o.validos"/>
+                            </tr>
+                            <tr>
+                                <td style="padding: 2px 8px 2px 0;">Inválidos</td>
+                                <td style="padding: 2px 0;" t-esc="o.invalidos"/>
+                            </tr>
+                            <tr>
+                                <td style="padding: 2px 8px 2px 0;">Incompletos</td>
+                                <td style="padding: 2px 0;" t-esc="o.incompletos"/>
+                            </tr>
+                            <tr>
+                                <td style="padding: 2px 8px 2px 0;">Indeterminados</td>
+                                <td style="padding: 2px 0;" t-esc="o.indeterminados"/>
+                            </tr>
+                            <tr>
+                                <td style="padding: 2px 8px 2px 0;">Veredito</td>
+                                <td style="padding: 2px 0;">
+                                    <span t-if="o.todos_ok" style="color: #1e7e34; font-weight: bold;">
                                         Todos os arquivos autênticos
                                     </span>
-                                    <span t-else="" class="text-danger">
+                                    <span t-else="" style="color: #b02a2a; font-weight: bold;">
                                         Um ou mais arquivos falharam a verificação
                                     </span>
                                 </td>
@@ -31,35 +46,35 @@
                         </tbody>
                     </table>
 
-                    <table class="table table-bordered table-sm">
+                    <table style="border-collapse: collapse; width: 100%;">
                         <thead>
                             <tr>
-                                <th>Arquivo</th>
-                                <th>Estado</th>
-                                <th>Motivo</th>
-                                <th>Coletor</th>
-                                <th>Data de referência</th>
-                                <th>Linhas</th>
+                                <th style="border: 1px solid #999999; padding: 4px 6px; background-color: #eeeeee; text-align: left;">Arquivo</th>
+                                <th style="border: 1px solid #999999; padding: 4px 6px; background-color: #eeeeee; text-align: left;">Estado</th>
+                                <th style="border: 1px solid #999999; padding: 4px 6px; background-color: #eeeeee; text-align: left;">Motivo</th>
+                                <th style="border: 1px solid #999999; padding: 4px 6px; background-color: #eeeeee; text-align: left;">Coletor</th>
+                                <th style="border: 1px solid #999999; padding: 4px 6px; background-color: #eeeeee; text-align: left;">Data de referência</th>
+                                <th style="border: 1px solid #999999; padding: 4px 6px; background-color: #eeeeee; text-align: left;">Linhas</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr t-foreach="o.linha_ids" t-as="linha">
-                                <td t-esc="linha.nome"/>
-                                <td>
-                                    <span t-if="linha.estado == 'valido'" class="text-success">
+                                <td style="border: 1px solid #999999; padding: 4px 6px;" t-esc="linha.nome"/>
+                                <td style="border: 1px solid #999999; padding: 4px 6px;">
+                                    <span t-if="linha.estado == 'valido'" style="color: #1e7e34; font-weight: bold;">
                                         <t t-esc="linha.estado"/>
                                     </span>
-                                    <span t-elif="linha.estado == 'invalido'" class="text-danger">
+                                    <span t-elif="linha.estado == 'invalido'" style="color: #b02a2a; font-weight: bold;">
                                         <t t-esc="linha.estado"/>
                                     </span>
-                                    <span t-else="" class="text-warning">
+                                    <span t-else="" style="color: #8a6d00; font-weight: bold;">
                                         <t t-esc="linha.estado"/>
                                     </span>
                                 </td>
-                                <td t-esc="linha.motivo"/>
-                                <td t-esc="linha.coletor_id"/>
-                                <td t-esc="linha.data_referencia"/>
-                                <td t-esc="linha.total_linhas"/>
+                                <td style="border: 1px solid #999999; padding: 4px 6px;" t-esc="linha.motivo"/>
+                                <td style="border: 1px solid #999999; padding: 4px 6px;" t-esc="linha.coletor_id"/>
+                                <td style="border: 1px solid #999999; padding: 4px 6px;" t-esc="linha.data_referencia"/>
+                                <td style="border: 1px solid #999999; padding: 4px 6px;" t-esc="linha.total_linhas"/>
                             </tr>
                         </tbody>
                     </table>

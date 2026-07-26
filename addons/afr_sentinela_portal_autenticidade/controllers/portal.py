@@ -7,8 +7,12 @@ def _client():
 
 
 def _ip():
-    xff = request.httprequest.headers.get('X-Forwarded-For', '')
-    return xff.split(',')[0].strip() if xff else request.httprequest.remote_addr
+    # remote_addr e' o peer TCP; com proxy_mode=True (Odoo atras de proxy
+    # confiavel) o werkzeug ProxyFix ja o corrige para o IP real do cliente
+    # a partir do X-Forwarded-For do proxy. NAO confiar no header cru aqui:
+    # o endpoint e' publico e um cliente direto pode forjar X-Forwarded-For,
+    # contornando o rate-limit por IP do api.
+    return request.httprequest.remote_addr
 
 
 class PortalAutenticidade(http.Controller):
@@ -24,18 +28,28 @@ class PortalAutenticidade(http.Controller):
         if arquivo is None:
             return request.render('afr_sentinela_portal_autenticidade.form',
                                   {'erro': 'Selecione um arquivo.'})
+        max_bytes = 25 * 1024 * 1024
+        if (request.httprequest.content_length or 0) > max_bytes:
+            return request.render('afr_sentinela_portal_autenticidade.form',
+                                  {'erro': 'Arquivo muito grande (máx 25 MB).'})
         dados = arquivo.read()
         try:
             r = _client().enviar(arquivo.filename, dados, _ip())
         except Exception:
             return request.render('afr_sentinela_portal_autenticidade.form',
                                   {'erro': 'Servidor ocupado, tente novamente em instantes.'})
+        if not isinstance(r, dict) or not r.get('job_id'):
+            return request.render('afr_sentinela_portal_autenticidade.form',
+                                  {'erro': 'Resposta inválida do servidor, tente novamente.'})
         return request.render('afr_sentinela_portal_autenticidade.processando',
                               {'job_id': r['job_id'], 'posicao': r.get('posicao', 0)})
 
     @http.route('/verificar-autenticidade/<job_id>', type='http', auth='public',
                 website=True, methods=['GET'], csrf=False)
     def status(self, job_id, **kw):
-        s = _client().status(job_id)
+        try:
+            s = _client().status(job_id)
+        except Exception:
+            s = {'estado': 'indisponivel'}
         # No Stage 5 este método passa a renderizar o relatório quando pronto.
         return request.make_json_response(s)

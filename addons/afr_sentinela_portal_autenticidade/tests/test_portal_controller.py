@@ -21,6 +21,12 @@ class TestPortalController(HttpCase):
             self.assertEqual(r.status_code, 200)
             self.assertIn('JID', r.text)
 
+    def test_upload_grande_rejeitado(self):
+        big = b'x' * (26 * 1024 * 1024)
+        r = self.url_open('/verificar-autenticidade', files={'arquivo': ('big.bin', big)})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('muito grande', r.text.lower())
+
     def test_status_proxy(self):
         with patch(
             'odoo.addons.afr_sentinela_portal_autenticidade.models.verificacao_client'

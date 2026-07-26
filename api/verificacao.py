@@ -109,6 +109,16 @@ class Gestor:
     async def start(self):
         if self._rodando:
             return
+        # Reata a fila/semáforo ao loop que está rodando agora: se o Gestor foi
+        # construído antes do event loop existir (ex.: TestClient roda a app
+        # numa thread própria com loop próprio via anyio blocking portal),
+        # Queue/Semaphore do asyncio 3.9 ficam presos ao loop de criação e o
+        # worker nunca enxerga o que foi enfileirado (visto na verificação:
+        # job travado em 'fila' indefinidamente, sem exceção). Como start()
+        # só chega aqui na transição parado->rodando (guard acima) e nenhum
+        # enfileirar() acontece antes do startup completar, é seguro recriar.
+        self._fila = asyncio.Queue()
+        self._sem = asyncio.Semaphore(CONCORRENCIA_N)
         self._rodando = True
         self._tarefas = [asyncio.create_task(self._loop()) for _ in range(CONCORRENCIA_N)]
 

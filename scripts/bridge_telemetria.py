@@ -45,7 +45,19 @@ def _site_code(coletor_id):
 def _on_message(conn):
     def handler(client, userdata, msg):
         try:
-            partes = msg.topic.split('/')   # sentinela/telemetria/<hub>/<coletor>/<sensor>
+            partes = msg.topic.split('/')   # sentinela/telemetria|alarme/<hub>/<coletor>/<sensor>
+            if partes[1] == 'alarme':
+                coletor_id = partes[3]
+                p = json.loads(msg.payload)
+                site = _site_code(coletor_id)
+                if not site:
+                    return
+                evento = {**p, "site_id": site, "tipo": "alarme_ao_vivo"}
+                with conn.cursor() as cur:
+                    cur.execute("SELECT pg_notify('alarme_ao_vivo', %s)", (json.dumps(evento),))
+                conn.commit()
+                print(f'[bridge] ALARME {p.get("sensor_id")} {p.get("tipo_evento")} → SSE ({site})')
+                return
             coletor_id, sensor_id = partes[3], partes[4]
             p = json.loads(msg.payload)
             site = _site_code(coletor_id)
@@ -71,9 +83,12 @@ def main():
     conn = timescale.conectar(DSN)
     c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     c.on_message = _on_message(conn)
-    c.on_connect = lambda cl, u, f, rc, p=None: cl.subscribe('sentinela/telemetria/#', qos=0)
+    c.on_connect = lambda cl, u, f, rc, p=None: (
+        cl.subscribe('sentinela/telemetria/#', qos=0),
+        cl.subscribe('sentinela/alarme/#', qos=0),
+    )
     c.connect(MQTT_HOST, MQTT_PORT, 30)
-    print(f'[bridge] telemetria MQTT → Timescale (assinando sentinela/telemetria/#)')
+    print(f'[bridge] telemetria+alarme MQTT → Timescale (assinando sentinela/telemetria/# e sentinela/alarme/#)')
     c.loop_forever()
 
 

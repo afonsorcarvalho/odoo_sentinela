@@ -50,4 +50,10 @@ export const mockLiveApi: LiveApi = {
     cb('live')
     return () => {}
   },
+
+  // Mock ainda nao simula alarmes ao vivo: stub que satisfaz o tipo LiveApi
+  // sem nunca notificar (preserva o seam mock<->real).
+  subscribeAlarme() {
+    return () => {}
+  },
 }

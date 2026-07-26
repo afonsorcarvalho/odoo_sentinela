@@ -8,10 +8,16 @@ from . import live
 
 DSN = os.environ.get('TIMESCALE_DSN', 'postgresql://sentinela:sentinela@localhost:5433/sentinela')
 CANAL = 'sensor_reading_new'
+CANAL_ALARME = 'alarme_ao_vivo'
 RETRY_SEGUNDOS = 2
 
 
 def _receber_notificacao(connection, pid, channel, payload):
+    dados = json.loads(payload)
+    live.publicar(dados['sensor_id'], dados)
+
+
+def _receber_alarme(connection, pid, channel, payload):
     dados = json.loads(payload)
     live.publicar(dados['sensor_id'], dados)
 
@@ -24,6 +30,7 @@ async def escutar(dsn=DSN):
             conn.add_termination_listener(lambda c: desconectado.set())
             try:
                 await conn.add_listener(CANAL, _receber_notificacao)
+                await conn.add_listener(CANAL_ALARME, _receber_alarme)
                 await desconectado.wait()
             finally:
                 if not conn.is_closed():

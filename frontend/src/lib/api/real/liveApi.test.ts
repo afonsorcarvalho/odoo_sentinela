@@ -169,6 +169,45 @@ describe('realLiveApi', () => {
   })
 })
 
+describe('subscribeAlarme', () => {
+  it('entrega payload alarme_ao_vivo mapeado e nao o trata como leitura do mesmo sensor_id', async () => {
+    const alarmes: unknown[] = []
+    const readingCb = vi.fn()
+    // Mesmo sensor_id do payload de alarme abaixo: se o branch de onmessage nao
+    // existisse, este cb receberia o payload como leitura (valor 30.0) -- ver
+    // nota do reviewer sobre teste vazio se os sensor_id nao coincidissem.
+    subscribe('SNR-T-01', readingCb)
+    const off = realLiveApi.subscribeAlarme((a) => alarmes.push(a))
+    await Promise.resolve()
+
+    const es = MockEventSource.instances[0]
+    es.onmessage?.({
+      data: JSON.stringify({
+        tipo: 'alarme_ao_vivo',
+        sensor_id: 'SNR-T-01',
+        area_id: 'AREA-T',
+        tipo_evento: 'entrada_alarme',
+        tipo_violacao: 'acima_limite',
+        valor: 30.0,
+        timestamp: '2026-07-26T12:00:00+00:00',
+      }),
+    })
+
+    expect(alarmes).toHaveLength(1)
+    expect(alarmes[0]).toEqual({
+      sensor_code: 'SNR-T-01',
+      area_code: 'AREA-T',
+      tipo_evento: 'entrada_alarme',
+      tipo_violacao: 'acima_limite',
+      valor: 30.0,
+      timestamp: '2026-07-26T12:00:00+00:00',
+    })
+    expect(readingCb).not.toHaveBeenCalled()
+
+    off()
+  })
+})
+
 describe('realLiveApi estado de conexao (subscribeConnection)', () => {
   it('onerror transitorio (readyState=CONNECTING) antes de 3s: sem transicao, segue live', () => {
     vi.useFakeTimers()

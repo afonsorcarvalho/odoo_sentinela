@@ -99,6 +99,13 @@ def resolver_sensor(cliente, sensor_code):
 
 
 def processar_entrada_alarme(cliente, evento, sensor_odoo_id, area_odoo_id, coletor_odoo_id, hash_arquivo):
+    abertos = executar(
+        cliente, 'sensor_monitor.alarm.event', 'search',
+        [('sensor_id', '=', sensor_odoo_id), ('timestamp_resolucao_sensor', '=', False)],
+        limit=1,
+    )
+    if abertos:
+        return abertos[0]
     if evento['tipo_violacao'] == 'acima_limite':
         limite_snapshot = evento['limite_max_vigente']
     elif evento['tipo_violacao'] == 'abaixo_limite':

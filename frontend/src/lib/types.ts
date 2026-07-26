@@ -52,6 +52,18 @@ export type LiveConnectionState = 'live' | 'reconnecting' | 'offline'
 export type AlarmEventStatus = 'aberto' | 'reconhecido' | 'resolvido'
 export type AlarmTipoViolacao = 'acima_limite' | 'abaixo_limite' | 'sensor_offline' | 'erro_leitura'
 
+// Evento de alarme empurrado ao vivo pelo mesmo SSE de /live (tipo:
+// 'alarme_ao_vivo'), distinto de AlarmEvent (que vem do REST /alarmes com
+// campos de ciclo de vida como status/usuario_responsavel).
+export type LiveAlarme = {
+  sensor_code: string
+  area_code: string
+  tipo_evento: 'entrada_alarme' | 'saida_alarme'
+  tipo_violacao: string
+  valor: number
+  timestamp: string
+}
+
 export type AlarmEvent = {
   id: number
   sensor_code: string

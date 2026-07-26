@@ -35,6 +35,25 @@ class PublicadorMqtt:
         except OSError:
             return None
 
+    def publicar_alarme(self, hub_id, coletor_id, evento):
+        topico = f"sentinela/alarme/{hub_id}/{coletor_id}/{evento['sensor_id']}"
+        payload = json.dumps({
+            "timestamp": evento["timestamp"].isoformat(timespec="seconds"),
+            "sensor_id": evento["sensor_id"],
+            "area_id": evento["area_id"],
+            "tipo_medida": evento["tipo_medida"],
+            "tipo_evento": evento["tipo_evento"],
+            "tipo_violacao": evento["tipo_violacao"],
+            "valor": evento["valor"],
+            "limite_min": evento["limite_min_vigente"],
+            "limite_max": evento["limite_max_vigente"],
+        })
+        try:
+            self._client.publish(topico, payload, qos=0)
+            return topico
+        except OSError:
+            return None
+
     def fechar(self):
         try:
             self._client.disconnect()

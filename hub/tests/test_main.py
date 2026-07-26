@@ -108,6 +108,7 @@ def _cfg_com_sftp(tmp_path):
         hub_id='HUB', firmware_version='0.1.0', caminho_dados=str(tmp_path / 'dados'),
         cliente_id='CLI-1', site_id='SITE-1',
         mqtt_host='localhost', mqtt_port=1883, intervalo_leitura_s=5,
+        barramentos=[], alarme_n=3, alarme_margem=0.0,
         sftp=SimpleNamespace(host='10.8.0.1', port=22, username='u', ssh_key_path='k',
                              remote_dir='/uploads'),
     )

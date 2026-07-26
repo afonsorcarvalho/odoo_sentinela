@@ -1,5 +1,5 @@
 import type { LiveApi } from '../contracts'
-import type { AlarmState, LiveConnectionState, LivePoint, Threshold } from '../../types'
+import type { AlarmState, LiveAlarme, LiveConnectionState, LivePoint, Threshold } from '../../types'
 import { TOKEN_STORAGE_KEY } from '../../useAuth'
 import { computeStatus } from '../../status'
 import { BASE_URL } from './http'
@@ -49,6 +49,12 @@ let sharedSource: EventSource | null = null
 const subscribers = new Map<string, Set<(p: LivePoint) => void>>()
 const thresholdCache = new Map<string, Threshold | null>()
 
+// Listeners de alarme ao vivo: observacional, como subscribeConnection --
+// nao entra no reference-count de closeSharedSourceIfIdle() nem chama
+// ensureSharedSource() por si so. Depende de um subscribe() de dados manter
+// o EventSource compartilhado aberto (sempre o caso no dashboard).
+const alarmeListeners = new Set<(a: LiveAlarme) => void>()
+
 function ensureSharedSource(): EventSource {
   if (sharedSource) return sharedSource
 
@@ -62,7 +68,20 @@ function ensureSharedSource(): EventSource {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY)
   const es = new EventSource(`${BASE_URL}/live?token=${token}`)
   es.onmessage = (event) => {
-    const { sensor_id, time, valor } = JSON.parse(event.data)
+    const data = JSON.parse(event.data)
+    if (data.tipo === 'alarme_ao_vivo') {
+      const alarme: LiveAlarme = {
+        sensor_code: data.sensor_id,
+        area_code: data.area_id,
+        tipo_evento: data.tipo_evento,
+        tipo_violacao: data.tipo_violacao,
+        valor: data.valor,
+        timestamp: data.timestamp,
+      }
+      alarmeListeners.forEach((cb) => cb(alarme))
+      return
+    }
+    const { sensor_id, time, valor } = data
     const callbacks = subscribers.get(sensor_id)
     if (!callbacks || callbacks.size === 0) return
     const threshold = thresholdCache.get(sensor_id) ?? null
@@ -146,6 +165,13 @@ export const realLiveApi: LiveApi = {
     cb(connectionState)
     return () => {
       connectionListeners.delete(cb)
+    }
+  },
+
+  subscribeAlarme(cb) {
+    alarmeListeners.add(cb)
+    return () => {
+      alarmeListeners.delete(cb)
     }
   },
 }

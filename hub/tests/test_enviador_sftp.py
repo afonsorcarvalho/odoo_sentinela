@@ -111,6 +111,35 @@ def test_envia_com_subcaminho_da_arvore(tmp_path):
     ]
 
 
+def test_envia_alarmes_selado(tmp_path):
+    """FIX CRITICAL: *_alarmes.txt selado tem que ser transportado, não só
+    *_leituras.txt — senão o alarme detectado na borda fica selado no disco
+    do hub e nunca chega ao Odoo (o caminho durável da feature nunca roda)."""
+    d = _dir(tmp_path)
+    _selado(d, "2026-07-21_alarmes.txt")
+    t = _TransporteFake()
+    env = EnviadorSftp(COLETOR, tmp_path / "dados", t,
+                       cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
+    enviados = env.varrer()
+    assert enviados == ["2026-07-21_alarmes.txt"]
+    assert t.enviados == [
+        f"CLI-1/2026/07/21/SITE-1/HUB-0001/{COLETOR}/2026-07-21_alarmes.txt"
+    ]
+
+
+def test_nao_reenvia_alarmes(tmp_path):
+    d = _dir(tmp_path)
+    _selado(d, "2026-07-21_alarmes.txt")
+    t = _TransporteFake()
+    env = EnviadorSftp(COLETOR, tmp_path / "dados", t,
+                       cliente_id="CLI-1", site_id="SITE-1", hub_id="HUB-0001")
+    env.varrer()
+    assert env.varrer() == []          # segunda varredura não reenvia
+    assert t.enviados == [
+        f"CLI-1/2026/07/21/SITE-1/HUB-0001/{COLETOR}/2026-07-21_alarmes.txt"
+    ]
+
+
 def test_transporte_paramiko_conecta_autentica_e_poe(tmp_path):
     from hub import identidade_ssh
     chave_path = tmp_path / "ssh_hub"

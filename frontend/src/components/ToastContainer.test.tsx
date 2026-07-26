@@ -1,7 +1,8 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ToastContainer } from './ToastContainer'
-import type { AlarmEvent } from '../lib/types'
+import { liveApi } from '../lib/api'
+import type { AlarmEvent, LiveAlarme } from '../lib/types'
 
 const AREA_NAMES = { EXPURGO: 'Expurgo' }
 
@@ -12,7 +13,10 @@ const EVT = (id: number, status: AlarmEvent['status'] = 'aberto'): AlarmEvent =>
   usuario_responsavel: null, data_resolucao: null, observacoes: null,
 })
 
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 describe('ToastContainer', () => {
   it('nao mostra toast na primeira renderizacao (baseline, nao "tudo e novo")', () => {
@@ -40,5 +44,51 @@ describe('ToastContainer', () => {
     const { rerender } = render(<ToastContainer alarms={[]} areaNameByCode={AREA_NAMES} loaded={false} />)
     rerender(<ToastContainer alarms={[EVT(1), EVT(2)]} areaNameByCode={AREA_NAMES} loaded />)
     expect(screen.queryByText(/Expurgo/)).not.toBeInTheDocument()
+  })
+
+  it('mostra toast ao vivo imediatamente e nao duplica quando o duravel chega', () => {
+    let capturedCb: ((a: LiveAlarme) => void) | null = null
+    vi.spyOn(liveApi, 'subscribeAlarme').mockImplementation((cb) => {
+      capturedCb = cb
+      return () => {}
+    })
+
+    const { rerender } = render(<ToastContainer alarms={[]} areaNameByCode={AREA_NAMES} loaded />)
+
+    const liveAlarme: LiveAlarme = {
+      sensor_code: 'PRESS-EXP-01',
+      area_code: 'EXPURGO',
+      tipo_evento: 'entrada_alarme',
+      tipo_violacao: 'abaixo_limite',
+      valor: -3.1,
+      timestamp: '2026-07-26T12:00:00Z',
+    }
+    act(() => capturedCb!(liveAlarme))
+
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByText(/Não conformidade — Expurgo/)).toBeInTheDocument()
+
+    const alarmeDuravel: AlarmEvent = {
+      ...EVT(1),
+      timestamp_deteccao: Date.parse('2026-07-26T12:00:00Z'),
+    }
+    rerender(
+      <ToastContainer
+        alarms={[alarmeDuravel]}
+        areaNameByCode={AREA_NAMES}
+        loaded
+      />,
+    )
+
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+  })
+
+  it('fallback: alarme duravel sem sinal ao vivo ainda toasta', () => {
+    const { rerender } = render(<ToastContainer alarms={[]} areaNameByCode={AREA_NAMES} loaded />)
+
+    rerender(<ToastContainer alarms={[EVT(1)]} areaNameByCode={AREA_NAMES} loaded />)
+
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByText(/Não conformidade — Expurgo/)).toBeInTheDocument()
   })
 })

@@ -4,6 +4,8 @@ from unittest.mock import MagicMock
 from hub import main as hub_main
 from hub.arquivo_diario import ArquivoDiario
 from hub.assinador import AssinadorSoftware
+from hub.config import BarramentoConfig, CanalConfig, DispositivoConfig, HubConfig
+from hub.detector_alarme import DetectorAlarme
 
 
 def test_executar_recarrega_leitor_quando_reconfigurar_setado(monkeypatch):
@@ -179,3 +181,89 @@ def test_recarregar_reconstroi_arquivo_com_tenant_da_config_nova(monkeypatch, tm
     texto = (tmp_path / 'dados' / 'COL' / '2026-07-22_HUB-COL_leituras.txt').read_text()
     assert "# cliente_id: CLI-43" in texto
     assert "# site_id: SITE-01" in texto
+
+
+def _cfg_com_limite_max(limite_max):
+    canal = CanalConfig(ch=1, sensor_id="SNR-1", area_id="AREA-1",
+                        tipo_medida="temperatura", unidade="C", protocolo_origem="4-20ma",
+                        limite_min=None, limite_max=limite_max)
+    disp = DispositivoConfig(endereco=1, driver="n4aib16", canais=[canal])
+    bus = BarramentoConfig(porta="/dev/ttyUSB0", baud=9600, paridade="N", stop_bits=1,
+                           dispositivos=[disp])
+    return HubConfig(hub_id="HUB", coletor_id="COL", firmware_version="0.1.0",
+                     timezone_offset="-03:00", intervalo_leitura_s=0, caminho_chave="/tmp/k",
+                     caminho_dados="/tmp/d", mqtt_host="localhost", mqtt_port=1883,
+                     barramentos=[bus], alarme_n=1, alarme_margem=0.0)
+
+
+class _ArquivoAlarmesFakeReload:
+    def __init__(self):
+        self.eventos = []
+    def recuperar_pendentes(self, hoje): pass
+    def registrar_evento(self, evento): self.eventos.append(evento)
+    def selar(self, data=None, caminho=None): pass
+
+
+def test_recarregar_reconstroi_detector_com_novos_limiares(monkeypatch):
+    """Bug: _recarregar() reconstruía leitor/config/arquivo mas NÃO
+    detector/arquivo_alarmes — um operador que editasse limite_min/max no Odoo
+    e republicasse a config via config-publish não via efeito nenhum até
+    reiniciar o processo do hub manualmente. Aqui a config nova tem um limite
+    mais apertado (max=25 em vez de 100); uma leitura de 30 só deve gerar
+    evento de alarme se o detector em uso já for o NOVO (reconstruído pela
+    factory), não o antigo (que ainda achava 30 dentro do limite de 100)."""
+    parar = Event()
+    reconfig = Event()
+    reconfig.set()  # já sinalizado -> deve recarregar no 1º ciclo
+
+    cfg_velha = _cfg_com_limite_max(100.0)
+    cfg_nova = _cfg_com_limite_max(25.0)
+    monkeypatch.setattr(hub_main.config_mod, 'carregar_config', lambda p: cfg_nova)
+
+    leitura = {"sensor_id": "SNR-1", "area_id": "AREA-1", "tipo_medida": "temperatura",
+              "valor": 30.0, "unidade": "C", "protocolo_origem": "4-20ma",
+              "status_leitura": "ok", "cert_ver": 0, "cal_ganho": 1.0, "cal_offset": 0.0}
+
+    leitor_velho = MagicMock()
+    leitor_velho.ler_todos.return_value = []
+    leitor_novo = MagicMock()
+
+    def agora():
+        parar.set()
+        import datetime
+        return datetime.datetime(2026, 7, 26, tzinfo=datetime.timezone.utc)
+
+    leitor_novo.ler_todos.side_effect = lambda ag: [dict(leitura, timestamp=ag)]
+    monkeypatch.setattr(hub_main, 'Leitor', lambda c: leitor_novo)
+
+    arquivo = MagicMock()
+    publicador = MagicMock()
+
+    detector_velho = DetectorAlarme(hub_main.montar_limites(cfg_velha), n=1, margem=0.0)
+    arquivo_alarmes_velho = _ArquivoAlarmesFakeReload()
+
+    detectores_criados = []
+    def detector_factory(c):
+        d = DetectorAlarme(hub_main.montar_limites(c), n=1, margem=0.0)
+        detectores_criados.append(d)
+        return d
+
+    arquivos_alarmes_criados = []
+    def arquivo_alarmes_factory(c):
+        a = _ArquivoAlarmesFakeReload()
+        arquivos_alarmes_criados.append(a)
+        return a
+
+    hub_main.executar(cfg_velha, leitor_velho, arquivo, publicador, agora_fn=agora,
+                      parar=parar, max_ciclos=1, reconfigurar=reconfig,
+                      caminho_config='config.yaml',
+                      detector=detector_velho, arquivo_alarmes=arquivo_alarmes_velho,
+                      detector_factory=detector_factory,
+                      arquivo_alarmes_factory=arquivo_alarmes_factory)
+
+    assert len(detectores_criados) == 1                 # detector foi reconstruído
+    assert len(arquivos_alarmes_criados) == 1            # arquivo_alarmes idem
+    assert arquivo_alarmes_velho.eventos == []            # o antigo não recebeu nada
+    novo_arquivo_alarmes = arquivos_alarmes_criados[0]
+    assert len(novo_arquivo_alarmes.eventos) == 1         # evento foi p/ o NOVO
+    assert novo_arquivo_alarmes.eventos[0]["tipo_evento"] == "entrada_alarme"

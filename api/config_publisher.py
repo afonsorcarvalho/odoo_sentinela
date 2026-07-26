@@ -101,6 +101,14 @@ def serializar_config_hub(cliente, hub_code, version=None):
                                   'calibracao_vigente_id', 'usa_map', 'modbus_register_id',
                                   'usa_faixa', 'faixa_min', 'faixa_max'])
 
+            sensor_ids_odoo = [s['id'] for s in sensores]
+            limites_por_sensor = {}
+            if sensor_ids_odoo:
+                thresholds = ex('sensor_monitor.alarm.threshold', 'search_read',
+                                [('sensor_id', 'in', sensor_ids_odoo)],
+                                fields=['sensor_id', 'limite_min', 'limite_max'])
+                limites_por_sensor = {t['sensor_id'][0]: t for t in thresholds}
+
             # area_id/measurement_type_id vêm como (id, display_name) via search_read;
             # o Hub espera os CÓDIGOS (area_code / measurement_type.code), não o nome
             # de exibição — resolve em lote.
@@ -147,6 +155,10 @@ def serializar_config_hub(cliente, hub_code, version=None):
                             f">= faixa_max ({s['faixa_min']} >= {s['faixa_max']})")
                     canal['faixa_min'] = s['faixa_min']
                     canal['faixa_max'] = s['faixa_max']
+                th = limites_por_sensor.get(s['id'])
+                if th is not None:
+                    canal['limite_min'] = th['limite_min']
+                    canal['limite_max'] = th['limite_max']
                 if s['filtro_tipo'] != 'none':
                     canal['filtro'] = {'tipo': s['filtro_tipo'], 'alpha': s['filtro_alpha']}
                 cert = certs_por_id.get(s['calibracao_vigente_id'][0]) if s.get('calibracao_vigente_id') else None

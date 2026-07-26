@@ -46,3 +46,34 @@ def test_falha_de_publish_nao_propaga():
     pub = PublicadorMqtt("localhost", 1883, client=Explode())
     pub.conectar()
     assert pub.publicar("HUB-0001", "COL-RS485-BUS0", _leitura()) is None  # não levanta
+
+
+class _FakeClient:
+    def __init__(self): self.publicados = []
+    def connect(self, *a, **k): pass
+    def publish(self, topico, payload, qos=0): self.publicados.append((topico, payload, qos))
+    def disconnect(self): pass
+
+
+def _evento():
+    return {"sensor_id": "SNR-T-01", "area_id": "AREA-T", "tipo_medida": "temperatura",
+            "timestamp": datetime(2026, 7, 26, 12, 0, 0, tzinfo=timezone.utc),
+            "tipo_evento": "entrada_alarme", "tipo_violacao": "acima_limite", "valor": 30.0,
+            "limite_min_vigente": 18.0, "limite_max_vigente": 25.0}
+
+
+def test_publicar_alarme_topico_e_payload():
+    fake = _FakeClient()
+    pub = PublicadorMqtt("localhost", 1883, client=fake)
+    topico = pub.publicar_alarme("HUB-T", "COL-T", _evento())
+    assert topico == "sentinela/alarme/HUB-T/COL-T/SNR-T-01"
+    assert len(fake.publicados) == 1
+    t, payload, qos = fake.publicados[0]
+    p = json.loads(payload)
+    assert p["tipo_evento"] == "entrada_alarme"
+    assert p["tipo_violacao"] == "acima_limite"
+    assert p["valor"] == 30.0
+    assert p["limite_max"] == 25.0
+    assert p["sensor_id"] == "SNR-T-01"
+    assert p["area_id"] == "AREA-T"
+    assert p["timestamp"] == "2026-07-26T12:00:00+00:00"

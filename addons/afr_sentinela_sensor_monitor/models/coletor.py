@@ -51,16 +51,19 @@ class Coletor(models.Model):
     @api.depends('pubkey_pem')
     def _compute_pubkey_fingerprint(self):
         for coletor in self:
-            fp = False
-            if coletor.pubkey_pem:
-                try:
-                    chave = serialization.load_pem_public_key(coletor.pubkey_pem.encode())
-                    der = chave.public_bytes(
-                        encoding=serialization.Encoding.DER,
-                        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                    )
-                    d = hashlib.sha256(der).hexdigest().upper()
-                    fp = ':'.join(d[i:i + 2] for i in range(0, len(d), 2))
-                except (ValueError, TypeError):
-                    fp = False
-            coletor.pubkey_fingerprint = fp
+            if not coletor.pubkey_pem:
+                # Sem PEM (ainda) não significa "sem fingerprint": preserva
+                # um valor já armazenado (ex.: cadastrado manualmente antes
+                # do coletor enviar a chave) em vez de apagá-lo num -u.
+                coletor.pubkey_fingerprint = coletor.pubkey_fingerprint
+                continue
+            try:
+                chave = serialization.load_pem_public_key(coletor.pubkey_pem.encode())
+                der = chave.public_bytes(
+                    encoding=serialization.Encoding.DER,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                )
+                d = hashlib.sha256(der).hexdigest().upper()
+                coletor.pubkey_fingerprint = ':'.join(d[i:i + 2] for i in range(0, len(d), 2))
+            except (ValueError, TypeError):
+                coletor.pubkey_fingerprint = False

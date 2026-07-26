@@ -46,3 +46,18 @@ class TestColetorPubkey(TransactionCase):
     def test_pem_invalido_fingerprint_vazio(self):
         col = self._coletor('nao eh pem')
         self.assertFalse(col.pubkey_fingerprint)
+
+    def test_pem_vazio_preserva_fingerprint_manual(self):
+        # Coletor com PEM válido (fingerprint calculado a partir dele).
+        col = self._coletor(self.pem)
+        self.assertEqual(col.pubkey_fingerprint, self.fp_esperado)
+        # Fingerprint manual sobrescrito diretamente (sem alterar pubkey_pem,
+        # então não dispara recompute).
+        col.write({'pubkey_fingerprint': 'AA:BB'})
+        self.assertEqual(col.pubkey_fingerprint, 'AA:BB')
+        # Zerar o PEM É uma mudança real de dependência: dispara o recompute
+        # de verdade (simula o -u com uma linha que tinha fingerprint setado
+        # manualmente e ainda não recebeu o PEM do coletor).
+        col.pubkey_pem = False
+        self.assertEqual(col.pubkey_fingerprint, 'AA:BB',
+                          'fingerprint manual não deve ser apagado quando pubkey_pem fica vazio')

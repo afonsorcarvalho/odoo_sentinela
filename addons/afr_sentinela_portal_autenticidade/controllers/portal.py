@@ -77,7 +77,8 @@ class PortalAutenticidade(http.Controller):
             s = _client().status(job_id)
         except Exception:
             s = {'estado': 'indisponivel'}
-        return request.make_json_response(s.get('lote', s))
+        lote = s.get('lote')
+        return request.make_json_response(lote if lote else {'estado': s.get('estado')})
 
     @http.route('/verificar-autenticidade/<job_id>/laudo.pdf', type='http',
                 auth='public', website=True, methods=['GET'], csrf=False)

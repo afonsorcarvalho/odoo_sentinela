@@ -38,6 +38,14 @@ class TestPortalRelatorio(HttpCase):
             self.assertIn('application/json', r.headers.get('Content-Type', ''))
             self.assertIn('"total": 2', r.text)
 
+    def test_estado_expirado_mostra_erro_sem_polling(self):
+        with patch('odoo.addons.afr_sentinela_portal_autenticidade.models.verificacao_client'
+                   '.VerificacaoClient.status', return_value={'estado': 'expirado'}):
+            r = self.url_open('/verificar-autenticidade/JID')  # full page (Accept text/html)
+            self.assertEqual(r.status_code, 200)
+            self.assertIn('expirou', r.text.lower())
+            self.assertNotIn('data-job-id', r.text)  # sem widget de polling -> nao faz loop
+
     def test_laudo_pdf_nao_vazio(self):
         # Mocka o renderer de PDF: wkhtmltopdf real, dentro de --test-enable,
         # faz um callback HTTP de volta ao mesmo servidor Odoo single-thread

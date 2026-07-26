@@ -51,13 +51,22 @@ class PortalAutenticidade(http.Controller):
             s = _client().status(job_id)
         except Exception:
             s = {'estado': 'indisponivel'}
-        if s.get('estado') == 'pronto':
-            laudo = request.env['sensor_monitor.verificacao.laudo'].sudo().criar_de_lote(s['lote'])
+        estado = s.get('estado')
+        if estado == 'pronto':
+            laudo = request.env['sensor_monitor.verificacao.laudo'].sudo().criar_de_lote(s.get('lote') or {})
             return request.render('afr_sentinela_portal_autenticidade.relatorio',
                                   {'laudo': laudo, 'job_id': job_id})
+        if estado in ('erro', 'expirado', 'indisponivel'):
+            msgs = {
+                'erro': 'A verificação falhou. Verifique o arquivo e tente novamente.',
+                'expirado': 'O resultado expirou. Reenvie o arquivo para verificar de novo.',
+                'indisponivel': 'Serviço de verificação indisponível no momento. Tente novamente em instantes.',
+            }
+            return request.render('afr_sentinela_portal_autenticidade.form',
+                                  {'erro': msgs[estado]})
+        # ainda em andamento (fila/processando)
         if request.httprequest.headers.get('Accept', '').startswith('application/json') or kw.get('json'):
             return request.make_json_response(s)
-        # ainda processando (ou erro/expirado): página com polling
         return request.render('afr_sentinela_portal_autenticidade.processando',
                               {'job_id': job_id, 'posicao': s.get('posicao', 0)})
 
@@ -79,7 +88,7 @@ class PortalAutenticidade(http.Controller):
             s = {'estado': 'indisponivel'}
         if s.get('estado') != 'pronto':
             return request.not_found()
-        laudo = request.env['sensor_monitor.verificacao.laudo'].sudo().criar_de_lote(s['lote'])
+        laudo = request.env['sensor_monitor.verificacao.laudo'].sudo().criar_de_lote(s.get('lote') or {})
         pdf, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
             'afr_sentinela_portal_autenticidade.laudo', res_ids=laudo.ids)
         return request.make_response(pdf, headers=[

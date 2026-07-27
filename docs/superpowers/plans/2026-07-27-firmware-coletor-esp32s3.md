@@ -89,6 +89,8 @@ Consultar a wiki oficial da Waveshare do **ESP32-S3-Touch-LCD-4.3B** e o esquem�
 
 Se algum item não for confirmável na documentação, escrever `NÃO CONFIRMADO — verificar por medição` e abrir um teste de bancada; **não** chutar.
 
+**Condição de parada**: se o item 3 apurar que a placa **não tem slot microSD**, ou que os pinos do SD conflitam com o painel RGB a ponto de não dar para usar os dois juntos, **parar o plano aqui e reportar**. As decisões D2, D3 e D10 do design todas pressupõem um cartão SD funcionando, e as Tasks 8, 12, 17 e 18 ficam inconstruíveis. A saída (módulo SD externo? SPI em pinos livres? flash interna com retenção menor?) é decisão de arquitetura com o Afonso, não improviso de quem executa a task.
+
 - [ ] **Step 2: Escrever `platformio.ini`**
 
 ```ini
@@ -180,12 +182,13 @@ git commit -m "chore: bootstrap PlatformIO project with native and target envs"
 - Produces:
   - `void sha256_hex(const char *dado, size_t n, char saida[65]);` — hex minúsculo, terminado em `\0`.
   - `size_t base64_encode(const uint8_t *dado, size_t n, char *saida, size_t saida_max);`
+  - `size_t base64_decode(const char *texto, uint8_t *saida, size_t saida_max);` — devolve o número de bytes decodificados, `0` em entrada inválida. Usado pelos testes de assinatura (Task 7).
   - `int formato_montar_cabecalho(char *saida, size_t max, const char *tipo_arquivo, const char *coletor_id, const char *hub_id, const char *fingerprint, const char *data_referencia, const char *timezone_offset, const char *firmware_version, const char *cliente_id, const char *site_id);` — devolve o número de bytes escritos, ou `-1` se algum identificador contiver caractere proibido.
   - `void formato_hash_seed(const char *cabecalho_canonico, char saida[65]);`
 
 - [ ] **Step 1: Vendorizar SHA-256 e base64**
 
-Copiar para `src/crypto/` uma implementação SHA-256 de domínio público em C puro (a de `B-Con/crypto-algorithms`, `sha256.c`/`sha256.h`, serve e não tem dependências). Escrever `sha256_hex` em cima dela. Escrever `base64_encode` à mão (alfabeto padrão, com padding `=`) — são ~30 linhas e evita dependência que não existe no `env:native`.
+Copiar para `src/crypto/` uma implementação SHA-256 de domínio público em C puro (a de `B-Con/crypto-algorithms`, `sha256.c`/`sha256.h`, serve e não tem dependências). Escrever `sha256_hex` em cima dela. Escrever `base64_encode` e `base64_decode` à mão (alfabeto padrão, com padding `=`) — são ~60 linhas juntas e evitam dependência que não existe no `env:native`.
 
 - [ ] **Step 2: Escrever o teste falho do cabeçalho**
 
@@ -1131,6 +1134,7 @@ Este teste roda **no ESP32** (`env:coletor`), porque depende de mbedTLS e NVS.
 #include <unity.h>
 #include "nvs_flash.h"
 #include "crypto/assinador.h"
+#include "crypto/base64.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -1156,11 +1160,16 @@ void test_fingerprint_tem_formato_de_octetos(void) {
     TEST_ASSERT_EQUAL_CHAR(':', fp[2]);
 }
 
-void test_assinatura_e_base64_nao_vazia(void) {
+void test_assinatura_decodifica_para_der_de_ecdsa(void) {
     char sig[256];
+    uint8_t der[128];
     TEST_ASSERT_EQUAL_INT(0, assinador_assinar_hash(HASH, sig, sizeof sig));
     TEST_ASSERT_GREATER_THAN_UINT(80, strlen(sig));
-    TEST_ASSERT_EQUAL_CHAR('M', sig[0]);      // DER de ECDSA começa com 0x30 -> 'M' em base64
+    size_t n = base64_decode(sig, der, sizeof der);
+    TEST_ASSERT_GREATER_THAN_UINT(68, n);          // DER de P-256: 70..72 bytes
+    TEST_ASSERT_LESS_THAN_UINT(73, n);
+    TEST_ASSERT_EQUAL_HEX8(0x30, der[0]);          // SEQUENCE
+    TEST_ASSERT_EQUAL_UINT(n - 2, der[1]);         // comprimento declarado
 }
 
 void test_chave_sobrevive_a_reinicio_do_modulo(void) {
@@ -1177,7 +1186,7 @@ void app_main(void) {
     RUN_TEST(test_inicia_e_gera_chave);
     RUN_TEST(test_pubkey_sai_em_pem);
     RUN_TEST(test_fingerprint_tem_formato_de_octetos);
-    RUN_TEST(test_assinatura_e_base64_nao_vazia);
+    RUN_TEST(test_assinatura_decodifica_para_der_de_ecdsa);
     RUN_TEST(test_chave_sobrevive_a_reinicio_do_modulo);
     UNITY_END();
 }
@@ -1250,7 +1259,9 @@ git commit -m "feat: ECDSA P-256 signer with NVS-persisted device key"
 
 - [ ] **Step 1: Escrever o teste falho (roda no alvo)**
 
-`test/test_target_arquivo/test_arquivo.c` — usa o SD já montado em `/sdcard`:
+`test/test_target_arquivo/test_arquivo.c` — usa o SD já montado em `/sdcard`.
+
+**Estes cinco testes são uma sequência deliberada sobre o mesmo arquivo**: o `remove()` do primeiro é o único reset, e cada teste depende do estado deixado pelo anterior. Rodá-los isolados ou fora de ordem falha por desenho — não é flakiness, não "consertar" tornando-os independentes (o que se quer provar aqui é justamente a continuidade da cadeia entre aberturas).
 
 ```c
 #include <stdio.h>

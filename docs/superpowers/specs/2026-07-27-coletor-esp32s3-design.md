@@ -123,6 +123,8 @@ loop do Pi, por coletor da lista:
 
 **Confirmação de download**: como o FTP do coletor é read-only (D3), o Hub não consegue marcar nada no cartão. Ele publica o nome de cada arquivo baixado em `sentinela/coletado/{hub_id}/{coletor_id}` (não-retido); o coletor guarda esse conjunto no NVS. É o que torna a rotação do D10 decidível — sem isso, "apagar só o que já foi transportado" não teria como ser sabido, e a rotação apagaria prova ainda não coletada.
 
+Esse tópico é o primeiro ponto do sistema em que uma mensagem MQTT leva a **apagar arquivo**, então a propriedade de segurança precisa ser explícita: a confirmação é **advisória**, nunca gatilho. Apagar só acontece quando o cartão está de fato acima do limiar de ocupação; uma confirmação forjada, sozinha, não apaga nada. O canal segue sem assinatura na v1, como o resto do control-plane (`diretrizes_projeto.md` §10.1).
+
 **Expiração do parcial**: assim que o selado de uma data chega, o `.parcial` correspondente vira peso morto e é apagado pelo Pi. Sem essa regra, o problema de disco cheio do D10 reaparece no Pi, onde ninguém está olhando.
 
 **Credencial FTP — quem manda**: a **fonte de verdade é o Odoo** (D6). O provisionamento pela tela (§6) serve só ao primeiro boot e à recuperação em campo; se o Odoo publicar credencial diferente, o coletor adota a do Odoo. Falha de autenticação **não pode** aparecer como "coletor inalcançável": a tela de diagnóstico e o `status` MQTT distinguem `sem rede` de `auth recusada`, porque o segundo é erro de cadastro e o primeiro é erro de campo.

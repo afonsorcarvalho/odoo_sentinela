@@ -85,6 +85,13 @@ Cada módulo espelha um equivalente Python já testado em campo. A tabela é o m
 
 O arquivo é a prova. Ordem obrigatória por leitura: **calcula hash → assina → grava → flush**. Só depois publica MQTT. Se o MQTT falhar, o arquivo já está íntegro; o contrário não é recuperável.
 
+**Custo do flush por linha no FatFS** (não existe no Python, existe aqui): cada append reescreve FAT e entrada de diretório. Duas consequências que o firmware precisa tratar e o `hub/` nunca precisou:
+
+- **Desgaste do cartão.** Com D10 (SD é arquivo permanente), vida útil do cartão é requisito, não detalhe. Mitigação: cadência de produção é 1 leitura/min por sensor — algumas centenas de appends por dia, não milhares por minuto. Manter o arquivo **aberto** entre gravações (`fsync` sem `close`) em vez de abrir/fechar por linha como o Python faz. Cartão industrial obrigatório.
+- **Queda de energia durante a atualização da FAT** corrompe o *diretório*, não só a última linha — pior que perder uma leitura. Regra de recuperação obrigatória no boot: ao reconstruir a cadeia do `.parcial`, **recalcular o hash de cada linha e conferir com o campo `hash` dela**; a primeira linha que não conferir (ou com contagem de campos errada) e todas as seguintes são **descartadas por truncamento do arquivo** antes de retomar a sequência. Registrar o descarte no diagnóstico e por MQTT.
+
+`hub/arquivo_diario.py::reconstruir_estado` **não** faz essa verificação — ele confia no conteúdo e dobraria uma linha truncada dentro da cadeia, corrompendo tudo em silêncio. No Pi isso nunca apareceu (ext4 + journal); no FatFS aparece. O firmware precisa ser mais estrito que a referência aqui, e este é o único ponto do design em que ele deliberadamente diverge.
+
 ---
 
 ## 5. Fluxos
@@ -110,7 +117,12 @@ loop do Pi, por coletor da lista:
    *.txt novos      → baixa p/ dados/{coletor_id}/          → entra no envio SFTP existente
    *.parcial        → baixa p/ dados/{coletor_id}/parciais/ → NÃO sobe ao servidor
    registra baixados; falha = retry na próxima varredura
+   ao receber o .txt selado de uma data: apaga o .parcial dessa data
 ```
+
+**Expiração do parcial**: assim que o selado de uma data chega, o `.parcial` correspondente vira peso morto e é apagado pelo Pi. Sem essa regra, o problema de disco cheio do D10 reaparece no Pi, onde ninguém está olhando.
+
+**Credencial FTP — quem manda**: a **fonte de verdade é o Odoo** (D6). O provisionamento pela tela (§6) serve só ao primeiro boot e à recuperação em campo; se o Odoo publicar credencial diferente, o coletor adota a do Odoo. Falha de autenticação **não pode** aparecer como "coletor inalcançável": a tela de diagnóstico e o `status` MQTT distinguem `sem rede` de `auth recusada`, porque o segundo é erro de cadastro e o primeiro é erro de campo.
 
 `.parcial` não casa com o glob `*_leituras.txt` de `hub/enviador_sftp.py`, então fica naturalmente fora do envio. O Hub **não re-assina nem reescreve** nada.
 

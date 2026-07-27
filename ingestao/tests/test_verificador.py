@@ -160,3 +160,27 @@ def test_modo_b_header_sem_fingerprint_e_indeterminado(tmp_path):
     item = lote.itens[0]
     assert item.estado == 'indeterminado'
     assert 'coletor_pubkey_fingerprint' in item.motivo
+
+
+def test_modo_a_chaves_pem_dict_valido(tmp_path):
+    caminho, _, assinador = _preparar(tmp_path, selar=True)
+    chaves = {'COL-1': assinador.chave_publica_pem()}
+    lote = verificador.verificar_itens([_bytes(caminho)], chaves_pem=chaves)
+    assert lote.validos == 1 and lote.todos_ok is True
+    assert lote.itens[0].estado == 'valido'
+    assert lote.itens[0].fingerprint_conferido is None  # modo A
+
+
+def test_modo_a_chaves_pem_coletor_ausente_indeterminado(tmp_path):
+    caminho, _, _ = _preparar(tmp_path, selar=True)
+    lote = verificador.verificar_itens([_bytes(caminho)], chaves_pem={'OUTRO': 'x'})
+    assert lote.indeterminados == 1
+    assert lote.itens[0].estado == 'indeterminado'
+    assert 'não registrado' in lote.itens[0].motivo
+
+
+def test_modo_a_chaves_pem_invalido_indeterminado(tmp_path):
+    caminho, _, _ = _preparar(tmp_path, selar=True)
+    lote = verificador.verificar_itens([_bytes(caminho)], chaves_pem={'COL-1': 'nao eh pem'})
+    assert lote.indeterminados == 1
+    assert lote.itens[0].estado == 'indeterminado'

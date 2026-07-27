@@ -4,7 +4,7 @@
 **Status:** aprovado, pronto para plano de implementação
 **Escopo:** firmware do coletor externo RS-485 com LCD, mais o trabalho correspondente no lado Python (Hub Pi + publicação de config).
 
-> **Contratos são código, não este documento.** Formato de arquivo, cadeia de hash e assinatura vivem em `contrato/formato.py`, `contrato/identidade.py` e `ingestao/validador.py`. Este design não os transcreve. Handoff para a sessão Windows/PlatformIO: `esp32s3_coletor_handoff.md`.
+> **Contratos são código, não este documento.** Formato de arquivo, cadeia de hash e assinatura vivem em `contrato/formato.py`, `contrato/identidade.py` e `ingestao/validador.py` — repositório público `https://github.com/afonsorcarvalho/odoo_sentinela`, branch `master`. Este design não os transcreve. Handoff para a sessão Windows/PlatformIO: `esp32s3_coletor_handoff.md`.
 
 ---
 

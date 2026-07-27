@@ -14,7 +14,7 @@
 
 Valores copiados verbatim do design (`docs/superpowers/specs/2026-07-27-coletor-esp32s3-design.md`) e do código de contrato. Valem para **todas** as tasks.
 
-- **Repositório de referência** (WSL2, acessível do Windows): `\\wsl.localhost\Ubuntu\home\afonso\docker\odoo_sentinela\`. Este é o repositório do sistema Sentinela — **não** é o projeto do firmware. Nunca commitar firmware nele.
+- **Repositório de referência**: `https://github.com/afonsorcarvalho/odoo_sentinela`, branch `master`, **público** — ler por `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/<caminho>`, sem autenticação. Fallback offline: `\\wsl.localhost\Ubuntu\home\afonso\docker\odoo_sentinela\`. Este é o repositório do sistema Sentinela — **não** é o projeto do firmware. Nunca commitar firmware nele.
 - **Projeto do firmware**: repositório próprio, na raiz de trabalho da sessão Windows. Todos os caminhos deste plano são relativos a essa raiz.
 - **Fonte da verdade do formato**: `contrato/formato.py`, `contrato/identidade.py`, `ingestao/validador.py` no repositório de referência. `esp32_coletor_spec.md` está **desatualizado** — não usar como contrato.
 - `schema_version: 3`. Delimitador `|`. Caracteres `|`, `\n`, `\r` **proibidos** em qualquer identificador.

@@ -8,11 +8,27 @@
 
 ## 0. Como chegar no repositório
 
-- Repositório (fonte da verdade): `https://github.com/afonsorcarvalho/odoo_sentinela`
-- No WSL2: `/home/afonso/docker/odoo_sentinela`
-- Do Windows: `\\wsl.localhost\Ubuntu\home\afonso\docker\odoo_sentinela\`
+**Fonte primária — GitHub, repositório público, sem autenticação:**
+`https://github.com/afonsorcarvalho/odoo_sentinela` (branch `master`)
 
-Leia os arquivos direto por esse caminho UNC. Não copie/duplique os arquivos de contrato para o projeto PlatformIO — releia sempre.
+Ler pelo raw, que devolve o arquivo puro:
+
+| O quê | URL |
+|---|---|
+| Formato do arquivo (contrato congelado) | `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/contrato/formato.py` |
+| Identidade / ECDSA | `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/contrato/identidade.py` |
+| Validador (critério de aceitação) | `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/ingestao/validador.py` |
+| Config de exemplo do Hub | `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/hub/config.example.yaml` |
+| Implementação de referência (o Hub inteiro) | `https://github.com/afonsorcarvalho/odoo_sentinela/tree/master/hub` |
+| Este handoff | `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/esp32s3_coletor_handoff.md` |
+| Design aprovado | `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/docs/superpowers/specs/2026-07-27-coletor-esp32s3-design.md` |
+| Plano de implementação | `https://raw.githubusercontent.com/afonsorcarvalho/odoo_sentinela/master/docs/superpowers/plans/2026-07-27-firmware-coletor-esp32s3.md` |
+
+Trocar `master` por outra branch na URL funciona, mas **use `master`** — é onde estes documentos vivem.
+
+**Fallback local** (mesma máquina, via WSL2): `\\wsl.localhost\Ubuntu\home\afonso\docker\odoo_sentinela\`. Serve quando não há rede, e é o único caminho que enxerga trabalho ainda não commitado. Se o conteúdo divergir do GitHub, o local é o mais novo — mas o commitado é o combinado.
+
+**Não copie os arquivos de contrato para o projeto PlatformIO.** Releia sempre da fonte. Cópia envelhece em silêncio, e o sintoma aparece só na validação final, depois de muito código escrito em cima.
 
 ---
 

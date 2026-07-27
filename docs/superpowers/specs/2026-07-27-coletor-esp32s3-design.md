@@ -118,7 +118,10 @@ loop do Pi, por coletor da lista:
    *.parcial        → baixa p/ dados/{coletor_id}/parciais/ → NÃO sobe ao servidor
    registra baixados; falha = retry na próxima varredura
    ao receber o .txt selado de uma data: apaga o .parcial dessa data
+   publica sentinela/coletado/{hub_id}/{coletor_id} com o nome baixado
 ```
+
+**Confirmação de download**: como o FTP do coletor é read-only (D3), o Hub não consegue marcar nada no cartão. Ele publica o nome de cada arquivo baixado em `sentinela/coletado/{hub_id}/{coletor_id}` (não-retido); o coletor guarda esse conjunto no NVS. É o que torna a rotação do D10 decidível — sem isso, "apagar só o que já foi transportado" não teria como ser sabido, e a rotação apagaria prova ainda não coletada.
 
 **Expiração do parcial**: assim que o selado de uma data chega, o `.parcial` correspondente vira peso morto e é apagado pelo Pi. Sem essa regra, o problema de disco cheio do D10 reaparece no Pi, onde ninguém está olhando.
 
@@ -175,7 +178,7 @@ Tela não edita limiar nem calibração (D11).
 
 | Item | Onde | O quê |
 |---|---|---|
-| Varredura de coletores externos | novo `hub/coletores_externos.py` | Lê lista do config, FTP `LIST`/`RETR`, baixa `.txt` e `.parcial`, mantém estado de baixados, retry natural por varredura |
+| Varredura de coletores externos | novo `hub/coletores_externos.py` | Lê lista do config, FTP `LIST`/`RETR`, baixa `.txt` e `.parcial`, mantém estado de baixados, retry natural por varredura, apaga o `.parcial` quando o selado da data chega, e publica cada nome baixado em `sentinela/coletado/{hub_id}/{coletor_id}` |
 | Envio por coletor | `hub/enviador_sftp.py` | Instanciar por `coletor_id` (a estrutura de diretório já é por coletor) |
 | Config dos coletores | `api/config_publisher.py` | Serializar coletores externos (endereço, credencial, canais, limiares) e publicar retido por coletor |
 | Cadastro | `addons/afr_sentinela_sensor_monitor` | Campos de endereço/porta/credencial FTP no `sensor_monitor.coletor`; `config_version_desejada`/`aplicada` já existem |

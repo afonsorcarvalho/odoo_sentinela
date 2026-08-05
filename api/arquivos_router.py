@@ -65,8 +65,6 @@ def zip_do_dia(cliente: str, site: str, data: str, x_config_secret: str = Header
             # ninguém mais vai limpar esse rastro se não limparmos aqui.
             _remover(tmp.name)()
             raise
-    except HTTPException:
-        raise
     finally:
         # Se sftp.close()/transport.close() estourasse sem essa proteção, a
         # exceção do close() mascararia o retorno normal — e, se montar_zip

@@ -1,6 +1,8 @@
+import glob
 import hashlib
 import io
 import stat as stat_mod
+import tempfile
 import zipfile
 
 import pytest
@@ -23,8 +25,15 @@ class FakeAttr:
 
 
 class FakeSFTP:
-    def __init__(self, arquivos):
+    def __init__(self, arquivos, falhar_no_open_index=None, falhar_no_close=False):
         self.arquivos = dict(arquivos)
+        # Conta chamadas a open() — usado para provar que o teto de tamanho
+        # é checado a partir dos metadados (st_size), sem baixar nenhum byte.
+        self.aberturas = 0
+        # Índice (1-based, ordem das chamadas a open()) em que simular uma
+        # queda de SFTP no meio da cópia de montar_zip.
+        self._falhar_no_open_index = falhar_no_open_index
+        self._falhar_no_close = falhar_no_close
 
     def listdir_attr(self, caminho):
         caminho = caminho.rstrip('/')
@@ -41,15 +50,43 @@ class FakeSFTP:
         return list(filhos.values())
 
     def open(self, caminho, modo='r'):
+        self.aberturas += 1
+        if self.aberturas == self._falhar_no_open_index:
+            raise IOError('SFTP caiu no meio da cópia')
         return io.BytesIO(self.arquivos[caminho])
 
     def close(self):
-        pass
+        if self._falhar_no_close:
+            raise IOError('conexão já caiu')
 
 
 class FakeTransport:
+    def __init__(self, falhar_no_close=False):
+        self._falhar_no_close = falhar_no_close
+
     def close(self):
-        pass
+        if self._falhar_no_close:
+            raise IOError('conexão já caiu')
+
+
+def _preparar(monkeypatch, sftp, transport=None, max_bytes=500 * 1024 * 1024):
+    """Fiação comum aos testes: secret/base/teto + troca de _sftp_conectar.
+
+    Cada teste monta seu próprio par (sftp, transport) — os modos de falha
+    variam por teste — então isso substitui a fixture `cliente` quando o
+    teste precisa inspecionar o fake depois da chamada.
+    """
+    monkeypatch.setattr(arquivos_router, '_SECRET', SECRET)
+    monkeypatch.setattr(arquivos_router, 'SFTP_UPLOADS', '/uploads')
+    monkeypatch.setattr(arquivos_router, 'MAX_BYTES', max_bytes)
+    monkeypatch.setattr(arquivos_router, '_sftp_conectar',
+                        lambda: (transport or FakeTransport(), sftp))
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def _tempfiles_zip():
+    """Conjunto de .zip soltos no diretório de temporários agora mesmo."""
+    return set(glob.glob(f'{tempfile.gettempdir()}/*.zip'))
 
 
 @pytest.fixture
@@ -90,10 +127,52 @@ def test_dia_sem_arquivo_404(cliente):
     assert r.status_code == 404
 
 
-def test_acima_do_teto_413(cliente, monkeypatch):
-    monkeypatch.setattr(arquivos_router, 'MAX_BYTES', 10)
-    r = cliente.get(_url(), headers={'X-Config-Secret': SECRET})
+def test_acima_do_teto_413(monkeypatch):
+    # Fixture `cliente` não serve aqui: precisamos inspecionar o fake depois
+    # da chamada para provar QUANDO o teto foi checado, não só o status code.
+    sftp = FakeSFTP({f'{RAIZ}/HUB-0001/COL-BUS0/leituras.txt': LEITURAS})
+    client = _preparar(monkeypatch, sftp, max_bytes=10)
+    r = client.get(_url(), headers={'X-Config-Secret': SECRET})
     assert r.status_code == 413
+    # O teto vem do st_size do listdir_attr — nenhum arquivo é aberto antes
+    # da comparação. Uma implementação que baixasse tudo e só depois
+    # comparasse com MAX_BYTES bateria o status code, mas abriria os
+    # arquivos: aberturas ficaria > 0.
+    assert sftp.aberturas == 0
+
+
+def test_close_falha_apos_sucesso_nao_deixa_zip_orfao(monkeypatch):
+    # sftp.close() e transport.close() levantam DEPOIS que montar_zip já
+    # terminou com sucesso — reproduz o gap achado na auto-revisão: sem a
+    # proteção no finally, a exceção do close() mascararia o `return
+    # FileResponse(...)` e o ZIP completo ficaria em disco sem que o
+    # BackgroundTask de limpeza chegasse a ser registrado.
+    sftp = FakeSFTP({f'{RAIZ}/HUB-0001/COL-BUS0/leituras.txt': LEITURAS}, falhar_no_close=True)
+    transport = FakeTransport(falhar_no_close=True)
+    client = _preparar(monkeypatch, sftp, transport=transport)
+
+    antes = _tempfiles_zip()
+    r = client.get(_url(), headers={'X-Config-Secret': SECRET})
+
+    assert r.status_code == 200
+    assert _tempfiles_zip() == antes, 'ZIP órfão sobrou em disco'
+
+
+def test_montar_zip_falha_no_meio_nao_deixa_zip_parcial(monkeypatch):
+    # Dois arquivos no dia; open() levanta na SEGUNDA chamada — simula o
+    # SFTP caindo depois que montar_zip já escreveu o primeiro membro no
+    # ZIP parcial. A rota tem que limpar esse tempfile antes de propagar.
+    sftp = FakeSFTP({
+        f'{RAIZ}/HUB-0001/COL-BUS0/a.txt': LEITURAS,
+        f'{RAIZ}/HUB-0001/COL-BUS0/b.txt': LEITURAS,
+    }, falhar_no_open_index=2)
+    client = _preparar(monkeypatch, sftp)
+
+    antes = _tempfiles_zip()
+    r = client.get(_url(), headers={'X-Config-Secret': SECRET})
+
+    assert r.status_code == 500
+    assert _tempfiles_zip() == antes, 'ZIP parcial sobrou em disco'
 
 
 def test_zip_do_dia_com_bytes_intactos(cliente):

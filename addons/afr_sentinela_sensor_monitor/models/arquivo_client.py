@@ -50,6 +50,15 @@ class ArquivoClient(models.AbstractModel):
                 stream=True, timeout=_TIMEOUT)
         except Exception:
             raise UserError('Serviço de arquivos indisponível. Tente novamente.')
+        if resp.status_code == 400:
+            # Código do site ou referência do cliente com caractere que a api
+            # rejeita (ela só aceita [A-Za-z0-9_-], até 64 chars). Nem
+            # site_code nem partner.ref têm essa restrição no Odoo, então isto
+            # é alcançável com cadastro solto, não só com bug.
+            raise UserError(
+                f'Código do site ({site.site_code}) ou referência do cliente '
+                f'({cliente_id}) contém caractere não aceito pelo serviço de '
+                f'arquivos (use apenas letras, números, "_" ou "-").')
         if resp.status_code == 404:
             raise UserError(
                 f'Nenhum arquivo encontrado para {site.site_code} em '

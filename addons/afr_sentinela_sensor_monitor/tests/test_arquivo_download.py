@@ -77,6 +77,15 @@ class TestArquivoClient(TransactionCase):
             _args, kwargs = mock_get.call_args
             assert kwargs['params']['cliente'] == f'CLI-{self.partner_a.id}'
 
+    def test_400_vira_mensagem_de_dados_invalidos(self):
+        # site_code/partner.ref não têm a mesma validação de caracteres que a
+        # api aplica ([A-Za-z0-9_-]); um 400 não é "serviço fora do ar".
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = self._resposta(400)
+            with self.assertRaises(UserError) as ctx:
+                self._client(self.user_a).baixar_zip(self.site_a.id, date(2026, 7, 29))
+            assert 'não aceito' in str(ctx.exception)
+
     def test_404_vira_mensagem_legivel(self):
         with patch('requests.get') as mock_get:
             mock_get.return_value = self._resposta(404)

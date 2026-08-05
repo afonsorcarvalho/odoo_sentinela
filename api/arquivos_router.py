@@ -68,8 +68,15 @@ def zip_do_dia(cliente: str, site: str, data: str, x_config_secret: str = Header
     except HTTPException:
         raise
     finally:
-        sftp.close()
-        transport.close()
+        # Se sftp.close()/transport.close() estourasse sem essa proteção, a
+        # exceção do close() mascararia o retorno normal — e, se montar_zip
+        # já tivesse terminado, o tempfile ficaria órfão (o FileResponse com
+        # o BackgroundTask de limpeza nunca chegaria a ser construído).
+        for fechar in (sftp.close, transport.close):
+            try:
+                fechar()
+            except Exception:
+                pass
 
     return FileResponse(
         tmp.name,

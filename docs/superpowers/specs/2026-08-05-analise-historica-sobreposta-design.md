@@ -56,33 +56,75 @@ CAgg de minuto custa ~112 mil linhas no volume atual.
 
 O limite de cada degrau é o span em que ele ainda cabe em ~2000 pontos por
 série. A regra vive em dois lugares — no backend (`bucket=auto`) e no frontend
-(`escolherBucket`, para saber a chave de cache antes da resposta) — e as duas
-implementações são testadas contra a mesma tabela de fronteiras.
+(`escolherBucket`, para saber a chave de cache antes da resposta).
 
-### A.2 Mudança de schema
+Duas tabelas copiadas à mão divergem. Por isso as fronteiras moram num único
+arquivo de fixture versionado, `contrato/escada_resolucao.json`, lido pelos
+testes dos dois lados. Divergência entre as implementações vira teste vermelho,
+não um gráfico sutilmente errado.
+
+### A.2 O buraco de materialização (pré-existente)
+
+Medido na base que está rodando, em 2026-08-05:
+
+```
+view_name              | materialized_only |  max(bucket)         | max(sensor_reading.time)
+sensor_reading_daily   | t                 | 2026-07-26 00:00Z    | 2026-08-05 20:00Z
+sensor_reading_hourly  | t                 | 2026-08-05 17:00Z    | 2026-08-05 20:00Z
+```
+
+`materialized_only = true` (default do TimescaleDB desde a 2.13) significa que
+a consulta **só enxerga o que já foi materializado**. O agregado diário está 10
+dias atrás do bruto; o horário, 3 horas.
+
+Isto já é um bug hoje, não uma consequência da tela nova: `?window=30d` lê
+`sensor_reading_daily` e perde os últimos 10 dias. O dashboard disfarça porque
+o `TimeseriesWidget` cola `useLiveTail` por cima — e o próprio
+`chartOption.ts` documenta ter apanhado exatamente disto ("agregado 30d ainda
+nao materializado").
+
+`/analise` não tem cauda ao vivo por decisão de escopo. Sem tratar isto, o
+usuário dá zoom na última hora, o gráfico simplesmente para no meio e nada
+explica por quê.
+
+**Correção: agregação em tempo real** (`materialized_only = false`) nas três
+views. O Timescale passa a unir o que está materializado com o que falta,
+calculado do bruto na hora. Custo: a consulta da borda mais recente fica mais
+cara; irrelevante no volume atual e ainda barata depois, porque a parte pesada
+continua vindo do materializado.
+
+### A.3 Mudança de schema
 
 Em `timescale/init.sql` **e** num script de migração aplicável à base que já
 roda (o `init.sql` só executa em volume novo; sem o script, a base atual fica
-com o schema velho):
+com o schema velho).
 
-- `sensor_reading_hourly` e `sensor_reading_daily` recriadas com
-  `count(*) AS valor_count`.
-- `sensor_reading_minutely` nova: `time_bucket('1 minute', time)`, com
-  `valor_min`, `valor_max`, `valor_avg`, `valor_count`.
-- Políticas de refresh recriadas junto (as três).
+Só o que precisa mudar muda — cada `DROP MATERIALIZED VIEW` é uma janela em que
+o `/historico?window=` da stack de produção devolve vazio:
 
-O dado bruto não é tocado. As views são derivadas e re-materializam a partir de
-`sensor_reading`, que continua intacto — a regra de que dado coletado nunca é
-apagado vale aqui integralmente.
+| View | Ação | Destrutivo? |
+|---|---|---|
+| `sensor_reading_hourly` | `ALTER … SET (timescaledb.materialized_only = false)` | Não. Nada é recriado; nenhum rollup lê desta view, então não precisa de `valor_count`. |
+| `sensor_reading_daily` | Recriar com `count(*) AS valor_count` e `materialized_only = false`; política de refresh recriada junto | Sim. É a única view derrubada. Durante a migração, `?window=30d` devolve vazio. |
+| `sensor_reading_minutely` | Criar nova, com `valor_count` e `materialized_only = false` | Não — não existe ainda. |
 
-`valor_count` existe para uma coisa só: média ponderada exata nos rollups.
-`avg(valor_avg)` sobre dias com quantidade diferente de leituras (sensor
-offline parte do dia) dá um número errado, e este é um produto cujo valor é a
-integridade do dado.
+A re-materialização do diário parte de `sensor_reading`, que não é tocado — a
+regra de que dado coletado nunca é apagado vale integralmente. Com 28 linhas no
+diário e 370k no bruto, é questão de segundos.
 
-### A.3 Rollup de semana e mês
+`valor_count` só faz sentido no diário, porque é dele que semana e mês são
+derivados (A.4). O horário não roda rollup nenhum, então não paga o preço de
+ser recriado.
 
-Derivados de `sensor_reading_daily`, não do bruto:
+Se o `ALTER … SET (materialized_only = false)` não for aceito nesta versão do
+TimescaleDB, o fallback é uma regra explícita no backend: qualquer span cujo
+`ate` alcance a borda não materializada cai para `raw` naquele trecho. A
+migração deve verificar isso antes de seguir, não assumir.
+
+### A.4 Rollup de semana e mês
+
+Derivados de `sensor_reading_daily`, não do bruto. `time_bucket` com intervalo
+de mês sobre `timestamptz` foi verificado nesta base (TimescaleDB 2.28.3):
 
 ```sql
 SELECT time_bucket(INTERVAL '7 days', bucket) AS b,
@@ -96,7 +138,7 @@ GROUP BY b ORDER BY b
 
 Mês idem, com `INTERVAL '1 month'`.
 
-### A.4 Endpoint
+### A.5 Endpoint
 
 `/sensores/{code}/historico` ganha parâmetros sem quebrar quem já usa:
 
@@ -231,8 +273,13 @@ tela de análise é mandar "olha isto aqui" para outra pessoa.
 
 **Migração** (`ingestao/tests/` ou script dedicado):
 
-- Depois de recriar as CAggs, `valor_count` bate com a contagem no bruto para
+- Depois da migração, `valor_count` do diário bate com a contagem no bruto para
   o mesmo bucket.
+- As três views reportam `materialized_only = false` em
+  `timescaledb_information.continuous_aggregates`.
+- **Sem buraco de borda:** para cada view, o bucket mais recente devolvido pela
+  consulta cobre o `max(time)` do bruto. É o teste que prova que o problema
+  medido em A.2 foi corrigido, e ele falharia hoje.
 
 **Frontend** (`frontend/src/`):
 
@@ -245,16 +292,28 @@ tela de análise é mandar "olha isto aqui" para outra pessoa.
   limpa a seleção; URL espelha o estado; zoom dispara busca com o bucket novo;
   nenhum sensor selecionado não dispara requisição.
 
-## Sequenciamento sugerido
+## Dois planos de implementação
 
-1. Migração de schema (CAggs com `valor_count` + minutely) e o teste que confere
-   a contagem contra o bruto.
-2. `escolher_bucket` e as consultas novas em `api/timescale.py`, com o guard de
-   site.
-3. Endpoint `/historico` com `desde/ate/bucket`, mantendo `window` intacto.
-4. `escolherBucket` no frontend + `multiChartOption` (puros, testáveis sem DOM).
-5. `MultiSeriesChart`.
-6. `AnalisePage` com seleção, regra de unidades e estado na URL.
-7. Zoom ligado à busca.
-8. Entradas: Topbar e `SensorDetailDrawer`.
-9. Verificação visual no browser contra a stack real, com dados de verdade.
+A fronteira A/B desta spec é também a fronteira de entrega. Cada metade vira um
+plano próprio; a primeira produz software funcionando e testável por `curl`
+sem depender da segunda.
+
+**Plano A — backend**
+
+1. Migração de schema: `ALTER` no horário, recriação do diário com
+   `valor_count`, criação do minutely, todas com `materialized_only = false`;
+   mais o teste de ausência de buraco de borda.
+2. `escolher_bucket` lendo `contrato/escada_resolucao.json`.
+3. Consultas novas em `api/timescale.py` (minutely e rollups), com o guard de
+   site em cada uma.
+4. Endpoint `/historico` com `desde/ate/bucket`, mantendo `window` intacto.
+
+**Plano B — frontend** (consome o contrato do Plano A)
+
+5. `escolherBucket` contra a mesma fixture + `multiChartOption` — puros,
+   testáveis sem DOM.
+6. `MultiSeriesChart`.
+7. `AnalisePage` com seleção, regra das duas unidades e estado na URL.
+8. Zoom ligado à busca.
+9. Entradas: Topbar e `SensorDetailDrawer`.
+10. Verificação visual no browser contra a stack real, com dados de verdade.

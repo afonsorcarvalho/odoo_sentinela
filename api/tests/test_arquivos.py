@@ -20,6 +20,9 @@ def test_validar_token_aceita_codigos_reais():
     'cli 43',
     '',
     'x' * 65,
+    'CLI-43\n',
+    '\nCLI-43',
+    'CLI-43\r\n',
 ])
 def test_validar_token_recusa_travessia_e_lixo(valor):
     # A defesa contra path traversal mora aqui: se um destes passar, o caminho

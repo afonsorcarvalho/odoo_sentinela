@@ -16,7 +16,7 @@ class ParametroInvalido(ValueError):
 
 
 def validar_token(valor: str) -> str:
-    if not isinstance(valor, str) or not _RE_TOKEN.match(valor):
+    if not isinstance(valor, str) or not _RE_TOKEN.fullmatch(valor):
         raise ParametroInvalido(f'valor inválido: {valor!r}')
     return valor
 

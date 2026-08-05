@@ -1,6 +1,7 @@
 from datetime import date
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase
 
@@ -105,3 +106,28 @@ class TestArquivoClient(TransactionCase):
             with self.assertRaises(UserError) as ctx:
                 self._client(self.user_a).baixar_zip(self.site_a.id, date(2026, 7, 29))
             assert 'indisponível' in str(ctx.exception)
+
+
+class TestArquivoDownloadWizard(TransactionCase):
+
+    def setUp(self):
+        super().setUp()
+        partner = self.env['res.partner'].create({'name': 'Hospital W', 'ref': 'CLI-W'})
+        self.site = self.env['sensor_monitor.site'].create({
+            'name': 'CME W', 'partner_id': partner.id,
+            'site_code': 'SITE-ARQ-W', 'vertical': 'cme_hospitalar'})
+
+    def test_action_baixar_devolve_act_url_com_site_e_data(self):
+        wizard = self.env['sensor_monitor.arquivo.download.wizard'].create({
+            'site_id': self.site.id, 'data_referencia': '2026-07-29'})
+        acao = wizard.action_baixar()
+        assert acao['type'] == 'ir.actions.act_url'
+        assert acao['target'] == 'self'
+        assert f'site_id={self.site.id}' in acao['url']
+        assert 'data=2026-07-29' in acao['url']
+        assert acao['url'].startswith('/sentinela/arquivos/zip?')
+
+    def test_data_referencia_default_e_hoje(self):
+        wizard = self.env['sensor_monitor.arquivo.download.wizard'].create({
+            'site_id': self.site.id})
+        assert wizard.data_referencia == fields.Date.context_today(wizard)

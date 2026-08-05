@@ -33,3 +33,4 @@ access_modbus_device_view,modbus.device.view,model_sensor_monitor_modbus_device,
 access_modbus_device_admin,modbus.device.admin,model_sensor_monitor_modbus_device,group_sensor_monitor_admin,1,1,1,1
 access_calibracao_view,calibracao.view,model_sensor_monitor_calibracao,group_sensor_monitor_view,1,0,0,0
 access_calibracao_admin,calibracao.admin,model_sensor_monitor_calibracao,group_sensor_monitor_admin,1,1,1,1
+access_arquivo_download_wizard,arquivo.download.wizard,model_sensor_monitor_arquivo_download_wizard,group_sensor_monitor_view,1,1,1,0

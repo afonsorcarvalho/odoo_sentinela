@@ -1,0 +1,30 @@
+<odoo>
+    <record id="view_arquivo_download_wizard_form" model="ir.ui.view">
+        <field name="name">sensor_monitor.arquivo.download.wizard.form</field>
+        <field name="model">sensor_monitor.arquivo.download.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Baixar arquivos do dia">
+                <group>
+                    <field name="site_id"/>
+                    <field name="data_referencia"/>
+                </group>
+                <p class="text-muted">
+                    O ZIP traz todos os arquivos daquele dia no site — leituras e alarmes,
+                    de todos os hubs e coletores — com os bytes originais preservados.
+                </p>
+                <footer>
+                    <button name="action_baixar" string="Baixar ZIP" type="object"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_arquivo_download" model="ir.actions.act_window">
+        <field name="name">Arquivos do Dia</field>
+        <field name="res_model">sensor_monitor.arquivo.download.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

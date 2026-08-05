@@ -21,6 +21,7 @@
         'views/file_ledger_views.xml',
         'views/rs485_modbus_views.xml',
         'views/calibracao_views.xml',
+        'views/arquivo_download_views.xml',
         'views/menu.xml',
     ],
     'installable': True,

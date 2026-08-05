@@ -16,3 +16,4 @@ from . import modbus_device
 from . import sensor_rs485_ext
 from . import calibracao
 from . import arquivo_client
+from . import arquivo_download_wizard

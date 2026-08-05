@@ -1,10 +1,12 @@
+import hashlib
 import io
 import stat as stat_mod
+import zipfile
 from datetime import date
 
 import pytest
 
-from api.arquivos import ParametroInvalido, caminho_do_dia, listar_arquivos_do_dia, validar_token
+from api.arquivos import ParametroInvalido, caminho_do_dia, listar_arquivos_do_dia, montar_zip, validar_token
 
 
 class FakeAttr:
@@ -137,3 +139,45 @@ def test_listar_ignora_symlink():
     })
     sftp.links.add(f'{RAIZ}/HUB-0001/COL-BUS0/atalho.txt')
     assert listar_arquivos_do_dia(sftp, RAIZ) == [('HUB-0001/COL-BUS0/real.txt', 3)]
+
+
+def test_montar_zip_preserva_bytes_e_arvore(tmp_path):
+    sftp = _acervo_de_um_dia()
+    arquivos = listar_arquivos_do_dia(sftp, RAIZ)
+    destino = tmp_path / 'dia.zip'
+
+    montar_zip(sftp, RAIZ, arquivos, str(destino))
+
+    with zipfile.ZipFile(destino) as zf:
+        assert sorted(zf.namelist()) == [
+            'HUB-0001/COL-BUS0/2026-07-29_HUB-0001-COL-BUS0_alarmes.txt',
+            'HUB-0001/COL-BUS0/2026-07-29_HUB-0001-COL-BUS0_leituras.txt',
+            'HUB-0001/COL-BUS1/2026-07-29_HUB-0001-COL-BUS1_leituras.txt',
+        ]
+        for arcname in zf.namelist():
+            original = sftp.arquivos[f'{RAIZ}/{arcname}']
+            extraido = zf.read(arcname)
+            # SHA-256 e não igualdade de string: é o mesmo confronto que o
+            # portal de autenticidade faz. Newline normalizado ou BOM
+            # inserido quebram aqui, que é onde tem que quebrar.
+            assert hashlib.sha256(extraido).hexdigest() == hashlib.sha256(original).hexdigest()
+
+
+def test_montar_zip_de_arquivo_com_bytes_nao_utf8(tmp_path):
+    # O acervo é texto, mas o ZIP não pode presumir isso: qualquer
+    # transcodificação silenciosa invalidaria a assinatura.
+    cru = b'\x00\xff\xfe raw \r\n sem newline normalizado \r'
+    sftp = FakeSFTP({f'{RAIZ}/HUB-X/COL-Y/cru.txt': cru})
+    destino = tmp_path / 'cru.zip'
+
+    montar_zip(sftp, RAIZ, listar_arquivos_do_dia(sftp, RAIZ), str(destino))
+
+    with zipfile.ZipFile(destino) as zf:
+        assert zf.read('HUB-X/COL-Y/cru.txt') == cru
+
+
+def test_montar_zip_vazio_gera_zip_valido_sem_membros(tmp_path):
+    destino = tmp_path / 'vazio.zip'
+    montar_zip(FakeSFTP({}), RAIZ, [], str(destino))
+    with zipfile.ZipFile(destino) as zf:
+        assert zf.namelist() == []

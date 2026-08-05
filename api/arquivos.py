@@ -3,7 +3,9 @@
 Módulo puro — sem FastAPI e sem HTTP. Quem fala HTTP é arquivos_router.py.
 """
 import re
+import shutil
 import stat
+import zipfile
 from datetime import date
 
 # Códigos do cadastro (CLI-43, SITE-DEMO-01, HUB_0001A2F3). O que este regex
@@ -53,3 +55,27 @@ def listar_arquivos_do_dia(sftp, raiz: str, profundidade_max: int = 3):
 
     varrer(raiz.rstrip('/'), '', 1)
     return sorted(encontrados)
+
+
+_BLOCO = 1024 * 1024
+
+
+def montar_zip(sftp, raiz: str, arquivos, destino: str) -> None:
+    """Escreve em `destino` um ZIP com os arquivos, preservando HUB/COLETOR/.
+
+    Cópia byte-a-byte via copyfileobj em modo binário: nada de ler como texto,
+    nada de decodificar. O rodapé assinado tem que sobreviver intacto.
+    """
+    raiz = raiz.rstrip('/')
+    with zipfile.ZipFile(destino, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        for rel, _tamanho in arquivos:
+            origem = sftp.open(f'{raiz}/{rel}', 'rb')
+            try:
+                # prefetch multiplica a taxa de leitura do paramiko; o duplo
+                # de teste não tem o método, daí o hasattr.
+                if hasattr(origem, 'prefetch'):
+                    origem.prefetch()
+                with zf.open(rel, 'w') as destino_membro:
+                    shutil.copyfileobj(origem, destino_membro, _BLOCO)
+            finally:
+                origem.close()

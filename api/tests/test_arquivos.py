@@ -1,5 +1,6 @@
 import hashlib
 import io
+import posixpath
 import stat as stat_mod
 import zipfile
 from datetime import date
@@ -30,12 +31,27 @@ class FakeSFTP:
     inexistente, igual ao paramiko.
     """
 
-    def __init__(self, arquivos):
+    def __init__(self, arquivos, falhar_em=()):
         self.arquivos = dict(arquivos)
         self.links = set()
+        # Conjunto de caminhos absolutos (sem barra final) cujo listdir_attr
+        # deve levantar IOError — imita uma queda de SFTP no meio da árvore,
+        # em vez de só "pasta que nunca existiu". Espelha o padrão
+        # `falhar_no_open_index` de test_arquivos_router.py.
+        self.falhar_em = set(falhar_em)
+        # Caminhos (absolutos, sem barra final) cujo listdir_attr deve incluir
+        # entradas '.' e '..' na resposta — imita um backend SFTP que devolve
+        # os links do próprio diretório, coisa que o sftpgo hoje não faz.
+        self.com_dot_dot = set()
 
     def listdir_attr(self, caminho):
-        caminho = caminho.rstrip('/')
+        # normpath: um caller que recursa para 'X/.' ou 'X/..' (por não
+        # filtrar essas entradas) precisa cair de volta num diretório REAL do
+        # fake — senão o teste do guard '.'/'..' não reproduz a duplicação/
+        # travessia de verdade, só um "No such file" inofensivo.
+        caminho = posixpath.normpath(caminho)
+        if caminho in self.falhar_em:
+            raise IOError(f'SFTP caiu ao listar: {caminho}')
         filhos = {}
         for full in self.arquivos:
             if not full.startswith(caminho + '/'):
@@ -49,7 +65,10 @@ class FakeSFTP:
                 filhos[nome] = FakeAttr(nome, len(self.arquivos[full]), tipo)
         if not filhos:
             raise IOError(f'No such file: {caminho}')
-        return list(filhos.values())
+        resultado = list(filhos.values())
+        if caminho in self.com_dot_dot:
+            resultado = [FakeAttr('.', 0, 'dir'), FakeAttr('..', 0, 'dir')] + resultado
+        return resultado
 
     def open(self, caminho, modo='r'):
         if caminho not in self.arquivos:
@@ -181,3 +200,44 @@ def test_montar_zip_vazio_gera_zip_valido_sem_membros(tmp_path):
     montar_zip(FakeSFTP({}), RAIZ, [], str(destino))
     with zipfile.ZipFile(destino) as zf:
         assert zf.namelist() == []
+
+
+def test_listar_falha_de_sftp_abaixo_da_raiz_propaga():
+    # FIX 1: uma queda de SFTP listando um HUB/COLETOR específico não pode
+    # virar lista curta silenciosa — o ZIP sairia completo em aparência e
+    # incompleto de fato. Só a pasta do DIA (a raiz) tem direito a virar [].
+    sftp = FakeSFTP({
+        f'{RAIZ}/HUB-0001/COL-BUS0/leituras.txt': b'ok',
+        f'{RAIZ}/HUB-0001/COL-BUS1/leituras.txt': b'sumiu',
+    }, falhar_em={f'{RAIZ}/HUB-0001/COL-BUS1'})
+    with pytest.raises(IOError):
+        listar_arquivos_do_dia(sftp, RAIZ)
+
+
+def test_listar_pasta_do_dia_ausente_ainda_devolve_vazio_com_falhar_em():
+    # A raiz continua tolerante mesmo com o mecanismo de falha presente —
+    # não é o parâmetro novo que muda esse comportamento, é o caminho.
+    sftp = FakeSFTP({}, falhar_em={RAIZ})
+    assert listar_arquivos_do_dia(sftp, RAIZ) == []
+
+
+def test_listar_ignora_entradas_dot_e_dotdot():
+    # FIX 2: '.' duplicaria cada arquivo do diretório; '..' andaria PARA CIMA
+    # e fora da raiz — um member '../algo' dentro do ZIP é zip-slip num
+    # artefato de auditoria. sftpgo não devolve essas entradas hoje, mas o
+    # guard tem que existir mesmo assim.
+    #
+    # As entradas '.'/'..' ficam no nível HUB (não no COL, que já é a última
+    # pasta antes do arquivo): com profundidade_max=3 padrão, a recursão pela
+    # entrada '.'/'..' bate no teto exatamente no mesmo nível que o arquivo
+    # real, sem sobrar orçamento pra provar duplicação. profundidade_max=4
+    # dá esse orçamento e faz o normpath do FakeSFTP resolver '.'/'..' de
+    # volta a diretórios REAIS do fake — reproduzindo a duplicação de
+    # verdade, não só um "No such file" inofensivo.
+    sftp = FakeSFTP({
+        f'{RAIZ}/HUB-0001/COL-BUS0/leituras.txt': b'ok',
+    })
+    sftp.com_dot_dot.add(f'{RAIZ}/HUB-0001')
+    encontrados = listar_arquivos_do_dia(sftp, RAIZ, profundidade_max=4)
+    assert encontrados == [('HUB-0001/COL-BUS0/leituras.txt', 2)]
+    assert all(not rel.startswith('..') for rel, _tam in encontrados)

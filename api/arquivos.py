@@ -36,24 +36,40 @@ def listar_arquivos_do_dia(sftp, raiz: str, profundidade_max: int = 3):
 
     `profundidade_max=3` é a convenção do acervo: HUB/COLETOR/arquivo.txt.
     Só entra o que for arquivo regular — symlink e diretório fundo demais
-    ficam de fora. Pasta inexistente devolve lista vazia (o chamador traduz
-    em 404), não exceção.
+    ficam de fora. Pasta do dia inexistente devolve lista vazia (o chamador
+    traduz em 404), não exceção.
+
+    Só a pasta do dia é tolerante a IOError. Uma falha de SFTP no meio da
+    árvore (ex.: listdir_attr de um HUB/COLETOR específico) PROPAGA: engolir
+    aqui faria o ZIP sair completo em aparência e incompleto de fato — uma
+    mentira silenciosa que nada no resto do caminho detecta.
     """
     encontrados = []
 
-    def varrer(caminho_abs, prefixo, profundidade):
-        try:
-            entradas = sftp.listdir_attr(caminho_abs)
-        except IOError:
-            return
+    # `varrer` nunca captura IOError — um try/except em volta da chamada de
+    # topo pegaria também as falhas de qualquer nível de recursão, porque é
+    # assim que a pilha de exceções do Python se desenrola. Por isso só a
+    # listagem da RAIZ (fora deste helper) é protegida; a recursão em si é
+    # sempre "deixa estourar".
+    def varrer(entradas, caminho_abs, prefixo, profundidade):
         for attr in entradas:
-            rel = f'{prefixo}{attr.filename}'
+            nome = attr.filename
+            if nome in ('.', '..'):
+                continue
+            rel = f'{prefixo}{nome}'
             if stat.S_ISREG(attr.st_mode):
                 encontrados.append((rel, attr.st_size))
             elif stat.S_ISDIR(attr.st_mode) and profundidade < profundidade_max:
-                varrer(f'{caminho_abs}/{attr.filename}', f'{rel}/', profundidade + 1)
+                caminho_filho = f'{caminho_abs}/{nome}'
+                # falhas aqui propagam para fora de listar_arquivos_do_dia
+                varrer(sftp.listdir_attr(caminho_filho), caminho_filho, f'{rel}/', profundidade + 1)
 
-    varrer(raiz.rstrip('/'), '', 1)
+    raiz = raiz.rstrip('/')
+    try:
+        entradas_raiz = sftp.listdir_attr(raiz)
+    except IOError:
+        return []  # só a pasta do dia ausente vira lista vazia -> 404
+    varrer(entradas_raiz, raiz, '', 1)
     return sorted(encontrados)
 
 

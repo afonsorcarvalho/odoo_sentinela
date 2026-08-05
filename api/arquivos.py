@@ -3,6 +3,7 @@
 Módulo puro — sem FastAPI e sem HTTP. Quem fala HTTP é arquivos_router.py.
 """
 import re
+import stat
 from datetime import date
 
 # Códigos do cadastro (CLI-43, SITE-DEMO-01, HUB_0001A2F3). O que este regex
@@ -26,3 +27,29 @@ def caminho_do_dia(base: str, cliente: str, site: str, data: date) -> str:
     cliente = validar_token(cliente)
     site = validar_token(site)
     return f'{base}/{cliente}/{data.year:04d}/{data.month:02d}/{data.day:02d}/{site}'
+
+
+def listar_arquivos_do_dia(sftp, raiz: str, profundidade_max: int = 3):
+    """Arquivos regulares sob `raiz`, como (caminho_relativo, tamanho).
+
+    `profundidade_max=3` é a convenção do acervo: HUB/COLETOR/arquivo.txt.
+    Só entra o que for arquivo regular — symlink e diretório fundo demais
+    ficam de fora. Pasta inexistente devolve lista vazia (o chamador traduz
+    em 404), não exceção.
+    """
+    encontrados = []
+
+    def varrer(caminho_abs, prefixo, profundidade):
+        try:
+            entradas = sftp.listdir_attr(caminho_abs)
+        except IOError:
+            return
+        for attr in entradas:
+            rel = f'{prefixo}{attr.filename}'
+            if stat.S_ISREG(attr.st_mode):
+                encontrados.append((rel, attr.st_size))
+            elif stat.S_ISDIR(attr.st_mode) and profundidade < profundidade_max:
+                varrer(f'{caminho_abs}/{attr.filename}', f'{rel}/', profundidade + 1)
+
+    varrer(raiz.rstrip('/'), '', 1)
+    return sorted(encontrados)

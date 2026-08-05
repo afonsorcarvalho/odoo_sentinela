@@ -236,7 +236,10 @@ docker exec odoo_sentinela-timescaledb-1 psql -U sentinela -d sentinela -c \
           (SELECT max(time) FROM sensor_reading) AS max_bruto;"
 ```
 
-Anotar os números. O `count(*)` do bruto tem que ser idêntico no passo 4 — é a garantia de que nada de dado real foi perdido.
+Anotar os três números. Duas conferências saem daí, no passo 4:
+
+- O `count(*)` do **bruto** tem que ser idêntico — garantia de que nenhum dado real se perdeu.
+- O `count(*)` do **diário** tem que voltar **maior ou igual** ao anotado. Hoje são 28 linhas de uma view 10 dias defasada; depois do `refresh_continuous_aggregate(..., NULL, NULL)` ele cobre até o presente, então tem que crescer. Se voltar **menor**, o refresh não cobriu o intervalo inteiro e os rollups de semana e mês vão sub-reportar em silêncio — exatamente a classe de erro que o `valor_count` existe para evitar. Nesse caso, pare e reporte.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -408,11 +411,13 @@ docker exec -i odoo_sentinela-timescaledb-1 psql -U sentinela -d sentinela -v ON
   < timescale/migracoes/001_escada_resolucao.sql
 ```
 
-Conferir que o bruto não mudou (comparar com o número anotado no passo 1):
+Conferir os dois números contra os anotados no passo 1 — bruto idêntico, diário maior ou igual:
 
 ```bash
 docker exec odoo_sentinela-timescaledb-1 psql -U sentinela -d sentinela -c \
-  "SELECT count(*) AS bruto FROM sensor_reading;"
+  "SELECT (SELECT count(*) FROM sensor_reading) AS bruto,
+          (SELECT count(*) FROM sensor_reading_daily) AS diario,
+          (SELECT count(*) FROM sensor_reading_minutely) AS minutely;"
 ```
 
 Se o `ALTER … SET (timescaledb.materialized_only = false)` for recusado nesta versão, **pare e reporte** — a spec prevê um fallback (span que alcança a borda cai para `raw`), mas ele muda o desenho e não deve ser improvisado dentro da task.

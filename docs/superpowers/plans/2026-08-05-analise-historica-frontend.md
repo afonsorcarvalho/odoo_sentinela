@@ -207,7 +207,7 @@ git commit -m "feat(frontend): escada de resolucao espelhada do contrato"
 - Consumes: `escolherBucket` (Task 1); endpoint do Plano A.
 - Produces:
   - `HistoryApi.getHistoryRange(code: string, desde: number, ate: number, bucket: BucketPedido): Promise<HistoryRangeResponse>` — `desde`/`ate` em epoch ms
-  - `useHistoriesRange(codes: string[], desde: number, ate: number, bucket: BucketPedido)` — array de resultados do TanStack, na ordem de `codes`
+  - `useHistoriesRange(codes: string[], desde: number, ate: number, bucket: BucketPedido)` — **`Map<string, UseQueryResult>`**, chaveado pelo `sensor_code`
 
 Epoch ms na fronteira do app e ISO só no adapter: o chart já trabalha em ms, e converter em um lugar só evita fuso perdido no caminho.
 
@@ -247,6 +247,50 @@ describe('realHistoryApi.getHistoryRange', () => {
 ```
 
 Ajustar a chave do `localStorage` para a constante real usada por `real/http.ts` se for outra.
+
+Criar também `frontend/src/lib/queries.range.test.tsx`, que é o teste que pega
+mispareamento — uma asserção de tamanho não pegaria:
+
+```tsx
+import { renderHook, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useHistoriesRange } from './queries'
+import { historyApi } from './api'
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+}
+
+describe('useHistoriesRange', () => {
+  it('casa cada código com a SUA resposta, não com a do vizinho', async () => {
+    // O mock ecoa o código pedido: se o pareamento trocar, a asserção quebra.
+    vi.spyOn(historyApi, 'getHistoryRange').mockImplementation(
+      async (code) => ({
+        sensor_code: code, desde: '', ate: '', bucket: 'hora',
+        resolution: 'agg', points: [],
+      }) as never,
+    )
+    const { result } = renderHook(
+      () => useHistoriesRange(['T1', 'P1'], 1000, 2000, 'auto'), { wrapper })
+    await waitFor(() => expect(result.current.get('P1')?.data).toBeDefined())
+    expect(result.current.get('T1')?.data?.sensor_code).toBe('T1')
+    expect(result.current.get('P1')?.data?.sensor_code).toBe('P1')
+  })
+
+  it('não dispara duas queries para o mesmo código repetido na URL', async () => {
+    const espia = vi.spyOn(historyApi, 'getHistoryRange').mockResolvedValue(
+      { sensor_code: 'T1', desde: '', ate: '', bucket: 'hora',
+        resolution: 'agg', points: [] } as never)
+    const { result } = renderHook(
+      () => useHistoriesRange(['T1', 'T1'], 1000, 2000, 'auto'), { wrapper })
+    await waitFor(() => expect(result.current.get('T1')?.data).toBeDefined())
+    expect(espia).toHaveBeenCalledTimes(1)
+    expect(result.current.size).toBe(1)
+  })
+})
+```
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -318,17 +362,26 @@ Em `frontend/src/lib/queries.ts`:
 // Chave inclui o bucket EFETIVO (não 'auto'): voltar a um zoom já visto acerta
 // a mesma chave e vem do cache, sem rede. Com 'auto' na chave, dois spans
 // diferentes que resolvem para o mesmo bucket disputariam a mesma entrada.
+//
+// Devolve Map por sensor_code, não array posicional: quem consome casa série
+// com dado pelo código. Pareamento por índice funciona hoje e quebra em
+// silêncio no dia em que uma das duas listas for filtrada e a outra não — e o
+// sintoma seria um gráfico com o dado do sensor errado, não um erro.
 export function useHistoriesRange(
   codes: string[], desde: number, ate: number, bucket: BucketPedido,
 ) {
   const efetivo = bucket === 'auto' ? escolherBucket((ate - desde) / 1000) : bucket
-  return useQueries({
-    queries: codes.map((code) => ({
+  // A URL é editável pelo usuário: ?sensores=T1,T1 geraria duas queries na
+  // mesma chave.
+  const unicos = [...new Set(codes.filter(Boolean))]
+  const resultados = useQueries({
+    queries: unicos.map((code) => ({
       queryKey: ['historyRange', code, efetivo, desde, ate],
       queryFn: () => historyApi.getHistoryRange(code, desde, ate, bucket),
-      enabled: code !== '' && ate > desde,
+      enabled: ate > desde,
     })),
   })
+  return new Map(unicos.map((code, i) => [code, resultados[i]]))
 }
 ```
 
@@ -1015,13 +1068,15 @@ export function AnalisePage() {
       nome: meta?.name ?? code,
       unidade: meta?.unidade ?? '',
       cor: paleta[i % paleta.length],
-      dados: resultados[i]?.data,
+      // Por código, nunca por índice: ver o comentário em useHistoriesRange.
+      dados: resultados.get(code)?.data,
     }
   })
 
-  const status = resultados.some((r) => r.isError)
+  const todos = [...resultados.values()]
+  const status = todos.some((r) => r.isError)
     ? ('error' as const)
-    : resultados.some((r) => r.isLoading)
+    : todos.some((r) => r.isLoading)
       ? ('loading' as const)
       : undefined
 
@@ -1399,6 +1454,6 @@ degrau, terceira unidade bloqueada, paleta legivel nos dois temas."
 | Sem cauda ao vivo | nenhuma task importa `useLiveTail` |
 | Escada espelhada do contrato | 1 |
 
-**Consistência de nomes:** `SerieAnalise` e `buildMultiChartOption` (Task 3) são consumidos com essas assinaturas nas Tasks 4 e 5. `getHistoryRange(code, desde, ate, bucket)` (Task 2) é chamado com essa ordem no teste da Task 5. `useHistoriesRange` devolve resultados na ordem de `codes`, o que a Task 5 assume ao casar `resultados[i]` com `selecionados[i]`.
+**Consistência de nomes:** `SerieAnalise` e `buildMultiChartOption` (Task 3) são consumidos com essas assinaturas nas Tasks 4 e 5. `getHistoryRange(code, desde, ate, bucket)` (Task 2) é chamado com essa ordem no teste da Task 5. `useHistoriesRange` devolve `Map<string, UseQueryResult>` chaveado pelo código, e a Task 5 lê `resultados.get(code)` — nunca por índice.
 
 **Onde este plano é deliberadamente menos prescritivo:** o markup do layout na Task 5 e os seletores dos testes das Tasks 5-7 dependem do markup escolhido. O comportamento a provar está fixado; a forma exata de alcançá-lo no teste pode ser ajustada, e isso está dito em cada passo onde vale.

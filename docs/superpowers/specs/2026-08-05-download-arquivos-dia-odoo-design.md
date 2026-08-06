@@ -156,8 +156,15 @@ serve por `FileResponse`; o Odoo repassa em blocos de 64 KB.
   devolve recordset vazio. O controller nunca usa `sudo` para resolver o site.
 - **O endpoint da api não aceita caminho.** Recebe três tokens validados e
   compõe o caminho internamente.
-- Rota sob `/internal/`, o mesmo prefixo de `publicar-config`: não é alcançável
-  pelo frontend nem pelo portal público.
+- Rota sob `/internal/`, o mesmo prefixo de `publicar-config`, protegida
+  SÓ pelo segredo compartilhado (`X-Config-Secret`). Isso não é um filtro de
+  rede: `docker-compose.yml` publica `"8000:8000"` em todas as interfaces do
+  host, e nada neste repositório — nenhum reverse proxy, nenhuma regra de
+  firewall — restringe `/internal/` por origem. Quem alcançar a porta 8000 do
+  host com o segredo em mãos enumera `cliente` × `site` × data à vontade; o
+  nome "interno" descreve a intenção de uso, não uma barreira técnica.
+  Antes de expor esta stack a uma rede não confiável, ligar o publish a
+  `127.0.0.1:8000:8000` e usar um segredo que não esteja versionado.
 
 ## Casos de borda
 

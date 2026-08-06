@@ -184,3 +184,30 @@ def test_zip_do_dia_com_bytes_intactos(cliente):
         assert zf.namelist() == ['HUB-0001/COL-BUS0/leituras.txt']
         assert hashlib.sha256(zf.read('HUB-0001/COL-BUS0/leituras.txt')).hexdigest() == \
             hashlib.sha256(LEITURAS).hexdigest()
+
+
+def test_ler_max_bytes_usa_default_com_env_malformado(monkeypatch):
+    # FIX 6: int(os.environ[...]) direto na import time derrubaria TODA a
+    # api (live, historico, config-publish) se ARQUIVOS_ZIP_MAX_BYTES viesse
+    # com lixo no .env — um typo numa rota vira downtime total. _ler_max_bytes
+    # tem que sobreviver e cair no default, não deixar o ValueError propagar.
+    monkeypatch.setenv('ARQUIVOS_ZIP_MAX_BYTES', 'not-a-number')
+    assert arquivos_router._ler_max_bytes() == arquivos_router._MAX_BYTES_PADRAO
+
+
+def test_ler_max_bytes_sem_env_usa_default(monkeypatch):
+    monkeypatch.delenv('ARQUIVOS_ZIP_MAX_BYTES', raising=False)
+    assert arquivos_router._ler_max_bytes() == arquivos_router._MAX_BYTES_PADRAO
+
+
+def test_ler_max_bytes_respeita_env_valido(monkeypatch):
+    monkeypatch.setenv('ARQUIVOS_ZIP_MAX_BYTES', '12345')
+    assert arquivos_router._ler_max_bytes() == 12345
+
+
+def test_secret_correto_com_string_diferente_em_tamanho_ainda_e_401(cliente):
+    # hmac.compare_digest não muda o resultado — só a forma como chega lá.
+    # Guarda contra uma migração futura que trocasse por comparação manual
+    # byte-a-byte com early exit.
+    r = cliente.get(_url(), headers={'X-Config-Secret': SECRET + 'x'})
+    assert r.status_code == 401

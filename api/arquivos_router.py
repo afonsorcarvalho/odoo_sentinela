@@ -3,6 +3,7 @@
 Fala HTTP; a lógica pura de varredura/zip mora em arquivos.py. Rota interna:
 só o Odoo chama, com o mesmo segredo do publicar-config.
 """
+import hmac
 import os
 import tempfile
 from datetime import date
@@ -19,7 +20,26 @@ router = APIRouter()
 _SECRET = os.environ.get('CONFIG_PUBLISH_SECRET', '')
 # Defaults no código de propósito: o docker-compose de produção não muda.
 SFTP_UPLOADS = os.environ.get('SFTP_UPLOADS', '/uploads')
-MAX_BYTES = int(os.environ.get('ARQUIVOS_ZIP_MAX_BYTES', str(500 * 1024 * 1024)))
+_MAX_BYTES_PADRAO = 500 * 1024 * 1024
+
+
+def _ler_max_bytes():
+    # int(os.environ[...]) direto na import time derrubava TODA a api (live,
+    # historico, config-publish) se ARQUIVOS_ZIP_MAX_BYTES viesse malformado
+    # no .env — um typo numa rota vira downtime total. Fallback pro default
+    # em vez de deixar o ValueError propagar do import de api.main.
+    bruto = os.environ.get('ARQUIVOS_ZIP_MAX_BYTES')
+    if bruto is None:
+        return _MAX_BYTES_PADRAO
+    try:
+        return int(bruto)
+    except ValueError:
+        return _MAX_BYTES_PADRAO
+
+
+# Nome de módulo continua MAX_BYTES de propósito: os testes existentes fazem
+# monkeypatch.setattr(arquivos_router, 'MAX_BYTES', ...) direto nesse nome.
+MAX_BYTES = _ler_max_bytes()
 
 
 def _remover(caminho):
@@ -39,7 +59,7 @@ def zip_do_dia(cliente: str, site: str, data: str, x_config_secret: str = Header
     Nenhum fragmento de caminho vem do chamador — cliente/site/data são
     validados e o caminho é montado aqui.
     """
-    if not _SECRET or x_config_secret != _SECRET:
+    if not _SECRET or not hmac.compare_digest(x_config_secret, _SECRET):
         raise HTTPException(status_code=401, detail='secret inválido')
     try:
         dia = date.fromisoformat(data)

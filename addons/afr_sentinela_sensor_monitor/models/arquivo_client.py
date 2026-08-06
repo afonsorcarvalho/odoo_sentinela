@@ -60,9 +60,22 @@ class ArquivoClient(models.AbstractModel):
                 f'({cliente_id}) contém caractere não aceito pelo serviço de '
                 f'arquivos (use apenas letras, números, "_" ou "-").')
         if resp.status_code == 404:
-            raise UserError(
-                f'Nenhum arquivo encontrado para {site.site_code} em '
-                f'{data.strftime("%d/%m/%Y")}.')
+            # A api devolve esse detail exato para "dia/site sem arquivo"
+            # (api/arquivos_router.py). Qualquer outro corpo em cima de um
+            # 404 — incluindo o {"detail": "Not Found"} que o próprio
+            # FastAPI gera para uma rota que não existe (ex.: container não
+            # reiniciado após deploy) — não é isso, e mentir "nenhum arquivo"
+            # pra um problema de infraestrutura já aconteceu de verdade
+            # durante a verificação desta branch.
+            try:
+                detalhe = resp.json().get('detail')
+            except ValueError:
+                detalhe = None
+            if detalhe == 'nenhum arquivo para este dia/site':
+                raise UserError(
+                    f'Nenhum arquivo encontrado para {site.site_code} em '
+                    f'{data.strftime("%d/%m/%Y")}.')
+            raise UserError('Serviço de arquivos indisponível. Tente novamente.')
         if resp.status_code == 413:
             raise UserError('Volume acima do limite; escolha um dia com menos coletores.')
         if resp.status_code != 200:

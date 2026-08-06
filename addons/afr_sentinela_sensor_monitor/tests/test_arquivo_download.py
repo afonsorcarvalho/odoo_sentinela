@@ -31,13 +31,18 @@ class TestArquivoClient(TransactionCase):
         modelo = self.env['sensor_monitor.arquivo.client']
         return modelo.with_user(user) if user else modelo
 
-    def _resposta(self, status_code, blocos=(b'PK\x03\x04',)):
+    def _resposta(self, status_code, blocos=(b'PK\x03\x04',), corpo_json=None, corpo_invalido=False):
         class Resp:
             def __init__(self):
                 self.status_code = status_code
 
             def iter_content(self, chunk_size=None):
                 return iter(blocos)
+
+            def json(self):
+                if corpo_invalido:
+                    raise ValueError('corpo não é JSON')
+                return corpo_json if corpo_json is not None else {}
         return Resp()
 
     def test_resolver_site_de_outro_cliente_levanta_access_error(self):
@@ -87,12 +92,34 @@ class TestArquivoClient(TransactionCase):
                 self._client(self.user_a).baixar_zip(self.site_a.id, date(2026, 7, 29))
             assert 'não aceito' in str(ctx.exception)
 
-    def test_404_vira_mensagem_legivel(self):
+    def test_404_com_detail_de_dia_vazio_vira_mensagem_legivel(self):
         with patch('requests.get') as mock_get:
-            mock_get.return_value = self._resposta(404)
+            mock_get.return_value = self._resposta(
+                404, corpo_json={'detail': 'nenhum arquivo para este dia/site'})
             with self.assertRaises(UserError) as ctx:
                 self._client(self.user_a).baixar_zip(self.site_a.id, date(2026, 7, 29))
             assert 'Nenhum arquivo' in str(ctx.exception)
+
+    def test_404_com_detail_diferente_vira_servico_indisponivel(self):
+        # Mesmo status code, corpo diferente: rota inexistente na api (ex.:
+        # container não reiniciado após deploy) também devolve 404, e o
+        # FastAPI gera {"detail": "Not Found"} pra isso — não é "dia sem
+        # arquivo", é a api quebrada. Isso já aconteceu de verdade durante a
+        # verificação desta branch.
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = self._resposta(404, corpo_json={'detail': 'Not Found'})
+            with self.assertRaises(UserError) as ctx:
+                self._client(self.user_a).baixar_zip(self.site_a.id, date(2026, 7, 29))
+            assert 'indisponível' in str(ctx.exception)
+
+    def test_404_com_corpo_nao_json_vira_servico_indisponivel(self):
+        # Guard contra resp.json() explodir (ex.: um proxy/reverse-proxy no
+        # meio do caminho devolvendo HTML de erro em vez de JSON).
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = self._resposta(404, corpo_invalido=True)
+            with self.assertRaises(UserError) as ctx:
+                self._client(self.user_a).baixar_zip(self.site_a.id, date(2026, 7, 29))
+            assert 'indisponível' in str(ctx.exception)
 
     def test_413_vira_mensagem_de_volume(self):
         with patch('requests.get') as mock_get:

@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import datetime, date
 from unittest.mock import patch
 
-from odoo import fields
+import pytz
+
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase
 
@@ -154,7 +155,16 @@ class TestArquivoDownloadWizard(TransactionCase):
         assert 'data=2026-07-29' in acao['url']
         assert acao['url'].startswith('/sentinela/arquivos/zip?')
 
-    def test_data_referencia_default_e_hoje(self):
-        wizard = self.env['sensor_monitor.arquivo.download.wizard'].create({
-            'site_id': self.site.id})
-        assert wizard.data_referencia == fields.Date.context_today(wizard)
+    def test_data_referencia_default_e_hoje_no_fuso_do_usuario(self):
+        # Fixa o fuso do contexto (em vez de deixar no fuso do usuário de
+        # teste, que pode ser UTC) e calcula o "hoje" esperado de forma
+        # INDEPENDENTE de fields.Date.context_today — chamar a mesma função
+        # que o default usa pra construir a expectativa é tautológico, passa
+        # em qualquer comportamento de fuso, e some com o teste virando
+        # documentação morta de uma preocupação real (o campo tem que
+        # refletir o fuso de quem está vendo o wizard, não o do servidor).
+        tz = pytz.timezone('America/Sao_Paulo')
+        esperado = pytz.UTC.localize(datetime.now()).astimezone(tz).date()
+        wizard = self.env['sensor_monitor.arquivo.download.wizard'].with_context(
+            tz='America/Sao_Paulo').create({'site_id': self.site.id})
+        assert wizard.data_referencia == esperado

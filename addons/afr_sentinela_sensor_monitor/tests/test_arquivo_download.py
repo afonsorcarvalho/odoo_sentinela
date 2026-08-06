@@ -75,8 +75,8 @@ class TestArquivoClient(TransactionCase):
             assert b''.join(blocos) == b'PK\x03\x04'
 
     def test_cliente_id_cai_para_partner_id_quando_ref_vazio(self):
-        # Mesma regra de ingestao/odoo_cliente.py::_info_coletor, que é quem
-        # escreve a árvore do acervo. Divergir aqui gera 404 silencioso.
+        # Mesma regra de ingestao/odoo_cliente.py::resolver_coletor, que é
+        # quem escreve a árvore do acervo. Divergir aqui gera 404 silencioso.
         self.partner_a.ref = False
         with patch('requests.get') as mock_get:
             mock_get.return_value = self._resposta(200)

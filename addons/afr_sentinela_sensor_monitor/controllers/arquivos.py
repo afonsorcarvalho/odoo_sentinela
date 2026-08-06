@@ -24,6 +24,14 @@ class SentinelaArquivos(http.Controller):
                 'Parâmetros inválidos.', status=400,
                 content_type='text/plain; charset=utf-8')
         try:
+            # NUNCA .sudo() aqui. arquivo.client.resolver_site usa search()
+            # sem sudo de propósito: é o ir.rule rule_site_tenant, aplicado
+            # sobre o usuário desta request, quem decide se site_id pertence
+            # a este cliente. Essa única linha é todo o isolamento
+            # multi-tenant da rota — não tem teste unitário que pegue um
+            # sudo() introduzido aqui por engano, só o comportamento em
+            # produção. Um futuro debugging de AccessError vai ser tentado
+            # a "resolver" adicionando sudo(); não faça isso.
             nome, blocos = request.env['sensor_monitor.arquivo.client'].baixar_zip(site_id, dia)
         except AccessError:
             return Response(

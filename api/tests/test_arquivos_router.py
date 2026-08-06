@@ -84,6 +84,20 @@ def _preparar(monkeypatch, sftp, transport=None, max_bytes=500 * 1024 * 1024):
     return TestClient(app, raise_server_exceptions=False)
 
 
+@pytest.fixture
+def tempdir_isolado(tmp_path, monkeypatch):
+    """Aponta tempfile.tempdir (e portanto tempfile.gettempdir()) pro
+    diretório privado do teste.
+
+    Sem isso, _tempfiles_zip() faz glob no /tmp compartilhado do processo:
+    qualquer outro teste (ou processo do sistema) que largue um .zip em
+    /tmp no meio da execução faz o assert de igualdade de conjunto flacar,
+    sem relação nenhuma com o comportamento sob teste.
+    """
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    return tmp_path
+
+
 def _tempfiles_zip():
     """Conjunto de .zip soltos no diretório de temporários agora mesmo."""
     return set(glob.glob(f'{tempfile.gettempdir()}/*.zip'))
@@ -141,7 +155,7 @@ def test_acima_do_teto_413(monkeypatch):
     assert sftp.aberturas == 0
 
 
-def test_close_falha_apos_sucesso_nao_deixa_zip_orfao(monkeypatch):
+def test_close_falha_apos_sucesso_nao_deixa_zip_orfao(monkeypatch, tempdir_isolado):
     # sftp.close() e transport.close() levantam DEPOIS que montar_zip já
     # terminou com sucesso — reproduz o gap achado na auto-revisão: sem a
     # proteção no finally, a exceção do close() mascararia o `return
@@ -158,7 +172,7 @@ def test_close_falha_apos_sucesso_nao_deixa_zip_orfao(monkeypatch):
     assert _tempfiles_zip() == antes, 'ZIP órfão sobrou em disco'
 
 
-def test_montar_zip_falha_no_meio_nao_deixa_zip_parcial(monkeypatch):
+def test_montar_zip_falha_no_meio_nao_deixa_zip_parcial(monkeypatch, tempdir_isolado):
     # Dois arquivos no dia; open() levanta na SEGUNDA chamada — simula o
     # SFTP caindo depois que montar_zip já escreveu o primeiro membro no
     # ZIP parcial. A rota tem que limpar esse tempfile antes de propagar.

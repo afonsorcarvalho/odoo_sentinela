@@ -3,8 +3,8 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import (alarmes, auth, config, config_publish_router, config_report, historico, live,
-               live_listener, meta, presenca, verificacao_router)
+from . import (alarmes, arquivos_router, auth, config, config_publish_router, config_report,
+               historico, live, live_listener, meta, presenca, verificacao_router)
 
 app = FastAPI(title='Sentinela API')
 
@@ -22,6 +22,7 @@ app.add_middleware(
 )
 
 app.include_router(alarmes.router)
+app.include_router(arquivos_router.router)
 app.include_router(auth.router)
 app.include_router(config.router)
 app.include_router(config_publish_router.router)

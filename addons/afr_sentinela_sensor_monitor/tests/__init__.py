@@ -11,3 +11,4 @@ from . import test_publicar_config
 from . import test_calibracao
 from . import test_faixa_plausivel
 from . import test_coletor_pubkey
+from . import test_arquivo_download

@@ -20,4 +20,5 @@
 
     <menuitem id="menu_sensor_monitor_operacao" name="Operação" parent="menu_sensor_monitor_root" sequence="40"/>
     <menuitem id="menu_file_ledger" name="Ledger de Arquivos" parent="menu_sensor_monitor_operacao" action="action_file_ledger" sequence="10"/>
+    <menuitem id="menu_arquivo_download" name="Arquivos do Dia" parent="menu_sensor_monitor_operacao" action="action_arquivo_download" sequence="20"/>
 </odoo>

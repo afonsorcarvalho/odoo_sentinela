@@ -18,3 +18,6 @@ ingestao/coletores_conhecidos.json
 exemplos/
 .sftp-config-svc/
 .watcher_ingestao.json
+
+# Notas locais com credenciais/acessos (ex.: ACESSOS.local.md)
+*.local.md

@@ -1,3 +1,4 @@
+import hmac
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,7 +23,7 @@ class PublicarConfigBody(BaseModel):
 @router.post('/internal/hub/{hub_code}/publicar-config')
 def publicar_config(hub_code: str, body: PublicarConfigBody = PublicarConfigBody(),
                      x_config_secret: str = Header(default='')):
-    if not _SECRET or x_config_secret != _SECRET:
+    if not _SECRET or not hmac.compare_digest(x_config_secret, _SECRET):
         raise HTTPException(status_code=401, detail='secret inválido')
     cliente = get_cliente_servico()
     try:

@@ -84,11 +84,13 @@ Novo arquivo `addons/afr_sentinela_sensor_monitor/controllers/arquivos.py`
 
 1. Faz parse de `site_id` (int) e `data` (`date.fromisoformat`). Malformado →
    `UserError`.
-2. `site = request.env['sensor_monitor.site'].browse(site_id).exists()`
-   **sem `sudo`**. Recordset vazio (site inexistente ou de outro partner) →
-   resposta 403. Não diferenciar as duas causas: não vazar existência.
+2. `site = request.env['sensor_monitor.site'].search([('id', '=', site_id)], limit=1)`
+   **sem `sudo`**. `search` é o que aplica o `ir.rule`; `browse(...).exists()`
+   confere só a existência da linha no banco e ignora record rule — usá-lo aqui
+   seria um furo silencioso no isolamento. Recordset vazio (site inexistente ou
+   de outro partner) → resposta 403, sem diferenciar as duas causas.
 3. `cliente_id = site.partner_id.ref or f'CLI-{site.partner_id.id}'` — mesma
-   regra de `ingestao/odoo_cliente.py::_info_coletor`, que é quem escreve a
+   regra de `ingestao/odoo_cliente.py::resolver_coletor`, que é quem escreve a
    árvore.
 4. Chama o client; repassa `resp.iter_content(64 * 1024)` num
    `werkzeug` `Response` com

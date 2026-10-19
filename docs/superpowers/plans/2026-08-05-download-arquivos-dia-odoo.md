@@ -116,6 +116,11 @@ def test_validar_token_aceita_codigos_reais():
     'cli 43',
     '',
     'x' * 65,
+    # Em Python, `$` casa também logo antes de um \n final — com .match() estes
+    # três passariam. Por isso validar_token usa .fullmatch().
+    'CLI-43\n',
+    '\nCLI-43',
+    'CLI-43\r\n',
 ])
 def test_validar_token_recusa_travessia_e_lixo(valor):
     # A defesa contra path traversal mora aqui: se um destes passar, o caminho
@@ -167,7 +172,10 @@ class ParametroInvalido(ValueError):
 
 
 def validar_token(valor: str) -> str:
-    if not isinstance(valor, str) or not _RE_TOKEN.match(valor):
+    # fullmatch, não match: `$` casa também imediatamente antes de um \n final,
+    # então .match() aceitaria 'CLI-43\n'. O token não viraria travessia por si
+    # só, mas um newline sobrevivente vira injeção em header ou log adiante.
+    if not isinstance(valor, str) or not _RE_TOKEN.fullmatch(valor):
         raise ParametroInvalido(f'valor inválido: {valor!r}')
     return valor
 
@@ -182,7 +190,7 @@ def caminho_do_dia(base: str, cliente: str, site: str, data: date) -> str:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest api/tests/test_arquivos.py -q`
-Expected: PASS (11 testes)
+Expected: PASS (15 testes — 11 do parametrize mais 4 avulsos)
 
 - [ ] **Step 5: Commit**
 
@@ -803,7 +811,7 @@ class TestArquivoClient(TransactionCase):
             assert b''.join(blocos) == b'PK\x03\x04'
 
     def test_cliente_id_cai_para_partner_id_quando_ref_vazio(self):
-        # Mesma regra de ingestao/odoo_cliente.py::_info_coletor, que é quem
+        # Mesma regra de ingestao/odoo_cliente.py::resolver_coletor, que é quem
         # escreve a árvore do acervo. Divergir aqui gera 404 silencioso.
         self.partner_a.ref = False
         with patch('requests.get') as mock_get:

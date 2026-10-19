@@ -1,12 +1,13 @@
 import json
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ingestao import odoo_cliente
 
-from .auth import exigir_admin, verificar_token
-from .odoo import SITE_CODE, get_cliente_servico
+from .auth import exigir_admin, get_cliente_usuario
+from .odoo import SITE_CODE
 
 router = APIRouter()
 
@@ -18,12 +19,26 @@ class LayoutBody(BaseModel):
     layout: dict
 
 
-def _site_id_do_code(cliente):
+def _site_id_do_usuario(cliente, site_code=None):
+    """Site do usuário logado. `cliente` é a sessão do usuário, então o
+    search_read já vem filtrado pelo ir.rule: só aparecem sites permitidos.
+
+    Com `site_code` explícito, ele tem de estar entre os permitidos (senão
+    404, sem distinguir "não existe" de "não é seu"). Sem ele: SITE_CODE do
+    processo se o usuário o enxerga, senão o primeiro por código. A escolha de
+    site no frontend (cliente multi-site) ainda não existe.
+    """
     sites = odoo_cliente.executar(
-        cliente, 'sensor_monitor.site', 'search_read',
-        [('site_code', '=', SITE_CODE)], fields=['id'],
+        cliente, 'sensor_monitor.site', 'search_read', [], fields=['id', 'site_code'],
     )
-    return sites[0]['id'] if sites else None
+    por_codigo = {s['site_code']: s['id'] for s in sites}
+    if site_code is not None:
+        if site_code not in por_codigo:
+            raise HTTPException(status_code=404, detail='site não encontrado')
+        return por_codigo[site_code]
+    if SITE_CODE in por_codigo:
+        return por_codigo[SITE_CODE]
+    return por_codigo[min(por_codigo)] if por_codigo else None
 
 
 def _default_config():
@@ -34,8 +49,8 @@ def _default_config():
     }
 
 
-def obter_config(cliente):
-    site_id = _site_id_do_code(cliente)
+def obter_config(cliente, site_code=None):
+    site_id = _site_id_do_usuario(cliente, site_code)
     if site_id is None:
         return _default_config()
 
@@ -57,20 +72,21 @@ def obter_config(cliente):
 
 
 @router.get('/config')
-def get_config(cliente=Depends(get_cliente_servico), _claims=Depends(verificar_token)):
-    return obter_config(cliente)
+def get_config(site: Optional[str] = None, cliente=Depends(get_cliente_usuario)):
+    return obter_config(cliente, site)
 
 
 @router.put('/config/layout')
-def put_layout(body: LayoutBody, cliente=Depends(get_cliente_servico), _claims=Depends(exigir_admin)):
+def put_layout(body: LayoutBody, site: Optional[str] = None, cliente=Depends(get_cliente_usuario),
+               _claims=Depends(exigir_admin)):
     layout = body.layout
     if not isinstance(layout, dict) or not isinstance(layout.get('version'), int) \
             or not isinstance(layout.get('widgets'), list):
         raise HTTPException(status_code=400, detail='layout inválido: requer version(int) e widgets(list)')
 
-    site_id = _site_id_do_code(cliente)
+    site_id = _site_id_do_usuario(cliente, site)
     if site_id is None:
-        raise HTTPException(status_code=404, detail=f'site {SITE_CODE} não encontrado')
+        raise HTTPException(status_code=404, detail='site não encontrado')
 
     valores = {'layout_json': json.dumps(layout), 'layout_version': layout['version']}
     existentes = odoo_cliente.executar(

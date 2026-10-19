@@ -1,3 +1,4 @@
+import json
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -208,3 +209,49 @@ def test_put_layout_sem_token_401():
 def test_put_layout_body_malformado_422_ou_400():
     resposta = client.put('/config/layout', json={'layout': {'version': 1}}, headers=_headers())
     assert resposta.status_code in (400, 422)
+
+
+def _login_tenant(dados):
+    resposta = client.post('/auth/login', json={'usuario': dados['login'], 'senha': dados['senha']})
+    assert resposta.status_code == 200
+    return {'Authorization': f"Bearer {resposta.json()['access_token']}"}
+
+
+def test_config_de_usuario_tenant_vem_do_site_dele_nao_do_site_code_fixo():
+    from api.tests.tenant_fixtures import criar_tenant, remover_tenant
+
+    servico = get_cliente_servico()
+    # Site "padrão" do processo (SITE_CODE) com layout que o tenant NÃO pode ver.
+    site_padrao = _site_id(servico)
+    _limpar_config(servico, site_padrao)
+    layout_alheio = {'version': 1, 'grid': {}, 'widgets': [{'id': 'alheio'}]}
+    cfg_padrao = odoo_cliente.executar(
+        servico, 'sensor_monitor.dashboard.config', 'create',
+        {'site_id': site_padrao, 'layout_json': json.dumps(layout_alheio)},
+    )
+    tenant = criar_tenant('CFG1')
+    cfg_tenant = odoo_cliente.executar(
+        servico, 'sensor_monitor.dashboard.config', 'create',
+        {'site_id': tenant['site_id'], 'carousel_interval_ms': 9100,
+         'layout_json': json.dumps({'version': 1, 'grid': {}, 'widgets': []})},
+    )
+    try:
+        resposta = client.get('/config', headers=_login_tenant(tenant))
+        assert resposta.status_code == 200
+        corpo = resposta.json()
+        assert corpo['carousel_interval_ms'] == 9100
+        assert corpo['layout']['widgets'] == []
+    finally:
+        odoo_cliente.executar(servico, 'sensor_monitor.dashboard.config', 'unlink', [cfg_padrao, cfg_tenant])
+        remover_tenant(tenant)
+
+
+def test_config_param_site_de_outro_tenant_retorna_404():
+    from api.tests.tenant_fixtures import criar_tenant, remover_tenant
+
+    tenant = criar_tenant('CFG2')
+    try:
+        resposta = client.get(f'/config?site={SITE_CODE}', headers=_login_tenant(tenant))
+        assert resposta.status_code == 404
+    finally:
+        remover_tenant(tenant)

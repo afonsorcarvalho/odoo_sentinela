@@ -17,6 +17,7 @@ class AlarmEvent(models.Model):
         ('abaixo_limite', 'Abaixo do limite'),
         ('sensor_offline', 'Sensor offline'),
         ('erro_leitura', 'Erro de leitura'),
+        ('falha_sensor', 'Falha do sensor'),
     ], required=True)
     limite_configurado_snapshot = fields.Float()
     origem_arquivo_hash = fields.Char()

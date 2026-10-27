@@ -21,3 +21,8 @@ exemplos/
 
 # Notas locais com credenciais/acessos (ex.: ACESSOS.local.md)
 *.local.md
+
+# produção (VPS) — segredos/estado gerados na VPS
+.env.prod
+conf/odoo.prod.conf
+registro/

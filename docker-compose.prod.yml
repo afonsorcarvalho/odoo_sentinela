@@ -1,0 +1,160 @@
+# Produção (VPS fitadigital, usuário `sentinela`). Arquivo STANDALONE — não é
+# override do docker-compose.yml: o Compose 2.21 da VPS concatena `ports:` em
+# overrides e as portas de dev (8000/5433/1883) colidem com outros serviços.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# Segredos em .env.prod e conf/odoo.prod.conf (fora do git).
+# HTTP só em 127.0.0.1 (Apache faz o proxy de sentinela.afrsistemas.com.br);
+# SFTP e MQTT só no IP da VPN (10.8.0.1), por onde os hubs chegam. MQTT ainda
+# anônimo (hub/api/bridge não suportam auth) — protegido só pela VPN.
+name: sentinela
+
+x-py: &py
+  build:
+    context: .
+    dockerfile: api/Dockerfile
+  image: sentinela-api:prod
+  restart: unless-stopped
+  mem_limit: 256m
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ${ODOO_DB_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    mem_limit: 256m
+
+  odoo:
+    image: odoo:18.0
+    depends_on: [db]
+    command: ["odoo", "-c", "/etc/odoo/odoo.prod.conf"]
+    # O entrypoint da imagem injeta --db_host/--db_user/--db_password a partir
+    # destas envs (default "odoo"), sobrescrevendo o conf.
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: ${ODOO_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:8196:8069"
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      - ./conf/odoo.prod.conf:/etc/odoo/odoo.prod.conf:ro
+      - odoo-filestore:/var/lib/odoo
+    restart: unless-stopped
+    mem_limit: 768m
+
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16
+    # Teto explícito: a imagem -ha auto-ajusta pela RAM do host (7.7 GB) e
+    # estouraria o mem_limit.
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "effective_cache_size=256MB",
+              "-c", "work_mem=8MB", "-c", "maintenance_work_mem=64MB", "-c", "max_connections=50"]
+    environment:
+      POSTGRES_USER: sentinela
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD}
+      POSTGRES_DB: sentinela
+    ports:
+      - "127.0.0.1:5439:5432"
+    volumes:
+      - timescale-data:/home/postgres/pgdata/data
+      - ./timescale/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    mem_limit: 512m
+
+  sftpgo:
+    image: drakkan/sftpgo:v2
+    ports:
+      - "10.8.0.1:2022:2022"     # SFTP dos hubs, só pela VPN
+      - "127.0.0.1:8198:8080"    # WebAdmin (túnel SSH)
+    environment:
+      SFTPGO_SFTPD__BINDINGS__0__PORT: 2022
+      SFTPGO_COMMON__UPLOAD_MODE: 2
+      SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
+      SFTPGO_DEFAULT_ADMIN_USERNAME: admin
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: ${SFTPGO_ADMIN_PASSWORD}
+    volumes:
+      - sftpgo-data:/srv/sftpgo
+      - sftpgo-config:/var/lib/sftpgo
+    restart: unless-stopped
+    mem_limit: 192m
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "10.8.0.1:1884:1883"     # MQTT dos hubs, só pela VPN (1883 é do mosquitto nativo)
+    volumes:
+      - ./mosquitto/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    restart: unless-stopped
+    mem_limit: 64m
+
+  api:
+    <<: *py
+    depends_on: [odoo, timescaledb, sftpgo, mosquitto]
+    ports:
+      - "127.0.0.1:8197:8000"
+    environment: &app-env
+      CONFIG_PUBLISH_SECRET: ${CONFIG_PUBLISH_SECRET}
+      API_JWT_SECRET: ${API_JWT_SECRET}
+      SFTP_HOST: sftpgo
+      SFTP_PORT: "2022"
+      SFTP_USER: sentinela-config-svc
+      SFTP_KEY_PATH: /keys/id_ed25519
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      TIMESCALE_DSN: postgresql://sentinela:${TIMESCALE_PASSWORD}@timescaledb:5432/sentinela
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: sentinela
+      ODOO_USUARIO_SERVICO: ${ODOO_SVC_USER}
+      ODOO_SENHA_SERVICO: ${ODOO_SVC_PASSWORD}
+      ODOO_USER: ${ODOO_SVC_USER}
+      ODOO_SENHA: ${ODOO_SVC_PASSWORD}
+      SENTINELA_SITE_CODE: ${SENTINELA_SITE_CODE}
+      SENTINELA_REGISTRO: /app/registro/coletores_conhecidos.json
+      PYTHONPATH: /app
+    volumes:
+      - ./api:/app/api:ro
+      - ./ingestao:/app/ingestao:ro
+      - ./contrato:/app/contrato:ro
+      - ./.sftp-config-svc:/keys:ro
+      - ./registro:/app/registro:ro
+
+  watcher:
+    <<: *py
+    depends_on: [sftpgo, timescaledb, odoo]
+    command: ["python", "-u", "scripts/watcher_ingestao.py"]
+    environment:
+      <<: *app-env
+      WATCH_ESTADO: /state/watcher_ingestao.json
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./ingestao:/app/ingestao:ro
+      - ./contrato:/app/contrato:ro
+      - ./.sftp-config-svc:/keys:ro
+      - ./registro:/app/registro:ro
+      - watcher-state:/state
+
+  bridge:
+    <<: *py
+    depends_on: [mosquitto, timescaledb, odoo]
+    command: ["python", "-u", "scripts/bridge_telemetria.py"]
+    environment: *app-env
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./ingestao:/app/ingestao:ro
+      - ./contrato:/app/contrato:ro
+
+volumes:
+  odoo-db-data:
+  odoo-filestore:
+  timescale-data:
+  sftpgo-data:
+  sftpgo-config:
+  mosquitto-data:
+  watcher-state:

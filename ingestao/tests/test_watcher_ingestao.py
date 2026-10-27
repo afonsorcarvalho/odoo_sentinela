@@ -97,6 +97,17 @@ def test_descobre_ignora_ponto_e_pontoponto(watcher):
     assert watcher._descobrir(_SftpFake(arvore), '/uploads') == ['/uploads/x_leituras.txt']
 
 
+def test_descobre_ignora_temporario_de_upload_atomico(watcher):
+    """SFTPGo com UPLOAD_MODE=2 grava em '.sftpgo-upload.<id>.<nome>' e renomeia no
+    fim. O temporário termina em _leituras.txt; ingerido no meio do upload, falha a
+    assinatura e vira falso 'arquivo adulterado' no ledger (visto em prod)."""
+    arvore = {'/uploads': [
+        ('.sftpgo-upload.dbgbh7ukct4c73bsqf4g.2026-10-27_HUB-1-COL-1_leituras.txt', False),
+        ('2026-10-27_HUB-1-COL-1_leituras.txt', False)]}
+    assert watcher._descobrir(_SftpFake(arvore), '/uploads') == [
+        '/uploads/2026-10-27_HUB-1-COL-1_leituras.txt']
+
+
 def _arvore_com_colisao():
     nome = '2026-07-23_HUB-1-COL-1_leituras.txt'
     return {

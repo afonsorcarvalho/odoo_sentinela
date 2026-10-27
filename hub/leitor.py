@@ -25,34 +25,33 @@ class Leitor:
         self._config = config
         self._backend = backend
         self._dispositivos = []
-        self._degradados = []   # list[list[CanalConfig]] — dispositivos que não instanciaram
         self._falhados = set()
         for bus in config.barramentos:
             for disp in bus.dispositivos:
-                try:
-                    registros = [
-                        {'ch': c.ch, **c.registro} for c in disp.canais if c.registro
-                    ] or None
-                    driver = backend.criar_driver(
-                        disp.driver, bus.porta, bus.baud, bus.paridade, bus.stop_bits, disp.endereco,
-                        registros=registros,
-                    )
-                except Exception as e:
-                    print(f"[hub] dispositivo nao instanciou, degradado: "
-                          f"driver={disp.driver!r} porta={bus.porta} endereco={disp.endereco} erro={e!r}")
-                    self._degradados.append(disp.canais)
-                    continue
+                registros = [
+                    {'ch': c.ch, **c.registro} for c in disp.canais if c.registro
+                ] or None
 
                 def _fazer_recriar(disp=disp, bus=bus, registros=registros):
                     return backend.criar_driver(
                         disp.driver, bus.porta, bus.baud, bus.paridade, bus.stop_bits,
                         disp.endereco, registros=registros,
                     )
-                self._dispositivos.append(_DispositivoLigado(
-                    driver, disp.canais, disp.driver, bus.porta, disp.endereco,
+                ligado = _DispositivoLigado(
+                    None, disp.canais, disp.driver, bus.porta, disp.endereco,
                     recriar=_fazer_recriar,
                     n=disp.reconexao_n, m=disp.reconexao_m, k=disp.reconexao_k,
-                ))
+                )
+                try:
+                    ligado.driver = _fazer_recriar()
+                except Exception as e:
+                    # Degradado, mas não para sempre: a porta pode aparecer depois
+                    # do boot (adaptador USB enumera tarde). cooldown=1 retenta no
+                    # 1º ciclo; falhando, o caminho normal de recriar põe cooldown k.
+                    print(f"[hub] dispositivo nao instanciou, degradado: "
+                          f"driver={disp.driver!r} porta={bus.porta} endereco={disp.endereco} erro={e!r}")
+                    ligado.cooldown = 1
+                self._dispositivos.append(ligado)
 
     def _specs(self, canais):
         return [
@@ -161,9 +160,6 @@ class Leitor:
             else:
                 disp.falhas_seguidas = 0
                 disp.reconexoes = 0
-        for canais in self._degradados:
-            for canal in canais:
-                leituras.append(self._normalizar(canal, 0.0, "sensor_offline", agora))
         return leituras
 
     def fechar(self):

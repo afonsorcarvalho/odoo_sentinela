@@ -769,6 +769,39 @@ def test_dispositivo_que_nao_instancia_nao_derruba_boot(tmp_path):
     assert por_sensor["SNR-RUIM"]["valor"] == 0.0
 
 
+class _BackendPortaAtrasada(_BackendReconexao):
+    """Porta que só aparece depois do boot (adaptador USB enumera tarde):
+    criar_driver estoura nas primeiras `falhas` chamadas."""
+    def __init__(self, driver, falhas):
+        super().__init__([driver])
+        self._falhas = falhas
+    def criar_driver(self, *a, registros=None, **k):
+        self.criacoes += 1
+        if self.criacoes <= self._falhas:
+            raise RuntimeError("could not open port /dev/ttyUSB0")
+        return self._drivers[0]
+
+
+def test_dispositivo_que_nao_instanciou_no_boot_retenta_e_recupera(tmp_path):
+    """Visto em prod: hub subiu segundos antes do /dev/ttyUSB0 aparecer e ficou
+    sensor_offline para sempre (só restart resolvia)."""
+    bom = _DriverFaixa(50.0)
+    backend = _BackendPortaAtrasada(bom, falhas=2)
+    leitor = Leitor(_cfg_reconexao(tmp_path), backend=backend)  # k=2
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+    assert backend.criacoes == 1  # boot falhou
+
+    assert leitor.ler_todos(agora)[0]["status_leitura"] == "sensor_offline"
+    assert backend.criacoes == 2  # retentou já no 1º ciclo; falhou de novo -> cooldown k
+
+    assert leitor.ler_todos(agora)[0]["status_leitura"] == "sensor_offline"
+    assert backend.criacoes == 2  # em cooldown
+
+    leituras = leitor.ler_todos(agora)  # cooldown expira -> retenta, porta existe
+    assert backend.criacoes == 3
+    assert leituras[0]["status_leitura"] == "ok"
+
+
 def test_flapping_bad_ok_bad_nao_reconecta(tmp_path):
     """Device flapping: alterna ciclo ruim (fora de faixa) e ciclo ok, sem
     nunca acumular N=2 ciclos ruins SEGUIDOS. O ciclo ok tem que zerar

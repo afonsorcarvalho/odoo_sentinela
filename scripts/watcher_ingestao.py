@@ -69,6 +69,10 @@ def _sftp():
 
 
 def _e_arquivo_ingerivel(nome):
+    # Ponto inicial = temporário do upload atômico do SFTPGo ('.sftpgo-upload.*'),
+    # ainda incompleto: ingerir falharia a assinatura.
+    if nome.startswith('.'):
+        return False
     return nome.endswith('_leituras.txt') or nome.endswith('_alarmes.txt')
 
 

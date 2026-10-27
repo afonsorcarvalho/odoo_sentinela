@@ -99,6 +99,25 @@ def resolver_sensor(cliente, sensor_code):
 
 
 def processar_entrada_alarme(cliente, evento, sensor_odoo_id, area_odoo_id, coletor_odoo_id, hash_arquivo):
+    # Reconciliação por evento: o mesmo (sensor, timestamp de entrada) pode já ter
+    # sido aberto ao vivo pela ponte MQTT (sem hash) — aberto ou já fechado.
+    # O arquivo assinado é a prova: carimba o hash nesse registro em vez de duplicar.
+    timestamp_deteccao = _timestamp_arquivo_para_utc(evento['timestamp'])
+    mesmos = executar(
+        cliente, 'sensor_monitor.alarm.event', 'search',
+        [('sensor_id', '=', sensor_odoo_id), ('timestamp_deteccao', '=', timestamp_deteccao)],
+        limit=1,
+    )
+    if mesmos:
+        if hash_arquivo:
+            sem_hash = executar(
+                cliente, 'sensor_monitor.alarm.event', 'search',
+                [('id', '=', mesmos[0]), ('origem_arquivo_hash', '=', False)],
+            )
+            if sem_hash:
+                executar(cliente, 'sensor_monitor.alarm.event', 'write', sem_hash,
+                         {'origem_arquivo_hash': hash_arquivo})
+        return mesmos[0]
     abertos = executar(
         cliente, 'sensor_monitor.alarm.event', 'search',
         [('sensor_id', '=', sensor_odoo_id), ('timestamp_resolucao_sensor', '=', False)],
@@ -116,7 +135,7 @@ def processar_entrada_alarme(cliente, evento, sensor_odoo_id, area_odoo_id, cole
         'sensor_id': sensor_odoo_id,
         'area_id': area_odoo_id,
         'coletor_id': coletor_odoo_id,
-        'timestamp_deteccao': _timestamp_arquivo_para_utc(evento['timestamp']),
+        'timestamp_deteccao': timestamp_deteccao,
         'valor_lido': evento['valor'],
         'tipo_violacao': evento['tipo_violacao'],
         'limite_configurado_snapshot': limite_snapshot if limite_snapshot is not None else 0.0,
@@ -127,6 +146,15 @@ def processar_entrada_alarme(cliente, evento, sensor_odoo_id, area_odoo_id, cole
 
 
 def processar_saida_alarme(cliente, evento, sensor_odoo_id):
+    timestamp_resolucao = _timestamp_arquivo_para_utc(evento['timestamp'])
+    # Já fechado ao vivo pela ponte com esta mesma saída → não é órfão.
+    ja_fechados = executar(
+        cliente, 'sensor_monitor.alarm.event', 'search',
+        [('sensor_id', '=', sensor_odoo_id), ('timestamp_resolucao_sensor', '=', timestamp_resolucao)],
+        limit=1,
+    )
+    if ja_fechados:
+        return ja_fechados[0]
     abertos = executar(
         cliente, 'sensor_monitor.alarm.event', 'search',
         [
@@ -139,6 +167,6 @@ def processar_saida_alarme(cliente, evento, sensor_odoo_id):
         return None
     executar(
         cliente, 'sensor_monitor.alarm.event', 'write', abertos,
-        {'timestamp_resolucao_sensor': _timestamp_arquivo_para_utc(evento['timestamp'])},
+        {'timestamp_resolucao_sensor': timestamp_resolucao},
     )
     return abertos[0]

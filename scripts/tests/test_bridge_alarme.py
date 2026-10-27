@@ -143,3 +143,43 @@ def test_cliente_odoo_preguicoso_e_reconecta(monkeypatch):
     assert bridge._obter_cliente_odoo() == 'C1'
     bridge._invalidar_cliente_odoo()
     assert bridge._obter_cliente_odoo() == 'C2'
+
+
+def _odoo_falso(monkeypatch, sensores):
+    """sensores: lista de dicts {sensor_code, coletor_id, id, area_id}."""
+    monkeypatch.setattr(bridge, '_site_code', lambda coletor_id: 'SITE-T')
+    monkeypatch.setattr(bridge, '_obter_cliente_odoo', lambda: 'CLI')
+    monkeypatch.setattr(bridge, '_coletor_odoo_id', {})
+    monkeypatch.setattr(bridge, '_sensor_odoo', {})
+    monkeypatch.setattr(bridge.odoo_cliente, 'resolver_coletor',
+                        lambda cli, code: {'id': {'COL-T': 33, 'COL-X': 44}[code]})
+
+    def fake_executar(cli, model, metodo, dominio, **kw):
+        assert model == 'sensor_monitor.sensor' and metodo == 'search_read'
+        filtro = dict((c, v) for c, _, v in dominio)
+        return [{'id': s['id'], 'area_id': [s['area_id'], 'A']} for s in sensores
+                if s['sensor_code'] == filtro['sensor_code']
+                and s['coletor_id'] == filtro.get('coletor_id', s['coletor_id'])]
+    monkeypatch.setattr(bridge.odoo_cliente, 'executar', fake_executar)
+
+
+def test_sensor_de_outro_coletor_nao_toca_odoo_mas_notifica(monkeypatch):
+    # SNR-T-01 pertence ao COL-X (outro site); tópico forjado usa COL-T.
+    _odoo_falso(monkeypatch, [{'sensor_code': 'SNR-T-01', 'coletor_id': 44, 'id': 11, 'area_id': 22}])
+    chamadas = []
+    monkeypatch.setattr(bridge.odoo_cliente, 'processar_entrada_alarme',
+                        lambda *a, **k: chamadas.append(a))
+    monkeypatch.setattr(bridge.odoo_cliente, 'processar_saida_alarme',
+                        lambda *a, **k: chamadas.append(a))
+    conn = _Conn()
+    h = bridge._on_message(conn)
+    h(None, None, _msg("sentinela/alarme/HUB-T/COL-T/SNR-T-01", _PAYLOAD_ENTRADA))
+    h(None, None, _msg("sentinela/alarme/HUB-T/COL-T/SNR-T-01",
+                       {**_PAYLOAD_ENTRADA, "tipo_evento": "saida_alarme"}))
+    assert chamadas == []
+    assert len(conn.notifies) == 2
+
+
+def test_sensor_do_proprio_coletor_resolve(monkeypatch):
+    _odoo_falso(monkeypatch, [{'sensor_code': 'SNR-T-01', 'coletor_id': 33, 'id': 11, 'area_id': 22}])
+    assert bridge._ids_odoo('COL-T', 'SNR-T-01') == (11, 22, 33)

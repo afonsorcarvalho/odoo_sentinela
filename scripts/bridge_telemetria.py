@@ -58,14 +58,29 @@ def _site_code(coletor_id):
 
 
 def _ids_odoo(coletor_code, sensor_code):
-    """(sensor_id, area_id, coletor_id) no Odoo, com cache (só sucessos)."""
+    """(sensor_id, area_id, coletor_id) no Odoo, com cache (só sucessos).
+
+    O MQTT não é assinado: o sensor só é aceito se pertencer ao coletor do
+    tópico (sensor.coletor_id), senão um publicador poderia abrir/fechar alarme
+    de sensor de outro site/tenant. Divergência → ValueError (logado, sem escrita).
+    """
     cliente = _obter_cliente_odoo()
     if coletor_code not in _coletor_odoo_id:
         _coletor_odoo_id[coletor_code] = odoo_cliente.resolver_coletor(cliente, coletor_code)['id']
-    if sensor_code not in _sensor_odoo:
-        _sensor_odoo[sensor_code] = odoo_cliente.resolver_sensor(cliente, sensor_code)
-    sensor = _sensor_odoo[sensor_code]
-    return sensor['id'], sensor['area_id'], _coletor_odoo_id[coletor_code]
+    coletor_id = _coletor_odoo_id[coletor_code]
+    chave = (coletor_code, sensor_code)
+    if chave not in _sensor_odoo:
+        sensores = odoo_cliente.executar(
+            cliente, 'sensor_monitor.sensor', 'search_read',
+            [('sensor_code', '=', sensor_code), ('coletor_id', '=', coletor_id)],
+            fields=['id', 'area_id'],
+        )
+        if not sensores:
+            raise ValueError(
+                f"sensor '{sensor_code}' não pertence ao coletor '{coletor_code}'")
+        _sensor_odoo[chave] = {'id': sensores[0]['id'], 'area_id': sensores[0]['area_id'][0]}
+    sensor = _sensor_odoo[chave]
+    return sensor['id'], sensor['area_id'], coletor_id
 
 
 def _alarme_no_odoo(coletor_code, sensor_code, p):

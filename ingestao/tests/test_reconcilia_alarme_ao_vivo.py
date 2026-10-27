@@ -108,3 +108,15 @@ def test_sequencia_ao_vivo_entrada_saida_depois_arquivo_um_registro(monkeypatch)
     assert len(fake.registros) == 1
     assert fake.registros[a]['origem_arquivo_hash'] == 'H'
     assert fake.registros[a]['timestamp_resolucao_sensor'] == '2026-07-26 12:05:00'
+
+
+def test_ao_vivo_aberto_sem_hash_arquivo_com_timestamp_diferente(monkeypatch):
+    """Comportamento atual documentado: entrada do arquivo com timestamp diferente,
+    havendo alarme aberto ao vivo (sem hash) no sensor → devolve o aberto, não cria
+    e não carimba hash (não é o mesmo evento)."""
+    fake = FakeOdoo([_reg()])
+    monkeypatch.setattr(odoo_cliente, 'executar', fake.executar)
+    ev = _evento(ts="2026-07-26T09:00:30-03:00")
+    assert odoo_cliente.processar_entrada_alarme(None, ev, 1, 2, 3, 'H') == 5
+    assert fake.criados == []
+    assert fake.registros[5]['origem_arquivo_hash'] is False

@@ -4,12 +4,12 @@ TABELAS_AGREGADO = {'sensor_reading_hourly', 'sensor_reading_daily'}
 def buscar_raw(conn, sensor_code, desde, sites_permitidos):
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT time, valor FROM sensor_reading "
+            "SELECT time, valor, status_leitura FROM sensor_reading "
             "WHERE sensor_id = %s AND time >= %s AND site_id = ANY(%s) ORDER BY time",
             (sensor_code, desde, sites_permitidos),
         )
         linhas = cur.fetchall()
-    return [{'time': linha[0], 'valor': linha[1]} for linha in linhas]
+    return [{'time': linha[0], 'valor': linha[1], 'status_leitura': linha[2]} for linha in linhas]
 
 
 def buscar_agregado(conn, sensor_code, tabela, desde, sites_permitidos):

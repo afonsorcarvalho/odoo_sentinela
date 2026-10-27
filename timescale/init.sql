@@ -73,7 +73,8 @@ BEGIN
             'sensor_id', NEW.sensor_id,
             'site_id', NEW.site_id,
             'time', extract(epoch from NEW.time) * 1000,
-            'valor', NEW.valor
+            'valor', NEW.valor,
+            'status_leitura', NEW.status_leitura
         )::text
     );
     RETURN NEW;

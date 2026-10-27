@@ -24,8 +24,10 @@ export type DashboardConfig = {
   layout?: DashboardLayout | null
 }
 
+export type StatusLeitura = 'ok' | 'suspeito' | 'erro_leitura' | 'falha_sensor' | 'sensor_offline'
+
 export type HistoryPoint =
-  | { ts: number; value: number }
+  | { ts: number; value: number; status_leitura?: StatusLeitura }
   | { ts: number; min: number; max: number; avg: number }
 
 export type HistoryResponse = {
@@ -42,6 +44,7 @@ export type LivePoint = {
   ts: number
   value: number
   alarm_state: AlarmState
+  status_leitura?: StatusLeitura
 }
 
 // Estado da conexao de dados ao vivo (EventSource), derivado exclusivamente

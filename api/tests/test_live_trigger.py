@@ -58,3 +58,35 @@ def test_trigger_dispara_notify_no_insert():
     finally:
         _limpar()
         conn.close()
+
+
+def test_notify_inclui_status_leitura():
+    conn = psycopg2.connect(DSN)
+    conn.autocommit = True
+    _limpar()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("LISTEN sensor_reading_new;")
+        conn_insert = conectar(DSN)
+        try:
+            with conn_insert.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO sensor_reading "
+                    "(time, site_id, coletor_id, sensor_id, area_id, tipo_medida, valor, unidade, protocolo_origem, status_leitura) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        datetime.now(timezone.utc), 'SITE-TEST', 'COL-TEST', SENSOR_CODE_TESTE,
+                        'AREA-TEST', 'temperatura', 23.4, 'C', '4-20ma', 'falha_sensor',
+                    ),
+                )
+            conn_insert.commit()
+        finally:
+            conn_insert.close()
+        prontos = select.select([conn], [], [], 3)
+        assert prontos[0], "nenhuma notificacao recebida em 3s"
+        conn.poll()
+        payload = json.loads(conn.notifies.pop(0).payload)
+        assert payload['status_leitura'] == 'falha_sensor'
+    finally:
+        _limpar()
+        conn.close()

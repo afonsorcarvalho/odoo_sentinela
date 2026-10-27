@@ -53,6 +53,7 @@ def test_historico_1h_raw_retorna_pontos_inseridos():
         assert len(corpo['points']) == 1
         assert corpo['points'][0]['value'] == 20.1
         assert 'ts' in corpo['points'][0]
+        assert corpo['points'][0]['status_leitura'] == 'ok'
     finally:
         _limpar()
         conn.close()

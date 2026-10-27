@@ -41,7 +41,8 @@ def get_historico(
     try:
         if config['resolution'] == 'raw':
             linhas = api_timescale.buscar_raw(conn, sensor_code, desde, sites_permitidos)
-            points = [{'ts': int(linha['time'].timestamp() * 1000), 'value': linha['valor']} for linha in linhas]
+            points = [{'ts': int(linha['time'].timestamp() * 1000), 'value': linha['valor'],
+                        'status_leitura': linha['status_leitura']} for linha in linhas]
         else:
             linhas = api_timescale.buscar_agregado(conn, sensor_code, config['tabela'], desde, sites_permitidos)
             points = [

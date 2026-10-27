@@ -77,3 +77,95 @@ def test_restart_nao_reemite_entrada(tmp_path):
 def test_sensor_sem_limite_configurado_ignora():
     d = DetectorAlarme({}, n=1)
     assert d.avaliar(_leitura(999.0)) == []
+
+
+# --- via de falha de instrumento ---
+
+def _tipos(ev):
+    return [(e["tipo_evento"], e["tipo_violacao"]) for e in ev]
+
+
+def test_falha_sensor_entra_na_primeira_leitura_sem_limite():
+    d = DetectorAlarme({}, n=3)
+    ev = d.avaliar(_leitura(None, status="falha_sensor"))
+    assert _tipos(ev) == [("entrada_alarme", "falha_sensor")]
+    assert ev[0]["limite_min_vigente"] is None and ev[0]["limite_max_vigente"] is None
+    assert set(ev[0]) == {"sensor_id", "area_id", "tipo_medida", "timestamp", "tipo_evento",
+                          "tipo_violacao", "valor", "limite_min_vigente", "limite_max_vigente"}
+
+
+def test_sensor_offline_entra_so_na_terceira_seguida():
+    d = DetectorAlarme({}, n=3)
+    off = lambda: d.avaliar(_leitura(None, status="sensor_offline"))
+    assert off() == [] and off() == []
+    assert d.avaliar(_leitura(20.0)) == []      # ok zera
+    assert off() == [] and off() == []
+    assert _tipos(off()) == [("entrada_alarme", "sensor_offline")]
+
+
+def test_saida_falha_apos_tres_ok_seguidas():
+    d = _det()
+    d.avaliar(_leitura(None, status="falha_sensor"))
+    assert d.avaliar(_leitura(20.0)) == []
+    assert d.avaliar(_leitura(20.0)) == []
+    ev = d.avaliar(_leitura(20.0))
+    assert _tipos(ev) == [("saida_alarme", "falha_sensor")]
+    assert ev[0]["limite_max_vigente"] == 25.0
+
+
+def test_ok_interrompida_por_falha_reinicia_saida():
+    d = DetectorAlarme({}, n=3)
+    d.avaliar(_leitura(None, status="falha_sensor"))
+    d.avaliar(_leitura(1.0)); d.avaliar(_leitura(1.0))
+    assert d.avaliar(_leitura(None, status="falha_sensor")) == []
+    d.avaliar(_leitura(1.0)); d.avaliar(_leitura(1.0))
+    assert _tipos(d.avaliar(_leitura(1.0))) == [("saida_alarme", "falha_sensor")]
+
+
+def test_falha_fecha_alarme_de_faixa_aberto_e_abre_falha():
+    d = _det()
+    for _ in range(3):
+        d.avaliar(_leitura(30.0))
+    ev = d.avaliar(_leitura(None, status="falha_sensor"))
+    assert _tipos(ev) == [("saida_alarme", "acima_limite"), ("entrada_alarme", "falha_sensor")]
+
+
+def test_troca_falha_offline_com_alarme_aberto_nao_emite():
+    d = DetectorAlarme({}, n=3)
+    d.avaliar(_leitura(None, status="falha_sensor"))
+    for _ in range(3):
+        assert d.avaliar(_leitura(None, status="sensor_offline")) == []
+    assert d.avaliar(_leitura(None, status="falha_sensor")) == []
+
+
+def test_apos_recuperar_faixa_reavalia_com_histerese():
+    d = _det()
+    d.avaliar(_leitura(None, status="falha_sensor"))
+    for _ in range(2):
+        assert d.avaliar(_leitura(20.0)) == []
+    assert _tipos(d.avaliar(_leitura(20.0))) == [("saida_alarme", "falha_sensor")]
+    assert d.avaliar(_leitura(30.0)) == []
+    assert d.avaliar(_leitura(30.0)) == []
+    assert _tipos(d.avaliar(_leitura(30.0))) == [("entrada_alarme", "acima_limite")]
+
+
+def test_erro_leitura_e_suspeito_nao_alarmam():
+    d = _det()
+    for _ in range(5):
+        assert d.avaliar(_leitura(None, status="erro_leitura")) == []
+        assert d.avaliar(_leitura(99.0, status="suspeito")) == []
+
+
+def test_estado_de_falha_persiste_entre_instancias(tmp_path):
+    p = tmp_path / "estado.json"
+    d = DetectorAlarme({}, n=3, estado_path=str(p))
+    assert len(d.avaliar(_leitura(None, status="falha_sensor"))) == 1
+    d2 = DetectorAlarme({}, n=3, estado_path=str(p))
+    assert d2.avaliar(_leitura(None, status="falha_sensor")) == []
+
+
+def test_estado_antigo_sem_chaves_novas_carrega(tmp_path):
+    p = tmp_path / "estado.json"
+    p.write_text(json.dumps({"S1": {"em_alarme": False, "tipo_violacao": None, "contador": 0}}))
+    d = DetectorAlarme({}, n=3, estado_path=str(p))
+    assert _tipos(d.avaliar(_leitura(None, status="falha_sensor"))) == [("entrada_alarme", "falha_sensor")]

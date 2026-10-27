@@ -889,3 +889,18 @@ def test_canal_0_20_sem_gate_ne43(tmp_path):
 def test_falha_sensor_prevalece_sobre_faixa(tmp_path):
     leituras = _ler_ne43(tmp_path, -25.0, faixa_min=0)
     assert leituras[0]["status_leitura"] == "falha_sensor"
+
+
+def test_falha_sensor_continua_nao_reconecta(tmp_path):
+    # laco 4-20 aberto: o modulo Modbus responde bem; reconectar a serial nao
+    # conserta nada e jogaria as leituras em sensor_offline (cooldown).
+    texto = CFG_RECONEXAO.replace(
+        "faixa_max: 100", "faixa_max: 100\n                map: {in: [4, 20], out: [0, 100]}")
+    p = tmp_path / "c_reconexao_ne43.yaml"
+    p.write_text(textwrap.dedent(texto))
+    backend = _BackendReconexao([_DriverFaixa(-25.0)])  # 0 mA
+    leitor = Leitor(config.carregar_config(p), backend=backend)
+    agora = datetime(2026, 7, 24, 0, 1, tzinfo=TZ)
+    status = [leitor.ler_todos(agora)[0]["status_leitura"] for _ in range(6)]
+    assert backend.criacoes == 1
+    assert status == ["falha_sensor"] * 6

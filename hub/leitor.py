@@ -110,7 +110,8 @@ class Leitor:
                     norm = self._normalizar(canal, float(entrada["value"]), "ok", agora)
                     ma = self._corrente_ma(canal, float(entrada["value"]))
                     if ma is not None and self._fora_ne43(ma):
-                        norm["status_leitura"] = "falha_sensor"; ruim = True
+                        # laco aberto: modulo responde, reconectar a serial nao ajuda -> nao seta ruim
+                        norm["status_leitura"] = "falha_sensor"
                     elif self._fora_da_faixa(canal, norm["valor"]):
                         norm["status_leitura"] = "suspeito"; ruim = True
                     out.append(norm)

@@ -844,3 +844,48 @@ def test_close_que_lanca_e_engolido_reconexao_prossegue(tmp_path):
 
     leituras3 = leitor.ler_todos(agora)  # ciclo 3: driver novo (bom) -> confirma reconexao completa
     assert leituras3[0]["status_leitura"] == "ok"
+
+
+# --- NAMUR NE43: corrente fora do envelope 3.6-21.0 mA vira falha_sensor ---
+
+def _cfg_ne43(tmp_path, map_in=(4, 20), map_out=(0, 100), faixa_min=None):
+    faixa = f"\n                faixa_min: {faixa_min}" if faixa_min is not None else ""
+    texto = CFG.replace("map: {in: [4, 20], out: [0, 100]}",
+                        f"map: {{in: [{map_in[0]}, {map_in[1]}], out: [{map_out[0]}, {map_out[1]}]}}{faixa}")
+    p = tmp_path / "c_ne43.yaml"
+    p.write_text(textwrap.dedent(texto))
+    return config.carregar_config(p)
+
+
+def _ler_ne43(tmp_path, valor, **kw):
+    driver = _DriverFaixa(valor)
+    leitor = Leitor(_cfg_ne43(tmp_path, **kw), backend=_BackendFake(driver))
+    return leitor.ler_todos(datetime(2026, 7, 24, 0, 1, tzinfo=TZ))
+
+
+def test_laco_aberto_4_20_vira_falha_sensor(tmp_path):
+    # 4-20 -> 0-100; -25.0 equivale a 0 mA (laco aberto)
+    leituras = _ler_ne43(tmp_path, -25.0)
+    assert leituras[0]["status_leitura"] == "falha_sensor"
+    assert leituras[0]["valor"] == -25.0
+
+
+def test_corrente_acima_de_21ma_vira_falha_sensor(tmp_path):
+    leituras = _ler_ne43(tmp_path, 112.5)  # 22 mA
+    assert leituras[0]["status_leitura"] == "falha_sensor"
+    assert leituras[0]["valor"] == 112.5
+
+
+def test_corrente_3_6ma_exato_nao_e_falha(tmp_path):
+    leituras = _ler_ne43(tmp_path, -2.5)  # 3.6 mA
+    assert leituras[0]["status_leitura"] == "ok"
+
+
+def test_canal_0_20_sem_gate_ne43(tmp_path):
+    leituras = _ler_ne43(tmp_path, 0.0, map_in=(0, 20))
+    assert leituras[0]["status_leitura"] == "ok"
+
+
+def test_falha_sensor_prevalece_sobre_faixa(tmp_path):
+    leituras = _ler_ne43(tmp_path, -25.0, faixa_min=0)
+    assert leituras[0]["status_leitura"] == "falha_sensor"

@@ -81,6 +81,22 @@ class Leitor:
             return True
         return False
 
+    @staticmethod
+    def _corrente_ma(canal, valor_eng):
+        """Inverte o map linear: valor de engenharia -> mA. None se o canal nao e 4-20."""
+        if canal.map_in is None or canal.map_out is None or tuple(canal.map_in) != (4, 20):
+            return None
+        out_min, out_max = canal.map_out
+        if out_max == out_min:
+            return None
+        return 4 + (valor_eng - out_min) * 16 / (out_max - out_min)
+
+    @staticmethod
+    def _fora_ne43(ma):
+        # arredonda p/ nao acusar falha por ruido de ponto flutuante nas bordas
+        ma = round(ma, 6)
+        return ma < 3.6 or ma > 21.0
+
     def _ler_device(self, disp, agora):
         try:
             lidos = disp.driver.ler(maps=self._specs(disp.canais))
@@ -92,7 +108,10 @@ class Leitor:
                     out.append(self._normalizar(canal, 0.0, "erro_leitura", agora)); ruim = True
                 else:
                     norm = self._normalizar(canal, float(entrada["value"]), "ok", agora)
-                    if self._fora_da_faixa(canal, norm["valor"]):
+                    ma = self._corrente_ma(canal, float(entrada["value"]))
+                    if ma is not None and self._fora_ne43(ma):
+                        norm["status_leitura"] = "falha_sensor"; ruim = True
+                    elif self._fora_da_faixa(canal, norm["valor"]):
                         norm["status_leitura"] = "suspeito"; ruim = True
                     out.append(norm)
             chave = id(disp)

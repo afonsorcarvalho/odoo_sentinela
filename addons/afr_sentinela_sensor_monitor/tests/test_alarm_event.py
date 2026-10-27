@@ -40,6 +40,19 @@ class TestAlarmEvent(TransactionCase):
         })
         self.assertEqual(event.status, 'aberto')
 
+    def test_cria_alarme_falha_sensor(self):
+        event = self.env['sensor_monitor.alarm.event'].create({
+            'sensor_id': self.sensor.id,
+            'area_id': self.area.id,
+            'coletor_id': self.coletor.id,
+            'timestamp_deteccao': '2026-07-16 03:14:00',
+            'tipo_violacao': 'falha_sensor',
+            'valor_lido': 0.0,
+            'limite_configurado_snapshot': 0.0,
+        })
+        self.assertEqual(event.tipo_violacao, 'falha_sensor')
+        self.assertEqual(event.status, 'aberto')
+
     def test_resolver_evento(self):
         event = self.env['sensor_monitor.alarm.event'].create({
             'sensor_id': self.sensor.id,

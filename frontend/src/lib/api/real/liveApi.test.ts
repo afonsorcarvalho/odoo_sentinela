@@ -116,6 +116,23 @@ describe('realLiveApi', () => {
     expect(cb).toHaveBeenCalledWith(expect.objectContaining({ alarm_state: 'crit' }))
   })
 
+  it('liveApi não converte unknown em ok: sem threshold -> alarm_state unknown', async () => {
+    vi.spyOn(metaApiModule.realMetaApi, 'getThreshold').mockResolvedValue(null)
+    const cb = vi.fn()
+    subscribe('SNR-9', cb)
+    await Promise.resolve()
+    MockEventSource.instances[0].onmessage?.({ data: JSON.stringify({ sensor_id: 'SNR-9', time: 1700000000000, valor: 15, status_leitura: 'ok' }) })
+    expect(cb).toHaveBeenCalledWith(expect.objectContaining({ alarm_state: 'unknown' }))
+  })
+
+  it('status_leitura falha_sensor vira alarm_state fault e e repassado no ponto', async () => {
+    const cb = vi.fn()
+    subscribe('SNR-1', cb)
+    await Promise.resolve()
+    MockEventSource.instances[0].onmessage?.({ data: JSON.stringify({ sensor_id: 'SNR-1', time: 1700000000000, valor: 15, status_leitura: 'falha_sensor' }) })
+    expect(cb).toHaveBeenCalledWith(expect.objectContaining({ alarm_state: 'fault', status_leitura: 'falha_sensor' }))
+  })
+
   it('unsubscribe de 1 sensor nao fecha o EventSource compartilhado enquanto outros seguem inscritos', async () => {
     const unsubA = subscribe('SNR-1', () => {})
     subscribe('SNR-2', () => {})

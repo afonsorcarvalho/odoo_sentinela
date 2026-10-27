@@ -516,4 +516,17 @@ describe('AreaCard', () => {
     })
     expect(screen.getByText('Pressão')).toBeInTheDocument()
   })
+
+  it('card em fault não mostra o valor numérico', () => {
+    const live = {
+      ...liveByCode,
+      'TEMP-EXP-01': { sensor_code: 'TEMP-EXP-01', ts: NOW_TS, value: -25, alarm_state: 'fault' as const, status_leitura: 'falha_sensor' as const },
+    }
+    render(
+      <AreaCard group={singleGroup} thresholdsByCode={thresholdsByCode} liveByCode={live}
+        selectedSensorCode={null} onSelectSensor={vi.fn()} hadAlarmToday={false} carouselIntervalMs={3000} />,
+    )
+    expect(screen.queryByText(/-25/)).not.toBeInTheDocument()
+    expect(screen.getAllByText('Sensor desconectado').length).toBeGreaterThan(0)
+  })
 })

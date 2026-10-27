@@ -1,6 +1,6 @@
-import { computeStatus, LABELS, type StatusResult } from '../lib/status'
+import { resolveStatus, stateLabel, type StatusResult } from '../lib/status'
 import type { AreaGroup } from '../lib/aggregateStatus'
-import type { AlarmState, HistoryResponse, LivePoint, Threshold, Window } from '../lib/types'
+import type { AlarmState, HistoryResponse, LivePoint, StatusLeitura, Threshold, Window } from '../lib/types'
 import { ToleranceRail } from './ToleranceRail'
 import { StatusIcon, statusTextColor } from './statusVisuals'
 import { WindowSelector } from './WindowSelector'
@@ -8,7 +8,7 @@ import { TimeSeriesChart } from './TimeSeriesChart'
 
 export function SensorDetailPanel({
   group, selectedCode, onSelectSensor, threshold, unidade, value, state,
-  window, onWindowChange, history, tail, status, now,
+  window, onWindowChange, history, tail, status, now, statusLeitura,
 }: {
   group: AreaGroup
   selectedCode: string
@@ -17,6 +17,7 @@ export function SensorDetailPanel({
   unidade: string
   value: number | null
   state?: AlarmState
+  statusLeitura?: StatusLeitura
   window: Window
   onWindowChange: (w: Window) => void
   history: HistoryResponse | undefined
@@ -28,11 +29,16 @@ export function SensorDetailPanel({
   now?: number
 }) {
   const selected = group.sensors.find((s) => s.sensor_code === selectedCode)
-  const derived: StatusResult =
-    value !== null
-      ? computeStatus(value, threshold)
-      : { state: 'unknown', label: LABELS.unknown, position: null }
-  const st = state ?? derived.state
+  const derived: StatusResult = resolveStatus(value, statusLeitura, threshold)
+  // O estado vindo do feed so e aceito se nao contradizer a precedencia:
+  // fault/invalid derivados do status_leitura e "sem limite" sempre vencem.
+  const st: StatusResult['state'] =
+    derived.state === 'fault' || derived.state === 'invalid' || !threshold
+      ? derived.state
+      : (state ?? derived.state)
+  // Instrumento em falha / leitura invalida: o numero nao e uma medicao --
+  // mostrar "—" + rotulo, nunca o valor cru (ex. -25 de laço aberto).
+  const hideValue = value === null || st === 'fault' || st === 'invalid'
 
   return (
     <div className="flex h-full flex-col rounded-md p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)' }}>
@@ -65,16 +71,21 @@ export function SensorDetailPanel({
 
       <div className="mt-4 flex items-end gap-2">
         <span className="font-mono text-5xl font-semibold leading-none tabular-nums md:text-6xl" style={{ color: 'var(--color-ink)' }}>
-          {value === null ? '—' : value.toFixed(1)}
+          {hideValue ? '—' : value.toFixed(1)}
         </span>
         <span className="pb-1 text-lg font-medium uppercase" style={{ color: 'var(--color-muted)' }}>{unidade}</span>
       </div>
       <div className="mt-2 flex items-center gap-2 text-sm font-semibold" style={{ color: statusTextColor(st) }}>
         <StatusIcon state={st} />
-        <span>{LABELS[st]}</span>
+        <span>{stateLabel(st, statusLeitura)}</span>
       </div>
+      {st === 'unknown' && !threshold && (
+        <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>
+          Sem limite configurado — defina no Odoo
+        </p>
+      )}
       <div className="mt-4">
-        <ToleranceRail position={derived.position} state={st} min={threshold?.limite_min} max={threshold?.limite_max} />
+        <ToleranceRail position={hideValue ? null : derived.position} state={st} min={threshold?.limite_min} max={threshold?.limite_max} />
       </div>
 
       <div className="mt-5 mb-3 flex justify-end">

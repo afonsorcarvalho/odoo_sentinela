@@ -1,4 +1,5 @@
 import type { AlarmEvent } from '../lib/types'
+import { VIOLACAO_LABEL } from '../lib/violacao'
 
 export function Toast({ alarm, areaName, onClose }: { alarm: AlarmEvent; areaName: string; onClose: () => void }) {
   const isResolucao = alarm.status === 'resolvido'
@@ -16,7 +17,9 @@ export function Toast({ alarm, areaName, onClose }: { alarm: AlarmEvent; areaNam
       </span>
       <div className="flex-1">
         <p className="text-sm font-semibold" style={{ color: 'var(--color-ink)' }}>{titulo}</p>
-        <p className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>{alarm.sensor_code}</p>
+        <p className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>{alarm.sensor_code}
+          {VIOLACAO_LABEL[alarm.tipo_violacao] ? ` · ${VIOLACAO_LABEL[alarm.tipo_violacao]}` : ''}
+        </p>
       </div>
       <button type="button" onClick={onClose} aria-label="Fechar" className="min-h-11 min-w-11 text-lg" style={{ color: 'var(--color-muted)' }}>
         ×

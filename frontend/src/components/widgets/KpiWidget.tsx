@@ -5,7 +5,8 @@ import { useCountUp } from '../../lib/useCountUp'
 import { useFitText } from '../../lib/useFitText'
 import { usePrefersReducedMotion } from '../../lib/useSensorCarousel'
 import { formatKpi, autoCasas } from '../../lib/kpiFormat'
-import { statusTextColor } from '../statusVisuals'
+import { StatusIcon, statusTextColor } from '../statusVisuals'
+import { stateLabel } from '../../lib/status'
 import { useNow } from '../../lib/useNow'
 import { freshness } from '../../lib/freshness'
 import { FreshnessBadge } from '../FreshnessBadge'
@@ -14,8 +15,8 @@ import type { StatusResult } from '../../lib/status'
 type State = StatusResult['state']
 
 // Ranking de severidade para a semântica `max()` do override de threshold:
-// quanto maior o índice, mais severo. unknown < ok < warn < crit.
-const SEVERITY_RANK: Record<State, number> = { unknown: 0, ok: 1, warn: 2, crit: 3 }
+// quanto maior o índice, mais severo. unknown < ok < invalid < warn < crit = fault.
+const SEVERITY_RANK: Record<State, number> = { unknown: 0, ok: 1, invalid: 2, warn: 3, crit: 4, fault: 4 }
 
 function maisSevero(a: State, b: State): State {
   return SEVERITY_RANK[b] > SEVERITY_RANK[a] ? b : a
@@ -49,8 +50,11 @@ export function KpiWidget({
   const unidade = meta.data?.unidade ?? ''
   const estadoBackend: State = last?.alarm_state ?? 'unknown'
   const temOverride = limiteMin != null || limiteMax != null
+  // fault/invalid: o valor não é medição -> sem número, sem override de faixa.
+  const instrumentoFalho = estadoBackend === 'fault' || estadoBackend === 'invalid'
   const foraDaFaixa =
     temOverride &&
+    !instrumentoFalho &&
     last != null &&
     ((limiteMin != null && last.value < limiteMin) || (limiteMax != null && last.value > limiteMax))
   const state: State = foraDaFaixa ? maisSevero(estadoBackend, 'crit') : estadoBackend
@@ -66,10 +70,10 @@ export function KpiWidget({
   const cor =
     tier !== 'fresh'
       ? 'var(--color-muted)'
-      : state === 'ok' || state === 'unknown'
+      : state === 'ok' || state === 'unknown' || state === 'invalid'
         ? 'var(--color-ink)'
         : statusTextColor(state)
-  const rawValue = last?.value ?? null
+  const rawValue = instrumentoFalho ? null : (last?.value ?? null)
   const animated = useCountUp(rawValue)
   const reducedMotion = usePrefersReducedMotion()
   // Formatação: casasDecimais/digitosInteiros vêm das options do widget; ausentes
@@ -108,6 +112,15 @@ export function KpiWidget({
           {titulo}
         </p>
         {tier !== 'fresh' && <FreshnessBadge tier={tier} ageMs={ageMs} />}
+        {instrumentoFalho && (
+          <span
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold"
+            style={{ color: statusTextColor(state) }}
+          >
+            <StatusIcon state={state} />
+            {stateLabel(state, last?.status_leitura)}
+          </span>
+        )}
       </div>
       {/* Caixa que ocupa toda a altura restante; o valor é centralizado e
           escalado por useFitText para preencher largura e altura, com uma

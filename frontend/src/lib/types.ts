@@ -24,8 +24,10 @@ export type DashboardConfig = {
   layout?: DashboardLayout | null
 }
 
+export type StatusLeitura = 'ok' | 'suspeito' | 'erro_leitura' | 'falha_sensor' | 'sensor_offline'
+
 export type HistoryPoint =
-  | { ts: number; value: number }
+  | { ts: number; value: number; status_leitura?: StatusLeitura }
   | { ts: number; min: number; max: number; avg: number }
 
 export type HistoryResponse = {
@@ -35,13 +37,14 @@ export type HistoryResponse = {
   points: HistoryPoint[]
 }
 
-export type AlarmState = 'ok' | 'warn' | 'crit'
+export type AlarmState = 'ok' | 'warn' | 'crit' | 'unknown' | 'fault' | 'invalid'
 
 export type LivePoint = {
   sensor_code: string
   ts: number
   value: number
   alarm_state: AlarmState
+  status_leitura?: StatusLeitura
 }
 
 // Estado da conexao de dados ao vivo (EventSource), derivado exclusivamente
@@ -50,7 +53,7 @@ export type LivePoint = {
 export type LiveConnectionState = 'live' | 'reconnecting' | 'offline'
 
 export type AlarmEventStatus = 'aberto' | 'reconhecido' | 'resolvido'
-export type AlarmTipoViolacao = 'acima_limite' | 'abaixo_limite' | 'sensor_offline' | 'erro_leitura'
+export type AlarmTipoViolacao = 'acima_limite' | 'abaixo_limite' | 'sensor_offline' | 'erro_leitura' | 'falha_sensor'
 
 // Evento de alarme empurrado ao vivo pelo mesmo SSE de /live (tipo:
 // 'alarme_ao_vivo'), distinto de AlarmEvent (que vem do REST /alarmes com

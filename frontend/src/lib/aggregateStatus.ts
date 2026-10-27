@@ -2,24 +2,28 @@ import type { FreshnessTier } from './freshness'
 import type { StatusResult } from './status'
 import type { LivePoint, SensorMeta, Threshold } from './types'
 
-// Estado a exibir para 1 sensor. Sem threshold configurado (ou sem dado ao
-// vivo ainda) -> 'unknown' ("Sem limite"), MESMO que o feed reporte
-// alarm_state 'ok' internamente — a convencao do liveApi mapeia
-// 'unknown'->'ok' na emissao (porque LivePoint.alarm_state nao tem variante
-// 'unknown'); aqui reconstruimos a distincao a partir do threshold, que e a
-// fonte de verdade sobre "esta configurado" e a UI PRECISA mostrar
-// corretamente (ver Global Constraints do plano).
+// Estado a exibir para 1 sensor. fault/invalid (status da leitura) vencem
+// sempre. Sem threshold configurado (ou sem dado ao vivo ainda) -> 'unknown'
+// ("Não avaliado"): o liveApi ja emite 'unknown' nesse caso, mas o threshold
+// e a fonte de verdade sobre "esta configurado" e pode ter chegado depois do
+// ponto -- por isso a checagem continua aqui.
 export function sensorDisplayState(
   threshold: Threshold | null,
   live: LivePoint | undefined,
 ): StatusResult['state'] {
-  if (!threshold || !live) return 'unknown'
+  if (!live) return 'unknown'
+  if (live.alarm_state === 'fault' || live.alarm_state === 'invalid') return live.alarm_state
+  if (!threshold) return 'unknown'
   return live.alarm_state
 }
 
-const SEVERITY: Record<StatusResult['state'], number> = { unknown: 0, ok: 1, warn: 2, crit: 3 }
+// fault empata com crit: instrumento em falha e tao grave quanto fora do
+// limite (nao se sabe o valor real). invalid fica abaixo de warn.
+export const SEVERITY: Record<StatusResult['state'], number> = {
+  unknown: 0, ok: 1, invalid: 2, warn: 3, crit: 4, fault: 4,
+}
 
-// Pior estado entre varios sensores (crit > warn > ok > unknown). Array vazio
+// Pior estado entre varios sensores (crit = fault > warn > invalid > ok > unknown). Array vazio
 // -> 'unknown' (nada para agregar).
 export function worstAlarmState(states: StatusResult['state'][]): StatusResult['state'] {
   if (states.length === 0) return 'unknown'

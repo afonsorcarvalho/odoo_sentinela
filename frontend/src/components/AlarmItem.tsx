@@ -1,4 +1,5 @@
 import type { AlarmEvent } from '../lib/types'
+import { isViolacaoInstrumento, VIOLACAO_LABEL } from '../lib/violacao'
 
 const TIPO_LABEL: Record<AlarmEvent['status'], string> = {
   aberto: 'NÃO CONFORMIDADE',
@@ -48,7 +49,9 @@ export function AlarmItem({
         {areaName} · {alarm.sensor_code}
       </p>
       <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--color-muted)' }}>
-        Valor lido {alarm.valor_lido} (limite {alarm.limite_configurado_snapshot})
+        {isViolacaoInstrumento(alarm.tipo_violacao)
+          ? (VIOLACAO_LABEL[alarm.tipo_violacao] ?? alarm.tipo_violacao)
+          : `Valor lido ${alarm.valor_lido} (limite ${alarm.limite_configurado_snapshot})`}
       </p>
       {alarm.timestamp_resolucao_sensor && (
         <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>

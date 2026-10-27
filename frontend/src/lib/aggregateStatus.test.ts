@@ -102,3 +102,20 @@ describe('groupSensorsByArea', () => {
     expect(groupSensorsByArea([])).toEqual([])
   })
 })
+
+describe('estados de falha/invalido', () => {
+  it('fault e invalid prevalecem sobre a ausencia de threshold', () => {
+    const p: LivePoint = { sensor_code: 'S', ts: 1, value: -25, alarm_state: 'fault', status_leitura: 'falha_sensor' }
+    expect(sensorDisplayState(null, p)).toBe('fault')
+    expect(sensorDisplayState(null, { ...p, alarm_state: 'invalid' })).toBe('invalid')
+  })
+  it('área com um sensor fault agrega como fault (severidade de crit)', () => {
+    expect(worstAlarmState(['ok', 'fault', 'warn'])).toBe('fault')
+    expect(areaAggregateState([{ display: 'ok', freshness: 'fresh' }, { display: 'fault', freshness: 'fresh' }])).toBe('fault')
+  })
+  it('ordem: unknown < ok < invalid < warn < crit', () => {
+    expect(worstAlarmState(['ok', 'invalid'])).toBe('invalid')
+    expect(worstAlarmState(['invalid', 'warn'])).toBe('warn')
+    expect(worstAlarmState(['unknown', 'ok'])).toBe('ok')
+  })
+})

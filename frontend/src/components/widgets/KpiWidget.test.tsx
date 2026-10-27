@@ -182,4 +182,17 @@ describe('KpiWidget', () => {
       expect(valor.style.color).toBe('var(--color-muted)')
     })
   })
+
+  it('fault: esconde o número (-25) e mostra "Sensor desconectado"', () => {
+    mockUseLiveTail.mockReturnValue({ last: { sensor_code: 'S', ts: 1_000_000, value: -25, alarm_state: 'fault', status_leitura: 'falha_sensor' } })
+    renderWithClient(<KpiWidget sensorCode="S" limiteMin={0} limiteMax={10} />)
+    expect(screen.queryByText(/-25/)).not.toBeInTheDocument()
+    expect(screen.getByText('Sensor desconectado')).toBeInTheDocument()
+  })
+  it('invalid: esconde o número e mostra "Leitura inválida"', () => {
+    mockUseLiveTail.mockReturnValue({ last: { sensor_code: 'S', ts: 1_000_000, value: 42, alarm_state: 'invalid', status_leitura: 'suspeito' } })
+    renderWithClient(<KpiWidget sensorCode="S" />)
+    expect(screen.queryByText(/42/)).not.toBeInTheDocument()
+    expect(screen.getByText('Leitura inválida')).toBeInTheDocument()
+  })
 })

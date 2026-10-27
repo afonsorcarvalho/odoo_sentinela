@@ -92,4 +92,31 @@ describe('SensorDetailPanel', () => {
     // TimeSeriesChart deve estar DENTRO do wrapper, nao como filho nu do painel.
     expect(chartWrapper.querySelector('div')).not.toBeNull()
   })
+
+  it('drawer em fault mostra "Sensor desconectado" e não mostra "-25.0"', () => {
+    render(
+      <SensorDetailPanel
+        group={group} selectedCode="TEMP-EXP-01" onSelectSensor={vi.fn()}
+        threshold={{ sensor_id: 'TEMP-EXP-01', limite_min: -30, limite_max: 26, is_valor_padrao_regulatorio: false }}
+        unidade="ppm" value={-25} state="fault" statusLeitura="falha_sensor"
+        window="24h" onWindowChange={vi.fn()} history={undefined} tail={[]}
+      />,
+    )
+    expect(screen.getByText('Sensor desconectado')).toBeInTheDocument()
+    expect(screen.queryByText('-25.0')).not.toBeInTheDocument()
+    expect(screen.queryByText('OK')).not.toBeInTheDocument()
+  })
+
+  it('sem limite mostra "Não avaliado" + ajuda, nunca OK', () => {
+    render(
+      <SensorDetailPanel
+        group={group} selectedCode="TEMP-EXP-01" onSelectSensor={vi.fn()}
+        threshold={null} unidade="°C" value={21} state="unknown" statusLeitura="ok"
+        window="24h" onWindowChange={vi.fn()} history={undefined} tail={[]}
+      />,
+    )
+    expect(screen.getByText('Não avaliado')).toBeInTheDocument()
+    expect(screen.getByText('Sem limite configurado — defina no Odoo')).toBeInTheDocument()
+    expect(screen.queryByText('OK')).not.toBeInTheDocument()
+  })
 })

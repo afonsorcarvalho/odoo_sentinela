@@ -67,4 +67,13 @@ describe('AlarmItem', () => {
     const li = screen.getByRole('listitem')
     expect(li.className).toMatch(/alarm-enter/)
   })
+
+  it('falha_sensor mostra "Falha do sensor" em vez de valor/limite', () => {
+    render(<AlarmItem alarm={makeAlarm({ tipo_violacao: 'falha_sensor' })} areaName="Expurgo" />)
+    expect(screen.getByText(/Falha do sensor/)).toBeInTheDocument()
+  })
+  it('sensor_offline mostra "Sem comunicação"', () => {
+    render(<AlarmItem alarm={makeAlarm({ tipo_violacao: 'sensor_offline' })} areaName="Expurgo" />)
+    expect(screen.getByText(/Sem comunicação/)).toBeInTheDocument()
+  })
 })

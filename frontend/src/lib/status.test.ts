@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStatus } from './status'
+import { computeStatus, resolveStatus } from './status'
 import type { Threshold } from './types'
 
 const t: Threshold = { sensor_id: 'S1', limite_min: 18, limite_max: 22, is_valor_padrao_regulatorio: true }
@@ -41,4 +41,29 @@ describe('computeStatus', () => {
     const r = computeStatus(21.6, t)
     expect(r.state).toBe('warn')
   })
+})
+
+describe('resolveStatus (precedencia status_leitura -> limite)', () => {
+  it('falha_sensor vira fault "Sensor desconectado" mesmo dentro do limite', () =>
+    expect(resolveStatus(20, 'falha_sensor', t)).toMatchObject({ state: 'fault', label: 'Sensor desconectado' }))
+  it('falha_sensor com -25 (laco aberto) vira fault', () =>
+    expect(resolveStatus(-25, 'falha_sensor', t)).toMatchObject({ state: 'fault', label: 'Sensor desconectado', position: null }))
+  it('sensor_offline vira fault "Sem comunicação"', () =>
+    expect(resolveStatus(20, 'sensor_offline', t)).toMatchObject({ state: 'fault', label: 'Sem comunicação' }))
+  it('suspeito/erro_leitura viram invalid "Leitura inválida"', () => {
+    expect(resolveStatus(20, 'suspeito', t)).toMatchObject({ state: 'invalid', label: 'Leitura inválida' })
+    expect(resolveStatus(20, 'erro_leitura', t)).toMatchObject({ state: 'invalid', label: 'Leitura inválida' })
+  })
+  it('sem limite e leitura ok vira unknown "Não avaliado", nunca ok', () => {
+    expect(resolveStatus(10, 'ok', null).state).toBe('unknown')
+    expect(resolveStatus(10, 'ok', null).label).toBe('Não avaliado')
+  })
+  it('falha prevalece mesmo sem limite', () =>
+    expect(resolveStatus(10, 'falha_sensor', null).state).toBe('fault'))
+  it('leitura ok com limite segue computeStatus', () => {
+    expect(resolveStatus(20, 'ok', t).state).toBe('ok')
+    expect(resolveStatus(30, undefined, t).state).toBe('crit')
+  })
+  it('valor null sem status vira unknown', () =>
+    expect(resolveStatus(null, undefined, t).state).toBe('unknown'))
 })

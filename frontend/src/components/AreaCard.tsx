@@ -8,7 +8,8 @@ import { useSensorCarousel, usePrefersReducedMotion } from '../lib/useSensorCaro
 import { DisconnectIcon, FreshnessBadge } from './FreshnessBadge'
 import { StatusChip } from './StatusChip'
 import { StatusDot } from './StatusDot'
-import { statusTextColor } from './statusVisuals'
+import { StatusIcon, statusTextColor } from './statusVisuals'
+import { stateLabel } from '../lib/status'
 import type { LivePoint, Threshold } from '../lib/types'
 
 // Janela de graca antes de escalar um sensor 'never' (nunca recebeu
@@ -26,6 +27,8 @@ const BORDER_COLOR: Record<ReturnType<typeof worstAlarmState>, string> = {
   warn: 'var(--color-warn)',
   crit: 'var(--color-crit)',
   unknown: 'var(--color-line)',
+  fault: 'var(--color-crit)',
+  invalid: 'var(--color-muted)',
 }
 
 type Sensor = AreaGroup['sensors'][number]
@@ -64,7 +67,9 @@ function AreaSensorReadout({
   // CONEXAO, nao mais o alarm_state antigo do ultimo valor conhecido.
   const dotState = fr === 'offline' ? 'crit' : state
   const opacity = valueOpacityFor(fr)
-  const rawValue = fr === 'offline' ? null : (live?.value ?? null)
+  // fault/invalid: o numero nao e medicao (ex. -25 de laço aberto) -> '—'.
+  const instrumentoFalho = state === 'fault' || state === 'invalid'
+  const rawValue = fr === 'offline' || instrumentoFalho ? null : (live?.value ?? null)
   const animated = useCountUp(rawValue)
   const displayValue = animated != null ? animated.toFixed(1) : '—'
   // O valor escala para preencher a caixa (largura e altura). Reajusta quando
@@ -88,13 +93,22 @@ function AreaSensorReadout({
         </span>
         {sensor.measurement_type.name}
         {fr !== 'fresh' && <FreshnessBadge tier={fr} ageMs={ageMs} />}
+        {instrumentoFalho && (
+          <span
+            className="inline-flex items-center gap-1 text-xs font-semibold"
+            style={{ color: statusTextColor(state) }}
+          >
+            <StatusIcon state={state} />
+            {stateLabel(state, live?.status_leitura)}
+          </span>
+        )}
       </span>
       <div ref={boxRef} className="flex min-h-0 flex-1 items-center overflow-hidden">
         <span
           ref={textRef}
           className="inline-block whitespace-nowrap font-mono font-bold leading-none tabular-nums"
           style={{
-            color: state === 'ok' || state === 'unknown' ? 'var(--color-ink)' : statusTextColor(state),
+            color: state === 'ok' || state === 'unknown' || state === 'invalid' ? 'var(--color-ink)' : statusTextColor(state),
             opacity,
           }}
         >

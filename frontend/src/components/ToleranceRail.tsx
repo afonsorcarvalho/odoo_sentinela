@@ -10,6 +10,8 @@ const DOT: Record<State, string> = {
   warn: 'var(--color-warn)',
   crit: 'var(--color-crit)',
   unknown: 'var(--color-muted)',
+  fault: 'var(--color-crit)',
+  invalid: 'var(--color-muted)',
 }
 
 function formatTick(n: number): string {

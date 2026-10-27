@@ -1,7 +1,7 @@
 import type { LiveApi } from '../contracts'
 import type { AlarmState, LiveAlarme, LiveConnectionState, LivePoint, Threshold } from '../../types'
 import { TOKEN_STORAGE_KEY } from '../../useAuth'
-import { computeStatus } from '../../status'
+import { resolveStatus } from '../../status'
 import { BASE_URL } from './http'
 import { realMetaApi } from './metaApi'
 
@@ -81,13 +81,15 @@ function ensureSharedSource(): EventSource {
       alarmeListeners.forEach((cb) => cb(alarme))
       return
     }
-    const { sensor_id, time, valor } = data
+    const { sensor_id, time, valor, status_leitura } = data
     const callbacks = subscribers.get(sensor_id)
     if (!callbacks || callbacks.size === 0) return
     const threshold = thresholdCache.get(sensor_id) ?? null
-    const { state } = computeStatus(valor, threshold)
-    const alarm_state: AlarmState = state === 'unknown' ? 'ok' : state
+    // Nunca mapear 'unknown'->'ok': sem limite e "Não avaliado"; e falha de
+    // instrumento vence o limite (ver resolveStatus).
+    const alarm_state: AlarmState = resolveStatus(valor, status_leitura, threshold).state
     const point: LivePoint = { sensor_code: sensor_id, ts: time, value: valor, alarm_state }
+    if (status_leitura) point.status_leitura = status_leitura
     callbacks.forEach((cb) => cb(point))
   }
   es.onopen = () => {

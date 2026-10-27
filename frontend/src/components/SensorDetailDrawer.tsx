@@ -71,6 +71,7 @@ export function SensorDetailDrawer({
   const { last, tail } = useLiveTail(sensorCode)
   const value = last?.value ?? null
   const state = last?.alarm_state
+  const statusLeitura = last?.status_leitura
 
   if (!group || !sensor) return null
 
@@ -114,6 +115,7 @@ export function SensorDetailDrawer({
                 unidade={sensor.unidade}
                 value={value}
                 state={state}
+                statusLeitura={statusLeitura}
                 window={window}
                 onWindowChange={setWindow}
                 history={history}

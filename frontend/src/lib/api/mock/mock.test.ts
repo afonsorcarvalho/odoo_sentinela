@@ -96,13 +96,13 @@ describe('mockLiveApi', () => {
     expect(states.has('crit')).toBe(true)
   })
 
-  it('TEMP-ARS-01 (sem threshold) sempre reporta ok, independente do valor', () => {
+  it('TEMP-ARS-01 (sem threshold) sempre reporta unknown (Não avaliado), nunca ok', () => {
     vi.useFakeTimers()
     const states = new Set<string>()
     const unsub = mockLiveApi.subscribe('TEMP-ARS-01', (p) => states.add(p.alarm_state))
     vi.advanceTimersByTime(20000)
     unsub()
-    expect([...states]).toEqual(['ok'])
+    expect([...states]).toEqual(['unknown'])
   })
 
   it('subscribeConnection emite "live" na inscricao e nunca muda (mock nao tem rede)', () => {

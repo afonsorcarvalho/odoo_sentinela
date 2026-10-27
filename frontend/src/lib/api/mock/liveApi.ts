@@ -34,7 +34,7 @@ export const mockLiveApi: LiveApi = {
       const value = +(mid + amp * Math.sin(i / 6)).toFixed(2)
       i++
       const state = computeStatus(value, threshold).state
-      const alarm_state = state === 'unknown' ? 'ok' : state
+      const alarm_state = state // sem limite -> 'unknown', nunca 'ok'
       // ts de relogio real (nao sintetico): consumido por freshness() contra
       // um `now` tambem real (useNow). Um ts fixo em 2023 faria todo sensor
       // parecer offline anos depois -- ver design doc A2, Dependencias #1.

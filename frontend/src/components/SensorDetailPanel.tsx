@@ -71,7 +71,7 @@ export function SensorDetailPanel({
 
       <div className="mt-4 flex items-end gap-2">
         <span className="font-mono text-5xl font-semibold leading-none tabular-nums md:text-6xl" style={{ color: 'var(--color-ink)' }}>
-          {hideValue || value === null ? '—' : value.toFixed(1)}
+          {hideValue ? '—' : value.toFixed(1)}
         </span>
         <span className="pb-1 text-lg font-medium uppercase" style={{ color: 'var(--color-muted)' }}>{unidade}</span>
       </div>

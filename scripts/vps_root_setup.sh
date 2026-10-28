@@ -79,7 +79,7 @@ cat > "$VHOST" <<EOF
     <LocationMatch "^/(web|odoo|websocket|mail|bus|report|longpolling|sentinela|verificar-autenticidade)(/|$)">
         FallbackResource disabled
     </LocationMatch>
-    ProxyPassMatch "^/((web|odoo|mail|bus|report|longpolling|sentinela|verificar-autenticidade)(/.*)?)$" http://127.0.0.1:$ODOO_PORT/\$1 timeout=600
+    ProxyPassMatch "^/((web|website|odoo|mail|bus|report|longpolling|sentinela|verificar-autenticidade)(/.*)?)$" http://127.0.0.1:$ODOO_PORT/\$1 timeout=600
     ProxyPassReverse / http://127.0.0.1:$ODOO_PORT/
 
     RequestHeader set X-Forwarded-Proto "https" env=HTTPS

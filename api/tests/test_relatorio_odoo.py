@@ -28,7 +28,7 @@ def tenant():
     remover_tenant(dados)
 
 
-def _evento(cliente, dados, deteccao, resolucao=None):
+def _evento(cliente, dados, deteccao, resolucao=None, manual=None):
     sensor = odoo_cliente.executar(
         cliente, 'sensor_monitor.sensor', 'read', [dados['sensor_id']], fields=['area_id'],
     )[0]
@@ -39,10 +39,12 @@ def _evento(cliente, dados, deteccao, resolucao=None):
         'valor_lido': 99.9,
         'tipo_violacao': 'acima_limite',
         'limite_configurado_snapshot': 30.0,
-        'status': 'resolvido' if resolucao else 'aberto',
+        'status': 'resolvido' if (resolucao or manual) else 'aberto',
     }
     if resolucao:
         valores['timestamp_resolucao_sensor'] = resolucao.strftime(_FMT)
+    if manual:
+        valores['data_resolucao'] = manual.strftime(_FMT)
     return odoo_cliente.executar(cliente, 'sensor_monitor.alarm.event', 'create', valores)
 
 
@@ -99,3 +101,19 @@ def test_nome_emissor_contem_login():
     cliente = get_cliente_servico()
     texto = nome_emissor(cliente)
     assert '(admin)' in texto
+
+
+def test_resolvido_manualmente_antes_do_periodo_nao_aparece(tenant):
+    cliente = get_cliente_servico()
+    inicio = datetime(2026, 3, 10, 3, 0, tzinfo=timezone.utc)
+    fim = inicio + timedelta(days=1)
+    _evento(cliente, tenant, inicio - timedelta(days=5), manual=inicio - timedelta(days=4))
+    assert alarmes_periodo(cliente, tenant['sensor_code'], inicio, fim) == []
+
+
+def test_resolvido_manualmente_dentro_do_periodo_aparece(tenant):
+    cliente = get_cliente_servico()
+    inicio = datetime(2026, 3, 10, 3, 0, tzinfo=timezone.utc)
+    fim = inicio + timedelta(days=1)
+    dentro = _evento(cliente, tenant, inicio - timedelta(days=5), manual=inicio + timedelta(hours=2))
+    assert [e['id'] for e in alarmes_periodo(cliente, tenant['sensor_code'], inicio, fim)] == [dentro]

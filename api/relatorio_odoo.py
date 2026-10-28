@@ -7,20 +7,28 @@ from .alarmes import _CAMPOS_EVENTO, _para_string_odoo, _serializar_evento
 _CAMPOS_LIMITE = ('limite_min', 'limite_max')
 
 
-def alarmes_periodo(cliente, sensor_code, inicio_utc, fim_utc):
-    """Alarmes do sensor que se sobrepõem a [inicio, fim): detectados antes do fim e
-    ainda abertos ou resolvidos a partir do início. Sem limite, ordenados por detecção."""
+def _sensor_id(cliente, sensor_code):
     sensor_ids = odoo_cliente.executar(
         cliente, 'sensor_monitor.sensor', 'search', [('sensor_code', '=', sensor_code)],
     )
     if not sensor_ids:
         raise ValueError(f"sensor '{sensor_code}' não encontrado")
+    return sensor_ids[0]
+
+
+def alarmes_periodo(cliente, sensor_code, inicio_utc, fim_utc):
+    """Alarmes do sensor que se sobrepõem a [inicio, fim): detectados antes do fim e
+    ainda abertos ou resolvidos a partir do início. Sem limite, ordenados por detecção."""
+    sensor_id = _sensor_id(cliente, sensor_code)
+    inicio = _para_string_odoo(inicio_utc)
     dominio = [
-        ('sensor_id', '=', sensor_ids[0]),
+        ('sensor_id', '=', sensor_id),
         ('timestamp_deteccao', '<', _para_string_odoo(fim_utc)),
-        '|',
-        ('timestamp_resolucao_sensor', '=', False),
-        ('timestamp_resolucao_sensor', '>=', _para_string_odoo(inicio_utc)),
+        # fim do alarme = saída do sensor, senão resolução manual; aberto só se ambos vazios
+        '|', '|',
+        '&', ('timestamp_resolucao_sensor', '=', False), ('data_resolucao', '=', False),
+        ('timestamp_resolucao_sensor', '>=', inicio),
+        '&', ('timestamp_resolucao_sensor', '=', False), ('data_resolucao', '>=', inicio),
     ]
     eventos = odoo_cliente.executar(
         cliente, 'sensor_monitor.alarm.event', 'search_read', dominio,
@@ -32,7 +40,7 @@ def alarmes_periodo(cliente, sensor_code, inicio_utc, fim_utc):
     areas = odoo_cliente.executar(
         cliente, 'sensor_monitor.area', 'read', area_ids, fields=['area_code'],
     )
-    sensores_por_id = {sensor_ids[0]: {'sensor_code': sensor_code}}
+    sensores_por_id = {sensor_id: {'sensor_code': sensor_code}}
     areas_por_id = {a['id']: a for a in areas}
     return [_serializar_evento(e, sensores_por_id, areas_por_id) for e in eventos]
 
@@ -40,13 +48,9 @@ def alarmes_periodo(cliente, sensor_code, inicio_utc, fim_utc):
 def alteracoes_limite(cliente, sensor_code, desde_utc):
     """Alterações de limite_min/limite_max do threshold do sensor feitas a partir de
     `desde_utc`, lidas do histórico de tracking do Odoo, em ordem cronológica."""
-    sensor_ids = odoo_cliente.executar(
-        cliente, 'sensor_monitor.sensor', 'search', [('sensor_code', '=', sensor_code)],
-    )
-    if not sensor_ids:
-        raise ValueError(f"sensor '{sensor_code}' não encontrado")
+    sensor_id = _sensor_id(cliente, sensor_code)
     threshold_ids = odoo_cliente.executar(
-        cliente, 'sensor_monitor.alarm.threshold', 'search', [('sensor_id', '=', sensor_ids[0])],
+        cliente, 'sensor_monitor.alarm.threshold', 'search', [('sensor_id', '=', sensor_id)],
     )
     if not threshold_ids:
         return []

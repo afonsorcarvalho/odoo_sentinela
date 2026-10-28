@@ -102,3 +102,11 @@ def nome_emissor(cliente):
         cliente, 'res.users', 'read', [cliente.uid], fields=['name', 'login'],
     )[0]
     return f"{usuario['name']} ({usuario['login']})"
+
+
+def nome_cliente(cliente):
+    """Nome da empresa (res.company) do usuário da sessão."""
+    usuario = odoo_cliente.executar(
+        cliente, 'res.users', 'read', [cliente.uid], fields=['company_id'],
+    )[0]
+    return usuario['company_id'][1]

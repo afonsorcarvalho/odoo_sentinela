@@ -3,7 +3,7 @@ import os
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from ingestao import odoo_cliente
 from ingestao.timescale import conectar
@@ -12,7 +12,8 @@ from .auth import get_cliente_usuario, verificar_token
 from .meta import obter_sensor, obter_threshold
 from .permissions import obter_sites_permitidos
 from .relatorio_dados import TZ, buscar_buckets, granularidade, intervalo_utc
-from .relatorio_odoo import alarmes_periodo, alteracoes_limite, nome_emissor
+from .relatorio_odoo import alarmes_periodo, alteracoes_limite, nome_cliente, nome_emissor
+from .relatorio_pdf import gerar_pdf, slug
 
 router = APIRouter()
 
@@ -119,6 +120,14 @@ def montar_relatorio(cliente, sensores: list[str], inicio: date, fim: date) -> d
     }
 
 
+def _montar_ou_http(cliente, sensores: str, inicio: date, fim: date) -> dict:
+    codigos = [c.strip() for c in sensores.split(',') if c.strip()]
+    try:
+        return montar_relatorio(cliente, codigos, inicio, fim)
+    except RelatorioErro as erro:
+        raise HTTPException(status_code=erro.status_code, detail=erro.detail)
+
+
 @router.get('/relatorio')
 def get_relatorio(
     sensores: str,
@@ -127,8 +136,21 @@ def get_relatorio(
     cliente=Depends(get_cliente_usuario),
     _claims=Depends(verificar_token),
 ):
-    codigos = [c.strip() for c in sensores.split(',') if c.strip()]
-    try:
-        return montar_relatorio(cliente, codigos, inicio, fim)
-    except RelatorioErro as erro:
-        raise HTTPException(status_code=erro.status_code, detail=erro.detail)
+    return _montar_ou_http(cliente, sensores, inicio, fim)
+
+
+@router.get('/relatorio.pdf')
+def get_relatorio_pdf(
+    sensores: str,
+    inicio: date,
+    fim: date,
+    cliente=Depends(get_cliente_usuario),
+    _claims=Depends(verificar_token),
+):
+    relatorio = _montar_ou_http(cliente, sensores, inicio, fim)
+    nome = nome_cliente(cliente)
+    arquivo = f'relatorio_{slug(nome)}_{inicio.isoformat()}_{fim.isoformat()}.pdf'
+    return Response(
+        content=gerar_pdf(relatorio, nome), media_type='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{arquivo}"'},
+    )

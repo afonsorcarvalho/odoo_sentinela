@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import (alarmes, arquivos_router, auth, config, config_publish_router, config_report,
-               historico, live, live_listener, meta, presenca, verificacao_router)
+               historico, live, live_listener, meta, presenca, relatorio, verificacao_router)
 
 app = FastAPI(title='Sentinela API')
 
@@ -28,6 +28,7 @@ app.include_router(config.router)
 app.include_router(config_publish_router.router)
 app.include_router(meta.router)
 app.include_router(historico.router)
+app.include_router(relatorio.router)
 app.include_router(live.router)
 app.include_router(verificacao_router.router)
 

@@ -137,3 +137,11 @@ def test_imagem_raster_aceita_png_jpeg_e_rejeita_svg():
     assert _imagem_raster(base64.b64encode(jpg)) == jpg
     assert _imagem_raster(base64.b64encode(svg)) is None
     assert _imagem_raster(False) is None
+
+
+def test_empresa_cliente_usa_dono_do_site_dos_sensores(tenant):
+    from api.relatorio_odoo import empresa_cliente
+    cliente = get_cliente_servico()
+    esperado = odoo_cliente.executar(cliente, 'res.partner', 'read', [tenant['partner_id']], fields=['name'])[0]
+    nome, _ = empresa_cliente(cliente, [tenant['sensor_code']])
+    assert nome == esperado['name'] != 'Serviço Sentinela'

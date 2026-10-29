@@ -148,7 +148,7 @@ def get_relatorio_pdf(
     _claims=Depends(verificar_token),
 ):
     relatorio = _montar_ou_http(cliente, sensores, inicio, fim)
-    nome, logo = empresa_cliente(cliente)
+    nome, logo = empresa_cliente(cliente, [s['sensor_code'] for s in relatorio['sensores']])
     arquivo = f'relatorio_{slug(nome)}_{inicio.isoformat()}_{fim.isoformat()}.pdf'
     return Response(
         content=gerar_pdf(relatorio, nome, logo=logo), media_type='application/pdf',

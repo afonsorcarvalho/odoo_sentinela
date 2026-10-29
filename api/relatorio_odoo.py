@@ -113,21 +113,45 @@ def _imagem_raster(b64):
     return dados if dados[:8] == b'\x89PNG\r\n\x1a\n' or dados[:3] == b'\xff\xd8\xff' else None
 
 
-def empresa_cliente(cliente):
-    """Nome e logo do cliente (parceiro comercial do usuário da sessão).
+def _parceiro_dos_sensores(cliente, sensor_codes):
+    """Cliente (res.partner) dono dos sites dos sensores; None se não houver exatamente um."""
+    if not sensor_codes:
+        return None
+    sensores = odoo_cliente.executar(
+        cliente, 'sensor_monitor.sensor', 'search_read', [('sensor_code', 'in', list(sensor_codes))],
+        fields=['area_id'],
+    )
+    area_ids = list({s['area_id'][0] for s in sensores if s['area_id']})
+    if not area_ids:
+        return None
+    areas = odoo_cliente.executar(cliente, 'sensor_monitor.area', 'read', area_ids, fields=['site_id'])
+    site_ids = list({a['site_id'][0] for a in areas if a['site_id']})
+    if not site_ids:
+        return None
+    sites = odoo_cliente.executar(cliente, 'sensor_monitor.site', 'read', site_ids, fields=['partner_id'])
+    parceiros = {st['partner_id'][0] for st in sites if st['partner_id']}
+    return parceiros.pop() if len(parceiros) == 1 else None
 
-    Sem imagem no cliente, cai no logo da empresa Odoo (res.company) — a marca Sentinela.
+
+def empresa_cliente(cliente, sensor_codes=()):
+    """Nome e logo do cliente do relatório.
+
+    Cliente = parceiro dono dos sites dos sensores; se não for único, o parceiro comercial do
+    usuário da sessão. Sem imagem no cliente, cai no logo da empresa Odoo (res.company).
     """
     usuario = odoo_cliente.executar(
         cliente, 'res.users', 'read', [cliente.uid], fields=['partner_id', 'company_id'],
     )[0]
-    parceiro = odoo_cliente.executar(
-        cliente, 'res.partner', 'read', [usuario['partner_id'][0]], fields=['commercial_partner_id'],
-    )[0]
-    comercial_id, nome = parceiro['commercial_partner_id']
+    parceiro_id = _parceiro_dos_sensores(cliente, sensor_codes)
+    if parceiro_id is None:
+        parceiro = odoo_cliente.executar(
+            cliente, 'res.partner', 'read', [usuario['partner_id'][0]], fields=['commercial_partner_id'],
+        )[0]
+        parceiro_id = parceiro['commercial_partner_id'][0]
     comercial = odoo_cliente.executar(
-        cliente, 'res.partner', 'read', [comercial_id], fields=['image_1920'],
+        cliente, 'res.partner', 'read', [parceiro_id], fields=['name', 'image_1920'],
     )[0]
+    nome = comercial['name']
     logo = _imagem_raster(comercial.get('image_1920'))
     if logo is None:
         empresa = odoo_cliente.executar(

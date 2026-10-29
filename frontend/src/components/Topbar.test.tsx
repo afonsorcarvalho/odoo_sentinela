@@ -59,4 +59,9 @@ describe('Topbar', () => {
     const badge = screen.getByText('AO VIVO').closest('span[role="status"]')
     expect(badge).toHaveAttribute('aria-live', 'polite')
   })
+
+  it('tem link para Relatórios', () => {
+    render(wrap(<Topbar healthy unitName="X" liveState="live" />))
+    expect(screen.getByRole('link', { name: 'Relatórios' })).toHaveAttribute('href', '/relatorios')
+  })
 })

@@ -1,3 +1,4 @@
+import { NavLink } from 'react-router'
 import { ThemeToggle } from './ThemeToggle'
 import { LogoutButton } from './LogoutButton'
 import { LiveClock } from './LiveClock'
@@ -59,6 +60,26 @@ export function Topbar({
       >
         {unitName}
       </span>
+
+      <nav aria-label="Principal" className="flex items-center gap-1 text-sm font-semibold">
+        {[
+          { to: '/', label: 'Painel' },
+          { to: '/relatorios', label: 'Relatórios' },
+        ].map((l) => (
+          <NavLink
+            key={l.to}
+            to={l.to}
+            end
+            className="rounded-md px-3 py-1.5 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
+            style={({ isActive }) => ({
+              color: isActive ? 'var(--color-primary)' : 'var(--color-muted)',
+              background: isActive ? 'var(--color-panel)' : undefined,
+            })}
+          >
+            {l.label}
+          </NavLink>
+        ))}
+      </nav>
 
       <div className="ml-auto flex items-center gap-3">
         {healthy && (

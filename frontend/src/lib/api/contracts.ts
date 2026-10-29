@@ -30,3 +30,46 @@ export type ConfigApi = {
   getConfig(): Promise<DashboardConfig>
   saveLayout(layout: DashboardLayout): Promise<{ layout: DashboardLayout }>
 }
+
+export type Granularidade = 'hora' | 'dia' | 'mes'
+export type ReportBucketEstado = 'ok' | 'falha_instrumento' | 'sem_dados'
+export type ReportBucket = {
+  bucket: string // ISO com offset local (America/Sao_Paulo)
+  avg: number | null
+  min: number | null
+  max: number | null
+  n_ok: number
+  n_falha: number
+  estado: ReportBucketEstado
+  fora_limite: boolean
+}
+export type ReportLimiteAlteracao = {
+  quando: string // ISO UTC
+  campo: string // 'limite_min' | 'limite_max'
+  de: number | null
+  para: number | null
+}
+export type ReportSensor = {
+  sensor_code: string
+  nome: string
+  unidade: string
+  site: string | null
+  limites: { limite_min: number | null; limite_max: number | null } | null
+  alteracoes_limite: ReportLimiteAlteracao[]
+  buckets: ReportBucket[]
+  alarmes: AlarmEvent[]
+}
+export type Report = {
+  inicio: string // AAAA-MM-DD
+  fim: string
+  granularidade: Granularidade
+  fuso: string
+  emitido_em: string
+  emissor: string
+  sensores: ReportSensor[]
+}
+export type ReportParams = { sensores: string[]; inicio: string; fim: string }
+export type ReportApi = {
+  getReport(p: ReportParams): Promise<Report>
+  getReportPdf(p: ReportParams): Promise<Blob>
+}

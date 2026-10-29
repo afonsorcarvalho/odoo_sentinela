@@ -4,6 +4,7 @@ import re
 import unicodedata
 import calendar
 from datetime import date, datetime, timezone
+from typing import Optional
 from xml.sax.saxutils import escape
 from zoneinfo import ZoneInfo
 
@@ -13,7 +14,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas as rl_canvas
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import KeepTogether
 
 _MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -294,14 +296,31 @@ class _CanvasNumerado(rl_canvas.Canvas):
         super().save()
 
 
-def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True) -> bytes:
+def _logo_flowable(logo: Optional[bytes]):
+    """Logo da empresa (PNG/JPEG) limitado a 5x2 cm; None se ausente ou ilegível."""
+    if not logo:
+        return None
+    try:
+        leitor = ImageReader(io.BytesIO(logo))
+        larg, alt = leitor.getSize()
+    except Exception:
+        return None
+    escala = min(5 * cm / larg, 2 * cm / alt)
+    img = Image(io.BytesIO(logo), width=larg * escala, height=alt * escala)
+    img.hAlign = 'LEFT'
+    return img
+
+
+def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True, logo: Optional[bytes] = None) -> bytes:
     tz = ZoneInfo(relatorio['fuso'])
     est = _estilos()
     gran = relatorio['granularidade']
     emitido = datetime.fromisoformat(relatorio['emitido_em']).astimezone(tz)
     rodape = f"{cliente_nome} — Relatório de período {_data_iso(relatorio['inicio'])} a {_data_iso(relatorio['fim'])}"
 
-    story = [
+    logo_img = _logo_flowable(logo)
+    story = [logo_img, Spacer(1, 0.3 * cm)] if logo_img else []
+    story += [
         Paragraph('Relatório de monitoramento', est['titulo']),
         Paragraph(f"<b>Cliente:</b> {escape(cliente_nome)}", est['corpo']),
         Paragraph(f"<b>Período:</b> {_data_iso(relatorio['inicio'])} – {_data_iso(relatorio['fim'])}", est['corpo']),

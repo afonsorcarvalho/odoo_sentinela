@@ -164,3 +164,27 @@ def test_pdf_mes_completo_sem_nota():
 def test_pdf_mes_unico_parcial():
     t = _texto(gerar_pdf(_rel_mes('2026-01-05', '2026-01-20', ['2026-01']), 'X', compress=False))
     assert 'Mês parcial: dados de 05/01/2026 a 20/01/2026.' in t
+
+
+
+def _png_bytes():
+    import base64
+    # PNG 2x1 vermelho, gerado offline.
+    return base64.b64decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAEElEQVR4nGP4z8DAwMDAAAAHBAEAXp0n5wAAAABJRU5ErkJggg==')
+
+
+def test_pdf_com_logo_embute_imagem():
+    pdf = gerar_pdf(_relatorio(), 'X', compress=False, logo=_png_bytes())
+    assert b'/Subtype /Image' in pdf
+
+
+def test_pdf_sem_logo_sem_imagem():
+    pdf = gerar_pdf(_relatorio(), 'X', compress=False)
+    assert b'/Subtype /Image' not in pdf
+
+
+def test_pdf_logo_invalido_nao_quebra():
+    pdf = gerar_pdf(_relatorio(), 'X', compress=False, logo=b'nao e imagem')
+    assert pdf.startswith(b'%PDF')
+    assert b'/Subtype /Image' not in pdf

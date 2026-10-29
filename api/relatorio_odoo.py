@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timezone
 
 from ingestao import odoo_cliente
@@ -104,9 +105,12 @@ def nome_emissor(cliente):
     return f"{usuario['name']} ({usuario['login']})"
 
 
-def nome_cliente(cliente):
-    """Nome da empresa (res.company) do usuário da sessão."""
+def empresa_cliente(cliente):
+    """Nome e logo (bytes PNG/JPEG, ou None) da empresa (res.company) do usuário da sessão."""
     usuario = odoo_cliente.executar(
         cliente, 'res.users', 'read', [cliente.uid], fields=['company_id'],
     )[0]
-    return usuario['company_id'][1]
+    empresa_id, nome = usuario['company_id']
+    empresa = odoo_cliente.executar(cliente, 'res.company', 'read', [empresa_id], fields=['logo'])[0]
+    logo = base64.b64decode(empresa['logo']) if empresa.get('logo') else None
+    return nome, logo

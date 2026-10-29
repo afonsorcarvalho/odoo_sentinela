@@ -12,7 +12,7 @@ from .auth import get_cliente_usuario, verificar_token
 from .meta import obter_sensor, obter_threshold
 from .permissions import obter_sites_permitidos
 from .relatorio_dados import TZ, buscar_buckets, granularidade, intervalo_utc
-from .relatorio_odoo import alarmes_periodo, alteracoes_limite, nome_cliente, nome_emissor
+from .relatorio_odoo import alarmes_periodo, alteracoes_limite, empresa_cliente, nome_emissor
 from .relatorio_pdf import gerar_pdf, slug
 
 router = APIRouter()
@@ -148,9 +148,9 @@ def get_relatorio_pdf(
     _claims=Depends(verificar_token),
 ):
     relatorio = _montar_ou_http(cliente, sensores, inicio, fim)
-    nome = nome_cliente(cliente)
+    nome, logo = empresa_cliente(cliente)
     arquivo = f'relatorio_{slug(nome)}_{inicio.isoformat()}_{fim.isoformat()}.pdf'
     return Response(
-        content=gerar_pdf(relatorio, nome), media_type='application/pdf',
+        content=gerar_pdf(relatorio, nome, logo=logo), media_type='application/pdf',
         headers={'Content-Disposition': f'attachment; filename="{arquivo}"'},
     )

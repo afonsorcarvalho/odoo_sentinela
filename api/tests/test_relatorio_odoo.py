@@ -117,3 +117,11 @@ def test_resolvido_manualmente_dentro_do_periodo_aparece(tenant):
     fim = inicio + timedelta(days=1)
     dentro = _evento(cliente, tenant, inicio - timedelta(days=5), manual=inicio + timedelta(hours=2))
     assert [e['id'] for e in alarmes_periodo(cliente, tenant['sensor_code'], inicio, fim)] == [dentro]
+
+
+def test_empresa_cliente_retorna_nome_e_logo():
+    from api.relatorio_odoo import empresa_cliente
+    from api.odoo import get_cliente_servico
+    nome, logo = empresa_cliente(get_cliente_servico())
+    assert isinstance(nome, str) and nome
+    assert logo is None or isinstance(logo, bytes)

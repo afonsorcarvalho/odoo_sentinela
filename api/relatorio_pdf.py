@@ -15,7 +15,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import KeepTogether
 
 _MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -31,8 +31,11 @@ _COR_LINHA = colors.HexColor('#1f4e79')
 _COR_FAIXA = colors.HexColor('#cfe0f1')
 _COR_LIMITE = colors.HexColor('#b3261e')
 _COR_FORA = colors.HexColor('#f8d7da')
-_COR_CAB = colors.HexColor('#e6e9ee')
-_COR_GRADE = colors.HexColor('#d0d4da')
+_COR_CAB = colors.HexColor('#1b2a3a')
+_COR_GRADE = colors.HexColor('#b8c0ca')
+_COR_ZEBRA = colors.HexColor('#f3f5f8')
+_COR_ROTULO = colors.HexColor('#e9edf2')
+_TITULO_DOC = 'RELATÓRIO DE REGISTRO DE MONITORAMENTO'
 
 _LARGURA = A4[0] - 4 * cm
 
@@ -170,18 +173,26 @@ def _grafico(s, gran) -> Drawing:
     return d
 
 
-def _tabela(s, gran, estilos):
-    cab = ['Período', f"Média ({s['unidade']})", 'Mín', 'Máx', 'Leituras', 'Falhas']
-    linhas = [cab]
+def _estilo_tabela(n_linhas):
     cmds = [
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('BACKGROUND', (0, 0), (-1, 0), _COR_CAB),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.3, _COR_GRADE),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('BOX', (0, 0), (-1, -1), 0.8, _COR_CAB),
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, _COR_GRADE),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
     ]
+    cmds += [('BACKGROUND', (0, r), (-1, r), _COR_ZEBRA) for r in range(2, n_linhas, 2)]
+    return cmds
+
+
+def _tabela(s, gran, estilos):
+    cab = ['Período', f"Média ({s['unidade']})", 'Mín', 'Máx', 'Leituras', 'Falhas']
+    linhas = [cab]
+    cmds = _estilo_tabela(len(s['buckets']) + 1) + [('ALIGN', (1, 0), (-1, -1), 'RIGHT')]
     for r, b in enumerate(s['buckets'], start=1):
         rot = rotulo_bucket(b['bucket'], gran)
         if b['estado'] == 'sem_dados':
@@ -205,7 +216,8 @@ def _tabela(s, gran, estilos):
 def _alarmes(s, tz, estilos):
     if not s['alarmes']:
         return [Paragraph('Nenhum alarme no período.', estilos['corpo'])]
-    linhas = [['Detectado em', 'Tipo', 'Valor lido', 'Status', 'Saiu do alarme em', 'Resolvido em']]
+    linhas = [[Paragraph(f'<font color="white"><b>{t}</b></font>', estilos['cel']) for t in
+               ('Detectado em', 'Tipo', 'Valor lido', 'Status', 'Saiu do alarme em', 'Resolvido em')]]
     for a in s['alarmes']:
         sensor = _local(a['timestamp_resolucao_sensor'], tz)
         resol = _local(a['data_resolucao'], tz)
@@ -218,29 +230,65 @@ def _alarmes(s, tz, estilos):
             _data_hora(sensor) if sensor else '—',
             _data_hora(resol) if resol else '—',
         ])
-    return [Table(linhas, repeatRows=1, style=TableStyle([
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 0), (-1, 0), _COR_CAB),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.3, _COR_GRADE),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]), colWidths=[3 * cm, 3 * cm, 2 * cm, 2.4 * cm, 3.3 * cm, 3.3 * cm])]
+    return [Table(linhas, repeatRows=1, style=TableStyle(_estilo_tabela(len(linhas))), colWidths=[3 * cm, 3 * cm, 2 * cm, 2.4 * cm, 3.3 * cm, 3.3 * cm])]
 
 
 def _estilos():
     base = getSampleStyleSheet()
     return {
-        'titulo': ParagraphStyle('titulo', parent=base['Title'], fontSize=17, alignment=0, spaceAfter=6),
-        'h2': ParagraphStyle('h2', parent=base['Heading2'], fontSize=13, spaceAfter=2),
-        'h3': ParagraphStyle('h3', parent=base['Heading3'], fontSize=10, spaceBefore=8, spaceAfter=3,
-                             keepWithNext=1),
-        'corpo': ParagraphStyle('corpo', parent=base['Normal'], fontSize=9, leading=12),
+        'titulo': ParagraphStyle('titulo', parent=base['Title'], fontName='Helvetica-Bold', fontSize=13,
+                                 alignment=1, spaceAfter=2, textColor=_COR_CAB),
+        'subtitulo': ParagraphStyle('subtitulo', parent=base['Normal'], fontSize=8.5, alignment=1,
+                                    textColor=colors.HexColor('#4a5968'), spaceAfter=10),
+        'secao': ParagraphStyle('secao', parent=base['Normal'], fontName='Helvetica-Bold', fontSize=10.5,
+                                textColor=colors.white, backColor=_COR_CAB, borderPadding=(4, 5, 4, 5),
+                                spaceBefore=10, spaceAfter=8, keepWithNext=1),
+        'h2': ParagraphStyle('h2', parent=base['Normal'], fontName='Helvetica-Bold', fontSize=10,
+                             textColor=_COR_CAB, backColor=_COR_ROTULO, borderColor=_COR_CAB,
+                             borderWidth=0.6, borderPadding=(4, 5, 4, 5),
+                             spaceBefore=4, spaceAfter=8, keepWithNext=1),
+        'h3': ParagraphStyle('h3', parent=base['Normal'], fontName='Helvetica-Bold', fontSize=9.5,
+                             textColor=_COR_CAB, spaceBefore=10, spaceAfter=4, keepWithNext=1),
+        'corpo': ParagraphStyle('corpo', parent=base['Normal'], fontSize=9, leading=12, alignment=4),
         'aviso': ParagraphStyle('aviso', parent=base['Normal'], fontSize=8.5, leading=11,
                                 textColor=colors.HexColor('#7a4b00'), backColor=colors.HexColor('#fff3cd'),
-                                borderPadding=3, spaceAfter=4),
-        'cel': ParagraphStyle('cel', parent=base['Normal'], fontSize=8, leading=9),
-        'peq': ParagraphStyle('peq', parent=base['Normal'], fontSize=7.5, textColor=colors.grey),
+                                borderColor=colors.HexColor('#e0b84f'), borderWidth=0.5,
+                                borderPadding=3, spaceAfter=5),
+        'cel': ParagraphStyle('cel', parent=base['Normal'], fontSize=8, leading=9.5),
+        'rotulo': ParagraphStyle('rotulo', parent=base['Normal'], fontName='Helvetica-Bold', fontSize=8,
+                                 leading=10, textColor=_COR_CAB),
+        'peq': ParagraphStyle('peq', parent=base['Normal'], fontSize=7.5, leading=9.5,
+                              textColor=colors.HexColor('#4a5968'), spaceBefore=2),
+        'assin': ParagraphStyle('assin', parent=base['Normal'], fontSize=8.5, leading=11, alignment=1),
     }
+
+
+def _quadro(pares, estilos, larguras=None):
+    """Quadro rotulo/valor em 2 pares por linha (estilo ficha de registro)."""
+    cel = lambda t: Paragraph(t, estilos['cel'])
+    linhas = []
+    for i in range(0, len(pares), 2):
+        linha = []
+        for rot, val in pares[i:i + 2]:
+            linha += [Paragraph(rot.upper(), estilos['rotulo']), cel(val)]
+        while len(linha) < 4:
+            linha += ['', '']
+        linhas.append(linha)
+    larguras = larguras or [3.3 * cm, 5.2 * cm, 3.3 * cm, 5.2 * cm]
+    return Table(linhas, colWidths=larguras, style=TableStyle([
+        ('BOX', (0, 0), (-1, -1), 0.8, _COR_CAB),
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, _COR_GRADE),
+        ('BACKGROUND', (0, 0), (0, -1), _COR_ROTULO),
+        ('BACKGROUND', (2, 0), (2, -1), _COR_ROTULO),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
+    ]))
+
+
+def numero_documento(relatorio: dict) -> str:
+    emitido = datetime.fromisoformat(relatorio['emitido_em']).astimezone(ZoneInfo(relatorio['fuso']))
+    return f'REL-{emitido:%Y%m%d-%H%M%S}'
 
 
 def _aviso_limite(a, tz, fim: str) -> str:
@@ -273,31 +321,53 @@ def _notas_mes(relatorio: dict) -> list:
 
 
 class _CanvasNumerado(rl_canvas.Canvas):
-    """Canvas que conhece o total de paginas, para o rodape 'Página X de Y'."""
+    """Canvas com cabecalho institucional e rodape 'Página X de Y' em todas as paginas."""
 
-    def __init__(self, *args, rodape='', **kwargs):
+    def __init__(self, *args, rodape='', numero='', logo=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._paginas = []
         self._rodape = rodape
+        self._numero = numero
+        self._logo = logo
 
     def showPage(self):
         self._paginas.append(dict(self.__dict__))
         self._startPage()
 
+    def _cabecalho(self):
+        topo = A4[1] - 1.2 * cm
+        if self._logo:
+            leitor, larg, alt = self._logo
+            esc = min(4.2 * cm / larg, 1.4 * cm / alt)
+            self.drawImage(leitor, 2 * cm, topo - alt * esc, larg * esc, alt * esc, mask='auto')
+        self.setFillColor(_COR_CAB)
+        self.setFont('Helvetica-Bold', 9)
+        self.drawRightString(A4[0] - 2 * cm, topo - 0.45 * cm, _TITULO_DOC)
+        self.setFont('Helvetica', 8)
+        self.setFillColor(colors.HexColor('#4a5968'))
+        self.drawRightString(A4[0] - 2 * cm, topo - 0.9 * cm, f'Documento nº {self._numero}')
+        self.setStrokeColor(_COR_CAB)
+        self.setLineWidth(1.2)
+        self.line(2 * cm, topo - 1.65 * cm, A4[0] - 2 * cm, topo - 1.65 * cm)
+
     def save(self):
         total = len(self._paginas)
         for estado in self._paginas:
             self.__dict__.update(estado)
-            self.setFont('Helvetica', 8)
-            self.setFillColor(colors.grey)
+            self._cabecalho()
+            self.setStrokeColor(_COR_GRADE)
+            self.setLineWidth(0.5)
+            self.line(2 * cm, 1.55 * cm, A4[0] - 2 * cm, 1.55 * cm)
+            self.setFont('Helvetica', 7.5)
+            self.setFillColor(colors.HexColor('#4a5968'))
             self.drawString(2 * cm, 1.1 * cm, self._rodape)
             self.drawRightString(A4[0] - 2 * cm, 1.1 * cm, f'Página {self._pageNumber} de {total}')
             super().showPage()
         super().save()
 
 
-def _logo_flowable(logo: Optional[bytes]):
-    """Logo da empresa (PNG/JPEG) limitado a 5x2 cm; None se ausente ou ilegível."""
+def _logo_leitor(logo: Optional[bytes]):
+    """(ImageReader, largura, altura) do logo PNG/JPEG; None se ausente ou ilegível."""
     if not logo:
         return None
     try:
@@ -305,10 +375,7 @@ def _logo_flowable(logo: Optional[bytes]):
         larg, alt = leitor.getSize()
     except Exception:
         return None
-    escala = min(5 * cm / larg, 2 * cm / alt)
-    img = Image(io.BytesIO(logo), width=larg * escala, height=alt * escala)
-    img.hAlign = 'LEFT'
-    return img
+    return leitor, larg, alt
 
 
 def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True, logo: Optional[bytes] = None) -> bytes:
@@ -316,50 +383,84 @@ def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True, logo: O
     est = _estilos()
     gran = relatorio['granularidade']
     emitido = datetime.fromisoformat(relatorio['emitido_em']).astimezone(tz)
-    rodape = f"{cliente_nome} — Relatório de período {_data_iso(relatorio['inicio'])} a {_data_iso(relatorio['fim'])}"
+    numero = numero_documento(relatorio)
+    periodo = f"{_data_iso(relatorio['inicio'])} – {_data_iso(relatorio['fim'])}"
+    rodape = (f"Documento gerado eletronicamente pelo sistema Sentinela em {_data_hora(emitido)} · "
+              f"{cliente_nome}")
 
-    logo_img = _logo_flowable(logo)
-    story = [logo_img, Spacer(1, 0.3 * cm)] if logo_img else []
-    story += [
-        Paragraph('Relatório de monitoramento', est['titulo']),
-        Paragraph(f"<b>Cliente:</b> {escape(cliente_nome)}", est['corpo']),
-        Paragraph(f"<b>Período:</b> {_data_iso(relatorio['inicio'])} – {_data_iso(relatorio['fim'])}", est['corpo']),
-        Paragraph(f"<b>Granularidade:</b> {_GRAN[gran]} &nbsp;&nbsp; <b>Fuso horário:</b> {escape(relatorio['fuso'])}",
-                  est['corpo']),
-        Paragraph(f"<b>Emitido em:</b> {_data_hora(emitido)} &nbsp;&nbsp; <b>Emissor:</b> {escape(relatorio['emissor'])}",
-                  est['corpo']),
-        Paragraph(f"<b>Sensores:</b> {len(relatorio['sensores'])}", est['corpo']),
-        Spacer(1, 0.4 * cm),
+    story = [
+        Paragraph(_TITULO_DOC, est['titulo']),
+        Paragraph('Registro de condições ambientais monitoradas por sensores', est['subtitulo']),
+        Paragraph('1. IDENTIFICAÇÃO', est['secao']),
+        _quadro([
+            ('Cliente', escape(cliente_nome)),
+            ('Documento', numero),
+            ('Período', periodo),
+            ('Granularidade', _GRAN[gran]),
+            ('Fuso horário', escape(relatorio['fuso'])),
+            ('Sensores', str(len(relatorio['sensores']))),
+            ('Emitido em', _data_hora(emitido)),
+            ('Emissor', escape(relatorio['emissor'])),
+        ], est),
+        Spacer(1, 0.25 * cm),
+        Paragraph('Valores consolidados a partir das leituras válidas de cada sensor. Leituras com falha de '
+                  'instrumento não entram na média, no mínimo nem no máximo e são contadas à parte. '
+                  'Períodos sem nenhuma leitura são identificados como "Sem dados".', est['peq']),
     ]
-    for idx, s in enumerate(relatorio['sensores']):
-        if idx:
+    for idx, s in enumerate(relatorio['sensores'], start=1):
+        if idx > 1:
             story.append(PageBreak())
-        story.append(Paragraph(f"{escape(s['nome'])} ({escape(s['sensor_code'])})", est['h2']))
+        else:
+            story.append(Paragraph('2. SENSORES MONITORADOS', est['secao']))
         story.append(Paragraph(
-            f"<b>Site:</b> {escape(s['site'] or '—')} &nbsp;&nbsp; <b>Unidade:</b> {escape(s['unidade'] or '—')}"
-            f" &nbsp;&nbsp; <b>Limites:</b> {escape(_limites_texto(s))}", est['corpo']))
+            f"2.{idx} {escape(s['nome'])} ({escape(s['sensor_code'])})", est['h2']))
+        story.append(_quadro([
+            ('Site', escape(s['site'] or '—')),
+            ('Código', escape(s['sensor_code'])),
+            ('Unidade', escape(s['unidade'] or '—')),
+            ('Limites', escape(_limites_texto(s))),
+        ], est))
         story.append(Spacer(1, 0.2 * cm))
         for a in s['alteracoes_limite']:
             story.append(Paragraph(escape(_aviso_limite(a, tz, relatorio['fim'])), est['aviso']))
         story.append(KeepTogether([
-            Paragraph('Evolução no período', est['h3']),
+            Paragraph(f'2.{idx}.1 Registro gráfico', est['h3']),
             _grafico(s, gran),
             Paragraph('Linha: média. Faixa clara: mínimo–máximo. Tracejado: limites atuais. '
                       'Ponto vermelho: período com valor fora do limite.', est['peq']),
         ]))
-        story.append(Paragraph('Dados por período', est['h3']))
+        story.append(Paragraph(f'2.{idx}.2 Registros consolidados', est['h3']))
         story.append(_tabela(s, gran, est))
         story.append(Paragraph('Linhas destacadas: mínimo ou máximo fora do limite atual.', est['peq']))
         for nota in _notas_mes(relatorio):
             story.append(Paragraph(nota, est['peq']))
-        story.append(Paragraph('Alarmes no período', est['h3']))
+        story.append(Paragraph(f'2.{idx}.3 Ocorrências — alarmes no período', est['h3']))
         story.extend(_alarmes(s, tz, est))
+
+    linha_assin = '_' * 38
+    assinaturas = Table([
+        [Paragraph(linha_assin, est['assin']), Paragraph(linha_assin, est['assin'])],
+        [Paragraph('<b>Responsável técnico</b><br/>Nome / registro profissional', est['assin']),
+         Paragraph('<b>Responsável pela unidade</b><br/>Nome / cargo', est['assin'])],
+        [Paragraph('Data: ____/____/________', est['assin']), Paragraph('Data: ____/____/________', est['assin'])],
+    ], colWidths=[_LARGURA / 2] * 2, style=TableStyle([('TOPPADDING', (0, 0), (-1, -1), 3)]))
+    story.append(KeepTogether([
+        Paragraph('3. TERMO DE RESPONSABILIDADE', est['secao']),
+        Paragraph(f'Declaramos que os dados apresentados neste relatório correspondem aos registros '
+                  f'armazenados pelo sistema de monitoramento Sentinela para o período de {periodo}, '
+                  f'obtidos automaticamente pelos sensores identificados acima, sem edição manual dos valores.',
+                  est['corpo']),
+        Spacer(1, 1.6 * cm),
+        assinaturas,
+    ]))
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
-        buf, pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=1.8 * cm, bottomMargin=2 * cm,
-        title=f'Relatório {_data_iso(relatorio["inicio"])} a {_data_iso(relatorio["fim"])}',
+        buf, pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=3.3 * cm, bottomMargin=2.2 * cm,
+        title=f'Relatório {numero} ({periodo})',
         author=relatorio['emissor'], pageCompression=1 if compress else 0,
     )
-    doc.build(story, canvasmaker=lambda *a, **k: _CanvasNumerado(*a, rodape=rodape, **k))
+    leitor = _logo_leitor(logo)
+    doc.build(story, canvasmaker=lambda *a, **k: _CanvasNumerado(
+        *a, rodape=rodape, numero=numero, logo=leitor, **k))
     return buf.getvalue()

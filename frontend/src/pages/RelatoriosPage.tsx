@@ -58,6 +58,24 @@ const inputCls =
 const inputStyle = { background: 'var(--color-surface)', border: '1px solid var(--color-line)', color: 'var(--color-ink)' }
 const btnCls =
   'min-h-11 rounded-md px-4 text-sm font-semibold outline-none transition-colors duration-200 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] disabled:opacity-60 motion-reduce:transition-none'
+const btnIconCls = `${btnCls} inline-flex items-center gap-2`
+
+function IconeDownload() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 2v8M4.5 6.8 8 10.3l3.5-3.5M2.5 11.5v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1.5" />
+    </svg>
+  )
+}
+
+function IconeImpressora() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 5.5V2h7v3.5M4.5 11.5h-2a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2M4.5 9.5h7V14h-7z" />
+    </svg>
+  )
+}
+
 const btnPrimary = { background: 'var(--color-primary)', color: 'var(--color-surface)' }
 const btnSecondary = { background: 'var(--color-panel)', color: 'var(--color-ink)', border: '1px solid var(--color-line)' }
 
@@ -263,10 +281,12 @@ export function RelatoriosPage() {
                 {fmtDia(report.data.inicio)} a {fmtDia(report.data.fim)} · emitido em {fmtDataHora(new Date(report.data.emitido_em))} por {report.data.emissor}
               </p>
               <div className="ml-auto flex gap-2">
-                <button type="button" className={btnCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => exportar('baixar')}>
+                <button type="button" className={btnIconCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => exportar('baixar')}>
+                  <IconeDownload />
                   Baixar PDF
                 </button>
-                <button type="button" className={btnCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => exportar('imprimir')}>
+                <button type="button" className={btnIconCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => exportar('imprimir')}>
+                  <IconeImpressora />
                   Imprimir
                 </button>
               </div>

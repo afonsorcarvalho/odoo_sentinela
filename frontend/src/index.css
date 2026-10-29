@@ -64,6 +64,15 @@
   --shadow-menu:            0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px var(--color-line);
 }
 
+/* Inputs nativos (ex.: ícone do calendário em type=date) seguem o tema escuro. */
+.theme-control input[type='date'] {
+  color-scheme: dark;
+}
+.theme-control input[type='date']::-webkit-calendar-picker-indicator {
+  opacity: 0.9;
+  cursor: pointer;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-ink);

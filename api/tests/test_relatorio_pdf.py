@@ -62,7 +62,7 @@ def test_pdf_conteudo():
     assert 'mín 2,00 / máx 8,00 °C' in t
     assert 'sem limite cadastrado' in t
     assert 'Limite alterado em 10/01/2026 08:00 (de 7,00 para 8,00)' in t
-    assert 'Sem dados' in t and 'Falha do instrumento' in t
+    assert 'Sem dados' in t and 'Falha de instrumento' in t
     assert '9,50' in t and '10:00' in t
     assert 'Acima do limite' in t and 'Resolvido' in t
     assert 'Nenhum alarme no período.' in t
@@ -114,3 +114,53 @@ def test_rota_pdf_erros():
     assert client.get('/relatorio.pdf', params={'sensores': 'SNR-NAO-EXISTE-XYZ', 'inicio': DIA, 'fim': DIA},
                       headers=h).status_code == 404
     assert client.get('/relatorio.pdf', params={'sensores': SENSOR_CODE, 'inicio': DIA, 'fim': DIA}).status_code == 401
+
+
+def test_pdf_alarme_sem_timestamp_nao_quebra():
+    rel = _relatorio()
+    rel['sensores'][0]['alarmes'][0]['timestamp_deteccao'] = None
+    t = _texto(gerar_pdf(rel, 'X', compress=False))
+    assert 'Acima do limite' in t and '—' in t
+
+
+def test_pdf_heading_alarmes_keep_with_next():
+    from api.relatorio_pdf import _estilos
+    assert _estilos()['h3'].keepWithNext
+
+
+def test_pdf_alteracao_limite_apos_periodo():
+    rel = _relatorio()
+    rel['sensores'][0]['alteracoes_limite'].append(
+        {'quando': '2026-01-12T15:00:00+00:00', 'campo': 'limite_min', 'de': 2.0, 'para': 3.0})
+    t = _texto(gerar_pdf(rel, 'X', compress=False))
+    assert 'Limite alterado em 12/01/2026 12:00 (de 2,00 para 3,00) — limite mínimo — após o período' in t
+    # alteracao dentro do periodo nao recebe o sufixo
+    assert 'Limite alterado em 10/01/2026 08:00 (de 7,00 para 8,00) — limite máximo' in t
+    assert '(de 7,00 para 8,00) — limite máximo — após' not in t
+
+
+def _rel_mes(inicio, fim, meses):
+    rel = _relatorio()
+    rel.update({'inicio': inicio, 'fim': fim, 'granularidade': 'mes'})
+    rel['sensores'] = rel['sensores'][:1]
+    rel['sensores'][0]['alteracoes_limite'] = []
+    rel['sensores'][0]['buckets'] = [
+        {'bucket': f'{m}-01T00:00:00-03:00', 'avg': 5.0, 'min': 4.0, 'max': 6.0, 'n_ok': 9, 'n_falha': 0,
+         'estado': 'ok', 'fora_limite': False} for m in meses]
+    return rel
+
+
+def test_pdf_mes_parcial_notas():
+    t = _texto(gerar_pdf(_rel_mes('2026-01-15', '2026-03-10', ['2026-01', '2026-02', '2026-03']), 'X', compress=False))
+    assert 'Primeiro mês parcial: dados de 15/01/2026 a 31/01/2026.' in t
+    assert 'Último mês parcial: dados de 01/03/2026 a 10/03/2026.' in t
+
+
+def test_pdf_mes_completo_sem_nota():
+    t = _texto(gerar_pdf(_rel_mes('2026-01-01', '2026-02-28', ['2026-01', '2026-02']), 'X', compress=False))
+    assert 'mês parcial' not in t
+
+
+def test_pdf_mes_unico_parcial():
+    t = _texto(gerar_pdf(_rel_mes('2026-01-05', '2026-01-20', ['2026-01']), 'X', compress=False))
+    assert 'Mês parcial: dados de 05/01/2026 a 20/01/2026.' in t

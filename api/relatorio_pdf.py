@@ -2,7 +2,8 @@
 import io
 import re
 import unicodedata
-from datetime import datetime, timezone
+import calendar
+from datetime import date, datetime, timezone
 from xml.sax.saxutils import escape
 from zoneinfo import ZoneInfo
 
@@ -186,7 +187,7 @@ def _tabela(s, gran, estilos):
             cmds += [('SPAN', (1, r), (3, r)), ('ALIGN', (1, r), (3, r), 'CENTER'),
                      ('TEXTCOLOR', (1, r), (3, r), colors.grey)]
         elif b['estado'] == 'falha_instrumento':
-            linhas.append([rot, 'Falha do instrumento', '', '', '0', str(b['n_falha'])])
+            linhas.append([rot, 'Falha de instrumento', '', '', '0', str(b['n_falha'])])
             cmds += [('SPAN', (1, r), (3, r)), ('ALIGN', (1, r), (3, r), 'CENTER'),
                      ('TEXTCOLOR', (1, r), (3, r), _COR_LIMITE)]
         else:
@@ -206,8 +207,9 @@ def _alarmes(s, tz, estilos):
     for a in s['alarmes']:
         sensor = _local(a['timestamp_resolucao_sensor'], tz)
         resol = _local(a['data_resolucao'], tz)
+        deteccao = _local(a['timestamp_deteccao'], tz)
         linhas.append([
-            _data_hora(_local(a['timestamp_deteccao'], tz)),
+            _data_hora(deteccao) if deteccao else '—',
             Paragraph(_TIPO.get(a['tipo_violacao'], a['tipo_violacao']), estilos['cel']),
             _num(a['valor_lido']),
             _STATUS.get(a['status'], a['status']),
@@ -228,7 +230,8 @@ def _estilos():
     return {
         'titulo': ParagraphStyle('titulo', parent=base['Title'], fontSize=17, alignment=0, spaceAfter=6),
         'h2': ParagraphStyle('h2', parent=base['Heading2'], fontSize=13, spaceAfter=2),
-        'h3': ParagraphStyle('h3', parent=base['Heading3'], fontSize=10, spaceBefore=8, spaceAfter=3),
+        'h3': ParagraphStyle('h3', parent=base['Heading3'], fontSize=10, spaceBefore=8, spaceAfter=3,
+                             keepWithNext=1),
         'corpo': ParagraphStyle('corpo', parent=base['Normal'], fontSize=9, leading=12),
         'aviso': ParagraphStyle('aviso', parent=base['Normal'], fontSize=8.5, leading=11,
                                 textColor=colors.HexColor('#7a4b00'), backColor=colors.HexColor('#fff3cd'),
@@ -238,10 +241,33 @@ def _estilos():
     }
 
 
-def _aviso_limite(a, tz) -> str:
-    quando = _data_hora(datetime.fromisoformat(a['quando']).astimezone(tz))
+def _aviso_limite(a, tz, fim: str) -> str:
+    dt = datetime.fromisoformat(a['quando']).astimezone(tz)
     campo = 'limite máximo' if a['campo'] == 'limite_max' else 'limite mínimo'
-    return f"Limite alterado em {quando} (de {_num(a['de'])} para {_num(a['para'])}) — {campo}"
+    texto = f"Limite alterado em {_data_hora(dt)} (de {_num(a['de'])} para {_num(a['para'])}) — {campo}"
+    if dt.date().isoformat() > fim:
+        texto += ' — após o período'
+    return texto
+
+
+def _notas_mes(relatorio: dict) -> list:
+    """Avisos de mes parcial (primeiro/ultimo) quando a granularidade e mensal."""
+    if relatorio['granularidade'] != 'mes':
+        return []
+    ini = date.fromisoformat(relatorio['inicio'])
+    fim = date.fromisoformat(relatorio['fim'])
+    fim_ini = date(ini.year, ini.month, calendar.monthrange(ini.year, ini.month)[1])
+    ini_fim = date(fim.year, fim.month, 1)
+    parcial_ini = ini.day != 1
+    parcial_fim = fim.day != calendar.monthrange(fim.year, fim.month)[1]
+    if (ini.year, ini.month) == (fim.year, fim.month):
+        return [f'Mês parcial: dados de {_data(ini)} a {_data(fim)}.'] if parcial_ini or parcial_fim else []
+    notas = []
+    if parcial_ini:
+        notas.append(f'Primeiro mês parcial: dados de {_data(ini)} a {_data(fim_ini)}.')
+    if parcial_fim:
+        notas.append(f'Último mês parcial: dados de {_data(ini_fim)} a {_data(fim)}.')
+    return notas
 
 
 class _CanvasNumerado(rl_canvas.Canvas):
@@ -295,7 +321,7 @@ def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True) -> byte
             f" &nbsp;&nbsp; <b>Limites:</b> {escape(_limites_texto(s))}", est['corpo']))
         story.append(Spacer(1, 0.2 * cm))
         for a in s['alteracoes_limite']:
-            story.append(Paragraph(escape(_aviso_limite(a, tz)), est['aviso']))
+            story.append(Paragraph(escape(_aviso_limite(a, tz, relatorio['fim'])), est['aviso']))
         story.append(KeepTogether([
             Paragraph('Evolução no período', est['h3']),
             _grafico(s, gran),
@@ -305,6 +331,8 @@ def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True) -> byte
         story.append(Paragraph('Dados por período', est['h3']))
         story.append(_tabela(s, gran, est))
         story.append(Paragraph('Linhas destacadas: mínimo ou máximo fora do limite atual.', est['peq']))
+        for nota in _notas_mes(relatorio):
+            story.append(Paragraph(nota, est['peq']))
         story.append(Paragraph('Alarmes no período', est['h3']))
         story.extend(_alarmes(s, tz, est))
 

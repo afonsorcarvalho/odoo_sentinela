@@ -125,3 +125,15 @@ def test_empresa_cliente_retorna_nome_e_logo():
     nome, logo = empresa_cliente(get_cliente_servico())
     assert isinstance(nome, str) and nome
     assert logo is None or isinstance(logo, bytes)
+
+
+def test_imagem_raster_aceita_png_jpeg_e_rejeita_svg():
+    import base64
+    from api.relatorio_odoo import _imagem_raster
+    png = b'\x89PNG\r\n\x1a\n' + b'resto'
+    jpg = b'\xff\xd8\xff' + b'resto'
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg"/>'
+    assert _imagem_raster(base64.b64encode(png)) == png
+    assert _imagem_raster(base64.b64encode(jpg)) == jpg
+    assert _imagem_raster(base64.b64encode(svg)) is None
+    assert _imagem_raster(False) is None

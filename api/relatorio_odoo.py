@@ -105,12 +105,33 @@ def nome_emissor(cliente):
     return f"{usuario['name']} ({usuario['login']})"
 
 
+def _imagem_raster(b64):
+    """bytes da imagem se PNG/JPEG (reportlab não lê SVG), senão None."""
+    if not b64:
+        return None
+    dados = base64.b64decode(b64)
+    return dados if dados[:8] == b'\x89PNG\r\n\x1a\n' or dados[:3] == b'\xff\xd8\xff' else None
+
+
 def empresa_cliente(cliente):
-    """Nome e logo (bytes PNG/JPEG, ou None) da empresa (res.company) do usuário da sessão."""
+    """Nome e logo do cliente (parceiro comercial do usuário da sessão).
+
+    Sem imagem no cliente, cai no logo da empresa Odoo (res.company) — a marca Sentinela.
+    """
     usuario = odoo_cliente.executar(
-        cliente, 'res.users', 'read', [cliente.uid], fields=['company_id'],
+        cliente, 'res.users', 'read', [cliente.uid], fields=['partner_id', 'company_id'],
     )[0]
-    empresa_id, nome = usuario['company_id']
-    empresa = odoo_cliente.executar(cliente, 'res.company', 'read', [empresa_id], fields=['logo'])[0]
-    logo = base64.b64decode(empresa['logo']) if empresa.get('logo') else None
+    parceiro = odoo_cliente.executar(
+        cliente, 'res.partner', 'read', [usuario['partner_id'][0]], fields=['commercial_partner_id'],
+    )[0]
+    comercial_id, nome = parceiro['commercial_partner_id']
+    comercial = odoo_cliente.executar(
+        cliente, 'res.partner', 'read', [comercial_id], fields=['image_1920'],
+    )[0]
+    logo = _imagem_raster(comercial.get('image_1920'))
+    if logo is None:
+        empresa = odoo_cliente.executar(
+            cliente, 'res.company', 'read', [usuario['company_id'][0]], fields=['logo'],
+        )[0]
+        logo = _imagem_raster(empresa.get('logo'))
     return nome, logo

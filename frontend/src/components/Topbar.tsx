@@ -1,3 +1,4 @@
+import { BrandMark } from './BrandMark'
 import { NavLink } from 'react-router'
 import { ThemeToggle } from './ThemeToggle'
 import { LogoutButton } from './LogoutButton'
@@ -13,15 +14,6 @@ const LIVE_STATE_BADGE: Record<LiveConnectionState, { label: string; color: stri
   live: { label: 'AO VIVO', color: 'var(--color-good)', dotClassName: 'motion-safe:animate-pulse' },
   reconnecting: { label: 'Reconectando…', color: 'var(--color-warn)', dotClassName: 'motion-safe:animate-pulse opacity-70' },
   offline: { label: 'Sem conexão', color: 'var(--color-crit)', dotClassName: '' },
-}
-
-function ShieldIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="m9 12 2 2 4-4" />
-    </svg>
-  )
 }
 
 export function Topbar({
@@ -40,12 +32,7 @@ export function Topbar({
       style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-line)' }}
     >
       <div className="flex items-center gap-2">
-        <div
-          className="flex size-[34px] items-center justify-center rounded-md"
-          style={{ background: 'var(--color-primary)', color: 'var(--color-surface)' }}
-        >
-          <ShieldIcon />
-        </div>
+        <BrandMark />
         <span className="text-lg font-bold" style={{ color: 'var(--color-ink)' }}>
           Sentinela
         </span>

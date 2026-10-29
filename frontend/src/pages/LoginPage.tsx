@@ -1,3 +1,4 @@
+import { BrandMark } from '../components/BrandMark'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../lib/useAuth'
@@ -30,7 +31,8 @@ export function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-4">
-      <h1 className="mb-6 text-xl font-bold" style={{ color: 'var(--color-ink)' }}>
+      <h1 className="mb-6 flex items-center gap-2 text-xl font-bold" style={{ color: 'var(--color-ink)' }}>
+        <BrandMark size={40} />
         Sentinela CME
       </h1>
       <form onSubmit={handleSubmit} className="space-y-4">

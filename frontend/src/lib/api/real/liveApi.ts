@@ -48,6 +48,19 @@ function setConnectionState(next: LiveConnectionState): void {
 let sharedSource: EventSource | null = null
 const subscribers = new Map<string, Set<(p: LivePoint) => void>>()
 const thresholdCache = new Map<string, Threshold | null>()
+// Limite editado no Odoo precisa chegar sem recarregar a página: revalida
+// em segundo plano quando a entrada passa desta idade.
+const THRESHOLD_TTL_MS = 60_000
+const thresholdBuscadoEm = new Map<string, number>()
+
+function revalidarThreshold(sensor_code: string) {
+  const em = thresholdBuscadoEm.get(sensor_code)
+  if (em !== undefined && Date.now() - em < THRESHOLD_TTL_MS) return
+  thresholdBuscadoEm.set(sensor_code, Date.now())
+  realMetaApi.getThreshold(sensor_code)
+    .then((t) => thresholdCache.set(sensor_code, t))
+    .catch(() => { if (!thresholdCache.has(sensor_code)) thresholdCache.set(sensor_code, null) })
+}
 
 // Listeners de alarme ao vivo: observacional, como subscribeConnection --
 // nao entra no reference-count de closeSharedSourceIfIdle() nem chama
@@ -84,6 +97,7 @@ function ensureSharedSource(): EventSource {
     const { sensor_id, time, valor, status_leitura } = data
     const callbacks = subscribers.get(sensor_id)
     if (!callbacks || callbacks.size === 0) return
+    revalidarThreshold(sensor_id)
     const threshold = thresholdCache.get(sensor_id) ?? null
     // Nunca mapear 'unknown'->'ok': sem limite e "Não avaliado"; e falha de
     // instrumento vence o limite (ver resolveStatus).
@@ -140,11 +154,7 @@ export const realLiveApi: LiveApi = {
       return () => closeSharedSourceIfIdle()
     }
 
-    if (!thresholdCache.has(sensor_code)) {
-      realMetaApi.getThreshold(sensor_code)
-        .then((t) => thresholdCache.set(sensor_code, t))
-        .catch(() => thresholdCache.set(sensor_code, null))
-    }
+    revalidarThreshold(sensor_code)
 
     const callbacks = subscribers.get(sensor_code) ?? new Set()
     callbacks.add(cb)

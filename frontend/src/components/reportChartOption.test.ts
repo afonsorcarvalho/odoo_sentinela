@@ -35,4 +35,8 @@ describe('buildReportChartOption', () => {
     const avg = series(buildReportChartOption(sensor({ limite_min: 10, limite_max: 30 }), 'hora')).find((s) => s.name === 'Média')!
     expect(avg.markLine!.data).toHaveLength(2)
   })
+  it('grid com folga a direita para os rotulos das linhas de limite', () => {
+    const o = buildReportChartOption(sensor({ limite_min: 10, limite_max: 30 }), 'hora')
+    expect((o.grid as { right: number }).right).toBeGreaterThanOrEqual(64)
+  })
 })

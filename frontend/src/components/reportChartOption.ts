@@ -37,7 +37,7 @@ export function buildReportChartOption(
 
   return {
     animation: false,
-    grid: { left: 48, right: 24, top: 16, bottom: 28 },
+    grid: { left: 48, right: 72, top: 16, bottom: 28 },
     tooltip: { trigger: 'axis', valueFormatter: fmt },
     xAxis: { type: 'category', data: s.buckets.map((b) => rotuloBucket(b.bucket, gran)), boundaryGap: false },
     yAxis: { type: 'value', scale: true, name: s.unidade, axisLabel: { formatter: (v: number) => v.toLocaleString('pt-BR') } },

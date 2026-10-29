@@ -4,7 +4,6 @@ import { Topbar } from '../components/Topbar'
 import { SensorSelect } from '../components/select/SensorSelect'
 import { useECharts } from '../components/useECharts'
 import { buildReportChartOption, rotuloBucket } from '../components/reportChartOption'
-import { useSensors } from '../lib/queries'
 import { useLiveConnection } from '../lib/useLiveConnection'
 import { useThemeColor } from '../lib/useThemeColor'
 import { reportApi } from '../lib/api'
@@ -30,6 +29,28 @@ function rotuloTabela(iso: string, gran: Granularidade): string {
   return gran === 'hora' ? `${fmtDia(data)} ${rotuloBucket(iso, gran)}` : gran === 'dia' ? fmtDia(data) : rotuloBucket(iso, gran)
 }
 
+// Data local (AAAA-MM-DD) de um instante, em Sao Paulo.
+const diaSP = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d)
+
+// Avisos de mes parcial (granularidade mensal): primeiro/ultimo mes incompleto.
+function notasMesParcial(inicio: string, fim: string, gran: Granularidade): string[] {
+  if (gran !== 'mes') return []
+  const [yi, mi, di] = inicio.split('-').map(Number)
+  const [yf, mf, df] = fim.split('-').map(Number)
+  const ultimoDia = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate()
+  const dd = (n: number) => String(n).padStart(2, '0')
+  const fmt = (y: number, m: number, d: number) => `${dd(d)}/${dd(m)}/${y}`
+  const parcialIni = di !== 1
+  const parcialFim = df !== ultimoDia(yf, mf)
+  if (yi === yf && mi === mf) {
+    return parcialIni || parcialFim ? [`Mês parcial: dados de ${fmt(yi, mi, di)} a ${fmt(yf, mf, df)}.`] : []
+  }
+  const notas: string[] = []
+  if (parcialIni) notas.push(`Primeiro mês parcial: dados de ${fmt(yi, mi, di)} a ${fmt(yi, mi, ultimoDia(yi, mi))}.`)
+  if (parcialFim) notas.push(`Último mês parcial: dados de ${fmt(yf, mf, 1)} a ${fmt(yf, mf, df)}.`)
+  return notas
+}
+
 const CAMPO_LABEL: Record<string, string> = { limite_min: 'mínimo', limite_max: 'máximo' }
 
 const inputCls =
@@ -50,7 +71,7 @@ function ReportChart({ sensor, gran }: { sensor: ReportSensor; gran: Granularida
   return <div ref={el} style={{ width: '100%', height: 260 }} />
 }
 
-function SensorReport({ sensor, gran }: { sensor: ReportSensor; gran: Granularidade }) {
+function SensorReport({ sensor, gran, fim, notas }: { sensor: ReportSensor; gran: Granularidade; fim: string; notas: string[] }) {
   const titleId = `rel-${sensor.sensor_code}`
   const muted = { color: 'var(--color-muted)' }
   return (
@@ -72,6 +93,7 @@ function SensorReport({ sensor, gran }: { sensor: ReportSensor; gran: Granularid
           {sensor.alteracoes_limite.map((a, i) => (
             <li key={i}>
               Limite alterado em {fmtDataHora(new Date(a.quando))} ({CAMPO_LABEL[a.campo] ?? a.campo}: de {fmtNum(a.de)} para {fmtNum(a.para)})
+              {diaSP(new Date(a.quando)) > fim && ' — após o período'}
             </li>
           ))}
         </ul>
@@ -122,6 +144,9 @@ function SensorReport({ sensor, gran }: { sensor: ReportSensor; gran: Granularid
           </tbody>
         </table>
       </div>
+      {notas.map((n) => (
+        <p key={n} className="mt-1 text-xs" style={muted}>{n}</p>
+      ))}
 
       <h3 className="mt-4 text-sm font-bold" style={{ color: 'var(--color-ink)' }}>Alarmes no período</h3>
       {sensor.alarmes.length === 0 ? (
@@ -144,18 +169,18 @@ function SensorReport({ sensor, gran }: { sensor: ReportSensor; gran: Granularid
 
 export function RelatoriosPage() {
   const liveState = useLiveConnection()
-  const sensorsQuery = useSensors()
   const [inicio, setInicio] = useState(hojeSP)
   const [fim, setFim] = useState(hojeSP)
-  const [sensores, setSensores] = useState<string[] | null>(null)
-  // Default: todos os sensores (ate o maximo da API) assim que carregarem.
-  const selecionados = sensores ?? (sensorsQuery.data ?? []).slice(0, MAX_SENSORES).map((s) => s.sensor_code)
+  // Nenhum sensor pre-selecionado: o usuario escolhe.
+  const [selecionados, setSelecionados] = useState<string[]>([])
+  const [erroJanela, setErroJanela] = useState<string | null>(null)
   const [gerado, setGerado] = useState<ReportParams | null>(null)
 
   const report = useMutation<Report, Error, ReportParams>({ mutationFn: (p) => reportApi.getReport(p) })
-  const pdf = useMutation<Blob, Error, { params: ReportParams; modo: 'baixar' | 'imprimir' }>({
+  const pdf = useMutation<Blob, Error, { params: ReportParams; modo: 'baixar' | 'imprimir'; janela: Window | null }>({
     mutationFn: ({ params }) => reportApi.getReportPdf(params),
-    onSuccess: (blob, { params, modo }) => {
+    onError: (_e, { janela }) => janela?.close(),
+    onSuccess: (blob, { params, modo, janela }) => {
       const url = URL.createObjectURL(blob)
       if (modo === 'baixar') {
         const a = document.createElement('a')
@@ -166,7 +191,8 @@ export function RelatoriosPage() {
         a.remove()
         URL.revokeObjectURL(url)
       } else {
-        window.open(url, '_blank')
+        // Janela aberta de forma sincrona no clique (senao o popup e bloqueado).
+        if (janela) janela.location.href = url
         // A nova aba ainda precisa carregar o blob: revoga depois.
         setTimeout(() => URL.revokeObjectURL(url), 60_000)
       }
@@ -177,10 +203,26 @@ export function RelatoriosPage() {
     e.preventDefault()
     const params = { sensores: selecionados, inicio, fim }
     setGerado(params)
+    setErroJanela(null)
+    pdf.reset()
     report.mutate(params)
   }
 
-  const erro = report.error?.message ?? pdf.error?.message
+  const exportar = (modo: 'baixar' | 'imprimir') => {
+    if (!gerado) return
+    setErroJanela(null)
+    let janela: Window | null = null
+    if (modo === 'imprimir') {
+      janela = window.open('', '_blank')
+      if (!janela) {
+        setErroJanela('Não foi possível abrir a janela de impressão. Permita pop-ups para este site e tente de novo.')
+        return
+      }
+    }
+    pdf.mutate({ params: gerado, modo, janela })
+  }
+
+  const erro = report.error?.message ?? pdf.error?.message ?? erroJanela
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-panel)' }}>
       <Topbar healthy={false} unitName={UNIT_NAME} liveState={liveState} />
@@ -197,9 +239,9 @@ export function RelatoriosPage() {
             <input type="date" required value={fim} min={inicio} onChange={(e) => setFim(e.target.value)} className={inputCls} style={inputStyle} />
           </label>
           <div className="min-w-[260px] flex-1">
-            <SensorSelect multiple label="Sensores" value={selecionados} onChange={setSensores} />
+            <SensorSelect multiple label="Sensores" value={selecionados} onChange={setSelecionados} />
           </div>
-          <button type="submit" className={btnCls} style={btnPrimary} disabled={selecionados.length === 0 || report.isPending}>
+          <button type="submit" className={btnCls} style={btnPrimary} disabled={selecionados.length === 0 || selecionados.length > MAX_SENSORES || report.isPending}>
             Gerar
           </button>
         </form>
@@ -221,16 +263,22 @@ export function RelatoriosPage() {
                 {fmtDia(report.data.inicio)} a {fmtDia(report.data.fim)} · emitido em {fmtDataHora(new Date(report.data.emitido_em))} por {report.data.emissor}
               </p>
               <div className="ml-auto flex gap-2">
-                <button type="button" className={btnCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => pdf.mutate({ params: gerado, modo: 'baixar' })}>
+                <button type="button" className={btnCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => exportar('baixar')}>
                   Baixar PDF
                 </button>
-                <button type="button" className={btnCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => pdf.mutate({ params: gerado, modo: 'imprimir' })}>
+                <button type="button" className={btnCls} style={btnSecondary} disabled={pdf.isPending} onClick={() => exportar('imprimir')}>
                   Imprimir
                 </button>
               </div>
             </div>
             {report.data.sensores.map((s) => (
-              <SensorReport key={s.sensor_code} sensor={s} gran={report.data.granularidade} />
+              <SensorReport
+                key={s.sensor_code}
+                sensor={s}
+                gran={report.data.granularidade}
+                fim={report.data.fim}
+                notas={notasMesParcial(report.data.inicio, report.data.fim, report.data.granularidade)}
+              />
             ))}
           </>
         )}

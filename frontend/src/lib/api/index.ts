@@ -1,10 +1,12 @@
-import type { MetaApi, HistoryApi, LiveApi, AuthApi, AlarmApi, ConfigApi } from './contracts'
+import type { MetaApi, HistoryApi, LiveApi, AuthApi, AlarmApi, ConfigApi, ReportApi } from './contracts'
 import { mockMetaApi } from './mock/metaApi'
 import { mockHistoryApi } from './mock/historyApi'
 import { mockLiveApi } from './mock/liveApi'
 import { mockAuthApi } from './mock/authApi'
 import { mockAlarmApi } from './mock/alarmApi'
 import { mockConfigApi } from './mock/configApi'
+import { mockReportApi } from './mock/reportApi'
+import { realReportApi } from './real/reportApi'
 import { realAuthApi } from './real/authApi'
 import { realMetaApi } from './real/metaApi'
 import { realHistoryApi } from './real/historyApi'
@@ -25,3 +27,4 @@ export const historyApi: HistoryApi = useReal ? realHistoryApi : mockHistoryApi
 export const liveApi: LiveApi = useReal ? realLiveApi : mockLiveApi
 export const alarmApi: AlarmApi = useReal ? realAlarmApi : mockAlarmApi
 export const configApi: ConfigApi = useReal ? realConfigApi : mockConfigApi
+export const reportApi: ReportApi = useReal ? realReportApi : mockReportApi

@@ -38,14 +38,14 @@ function inicios(inicio: string, fim: string, gran: Granularidade): string[] {
 }
 
 // Determinístico: sem Date.now/random. i=1 -> sem_dados; i=2 -> falha_instrumento;
-// i=3 -> fora_limite (acima do max); demais ok dentro da faixa.
-function bucketMock(label: string, i: number, min: number, max: number): ReportBucket {
+// i=3 -> fora_limite (acima do max, so se o sensor tem limites); demais ok dentro da faixa.
+function bucketMock(label: string, i: number, min: number, max: number, temLimites: boolean): ReportBucket {
   const mid = (min + max) / 2
   const amp = (max - min) / 4
   if (i === 1) return { bucket: label, avg: null, min: null, max: null, n_ok: 0, n_falha: 0, estado: 'sem_dados', fora_limite: false }
   if (i === 2) return { bucket: label, avg: null, min: null, max: null, n_ok: 0, n_falha: 5, estado: 'falha_instrumento', fora_limite: false }
   const avg = mid + amp * Math.sin(i)
-  const fora = i === 3
+  const fora = temLimites && i === 3
   return {
     bucket: label,
     avg: +avg.toFixed(2),
@@ -66,9 +66,21 @@ function sensorMock(code: string, gran: Granularidade, inicio: string, fim: stri
     unidade: meta.unidade,
     site: 'Site Mock',
     limites: th ? { limite_min: min, limite_max: max } : null,
-    alteracoes_limite: [],
-    buckets: inicios(inicio, fim, gran).map((l, i) => bucketMock(l, i, min, max)),
-    alarmes: [],
+    // Uma alteracao e um alarme de amostra (so p/ sensores com limite) para a
+    // UI ser exercitavel em modo mock. Instantes no primeiro dia do periodo.
+    alteracoes_limite: th
+      ? [{ quando: addDias(inicio, 0).toISOString().replace('T00:00:00.000Z', 'T13:30:00+00:00'), campo: 'limite_max', de: max - 1, para: max }]
+      : [],
+    buckets: inicios(inicio, fim, gran).map((l, i) => bucketMock(l, i, min, max, !!th)),
+    alarmes: th
+      ? [{
+          id: 9001, sensor_code: meta.sensor_code, area_code: meta.area.area_code,
+          timestamp_deteccao: addDias(inicio, 0).getTime() + 6 * 3_600_000, timestamp_resolucao_sensor: null,
+          valor_lido: max + 1, tipo_violacao: 'acima_limite', limite_configurado_snapshot: max,
+          status: 'resolvido', usuario_responsavel: 'Usuário Mock',
+          data_resolucao: addDias(inicio, 0).getTime() + 7 * 3_600_000, observacoes: null,
+        }]
+      : [],
   }
 }
 

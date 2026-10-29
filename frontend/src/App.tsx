@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useParams } from 'react-router'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
+import { RelatoriosPage } from './pages/RelatoriosPage'
 import { AuthGuard } from './components/AuthGuard'
 
 function AreaRedirect() {
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<AuthGuard />}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/relatorios" element={<RelatoriosPage />} />
         <Route path="/area/:areaCode" element={<AreaRedirect />} />
         <Route path="/sensor/:code" element={<SensorRedirect />} />
       </Route>

@@ -1,12 +1,10 @@
 # TODO — Sentinela
 
 ## Em curso
-- **Deploy VPS do formato numérico + gráfico máx/mín** — exige upgrade do addon no Odoo VPS ANTES da API (campos `casas_decimais`/`digitos_inteiros`); senão a API quebra lendo o sensor.
 
 ## Pendente
 - **Hub com limite novo?** Limite máx do ETO CH1 mudou 40→50 ppm no Odoo VPS (2026-10-29); alarme é gerado na borda — verificar se o hub recebeu (config-publish) ou se ainda alarma acima de 40.
 - **Trocar senha do admin do Odoo VPS** — foi exposta em chat (2026-10-29).
-- **Deploy do frontend da localização no relatório** (commit `72dea06`; API/Odoo já na VPS, tela de Relatórios ainda não).
 - **Análise histórica** (spec + planos A backend/B frontend de 2026-08-05, sem implementação). Trata o buraco de materialização das CAggs (10d de atraso em prod). Ver `docs/superpowers/plans/2026-08-05-analise-historica-*.md`.
 - **Pareamento por código na migração** (plano `6f26e7f`, sem implementação).
 - **Serial fd zumbi → zeros** (a desenhar): reconexão automática + gate de plausibilidade.
@@ -20,7 +18,7 @@
 - **[DISCUSSÃO FUTURA] Suporte a cliente com mais de um site (multi-site por usuário)**. `obter_sites_permitidos` (spec de isolamento multi-tenant) já pode retornar vários sites por usuário, mas não há seletor/troca de site no frontend nem definição de qual site vira "ativo" por padrão pro dashboard. Levantado como fora de escopo em [2026-07-20-api-multitenant-isolation-design.md](docs/superpowers/specs/2026-07-20-api-multitenant-isolation-design.md).
 
 ## Feito
-- 2026-10-30 — **Formato numérico por sensor no relatório**: `casas_decimais` (0–6, padrão 2) e `digitos_inteiros` (1–12, padrão 1, zero-pad) no sensor; tela e PDF formatam igual. **Gráfico do relatório** ganhou linhas de máximo (laranja) e mínimo (verde), valores extremos escritos e resumo máx/mín/média (PDF); legenda na tela. Local, falta deploy.
+- 2026-10-30 — **Formato numérico por sensor no relatório**: `casas_decimais` (0–6, padrão 2) e `digitos_inteiros` (1–12, padrão 1, zero-pad) no sensor; tela e PDF formatam igual. **Gráfico do relatório** ganhou linhas de máximo (laranja) e mínimo (verde), valores extremos escritos e resumo máx/mín/média (PDF); legenda na tela (`569d3a6`). Deploy VPS (addon 18.0.1.0.3 + API + frontend, inclui localização `72dea06`).
 - 2026-10-30 — **Localização do sensor no relatório**: campo `sensor.localizacao` + área (categoria) e endereço do site na tela e no PDF (`72dea06`). Odoo/API na VPS.
 - 2026-10-29 — **Limite live revalida a cada 60s** (antes: cache pela vida da página) + símbolo Sentinela no topbar/login/favicon. Deploy VPS.
 - 2026-10-29 — **Cliente do relatório = dono do site dos sensores** (antes: parceiro do usuário logado → saía "Administrator").

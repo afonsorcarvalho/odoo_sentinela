@@ -1,9 +1,12 @@
 # TODO — Sentinela
 
 ## Em curso
-- <nada ainda>
+- **Relatório de período: formatação numérica por sensor** (casas decimais + dígitos inteiros no sensor do Odoo, aplicado no relatório tela/PDF).
 
 ## Pendente
+- **Hub com limite novo?** Limite máx do ETO CH1 mudou 40→50 ppm no Odoo VPS (2026-10-29); alarme é gerado na borda — verificar se o hub recebeu (config-publish) ou se ainda alarma acima de 40.
+- **Trocar senha do admin do Odoo VPS** — foi exposta em chat (2026-10-29).
+- **Deploy do frontend da localização no relatório** (commit `72dea06`; API/Odoo já na VPS, tela de Relatórios ainda não).
 - **Análise histórica** (spec + planos A backend/B frontend de 2026-08-05, sem implementação). Trata o buraco de materialização das CAggs (10d de atraso em prod). Ver `docs/superpowers/plans/2026-08-05-analise-historica-*.md`.
 - **Pareamento por código na migração** (plano `6f26e7f`, sem implementação).
 - **Serial fd zumbi → zeros** (a desenhar): reconexão automática + gate de plausibilidade.
@@ -17,6 +20,12 @@
 - **[DISCUSSÃO FUTURA] Suporte a cliente com mais de um site (multi-site por usuário)**. `obter_sites_permitidos` (spec de isolamento multi-tenant) já pode retornar vários sites por usuário, mas não há seletor/troca de site no frontend nem definição de qual site vira "ativo" por padrão pro dashboard. Levantado como fora de escopo em [2026-07-20-api-multitenant-isolation-design.md](docs/superpowers/specs/2026-07-20-api-multitenant-isolation-design.md).
 
 ## Feito
+- 2026-10-30 — **Localização do sensor no relatório**: campo `sensor.localizacao` + área (categoria) e endereço do site na tela e no PDF (`72dea06`). Odoo/API na VPS.
+- 2026-10-29 — **Limite live revalida a cada 60s** (antes: cache pela vida da página) + símbolo Sentinela no topbar/login/favicon. Deploy VPS.
+- 2026-10-29 — **Cliente do relatório = dono do site dos sensores** (antes: parceiro do usuário logado → saía "Administrator").
+- 2026-10-29 — **Layout formal do PDF** (cabeçalho fixo c/ logo e nº documento, seções numeradas, termo de responsabilidade c/ assinaturas) (`0db4c5d`). Deploy VPS.
+- 2026-10-29 — **Logo Sentinela** (`branding/`, escudo + onda vazada); empresa Odoo VPS renomeada "Sentinela" c/ logo. PDF usa logo do cliente, fallback logo da empresa.
+- 2026-10-29 — **Relatório de período** (histórico + PDF/impressão, por hora/dia/mês) mergeado `0eb8ab9`, deploy VPS; ícones nos botões PDF.
 - 2026-10-19 — Removidos 7 tenants órfãos de teste (`SITE-TENANT-*`) do Odoo local; suíte da api: 164 ok, só 2 falhas dependentes de env.
 - 2026-10-19 — **`/config` deriva o site do usuário logado** (antes: `SITE_CODE` fixo por processo → usuário de outro site recebia layout alheio). Agora usa a sessão do usuário (ir.rule), `?site=` opcional validado contra os permitidos (404 se não permitido). Higiene: 11 testes `test_verificacao_*` falhavam por ordem (sem event loop corrente no py3.9) → fixture autouse no conftest.
 - 2026-10-19 — **Download do ZIP dos arquivos do dia pelo Odoo** (wizard → api → SFTP, ACL por site, bytes intactos). Mergeada em master (`bdabf8d`). Spec/plano: `docs/superpowers/*/2026-08-05-download-arquivos-dia-odoo*`.

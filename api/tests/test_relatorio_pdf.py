@@ -191,3 +191,27 @@ def test_pdf_logo_invalido_nao_quebra():
     pdf = gerar_pdf(_relatorio(), 'X', compress=False, logo=b'nao e imagem')
     assert pdf.startswith(b'%PDF')
     assert b'/Subtype /Image' not in pdf
+
+
+def test_num_casas_e_zero_pad():
+    from api.relatorio_pdf import _num
+    assert _num(9.5) == '9,50'
+    assert _num(9.5, 1, 3) == '009,5'
+    assert _num(1234.5, 0, 2) == '1234'  # padding nunca corta
+    assert _num(-2.25, 1, 2) == '-02,2'
+    assert _num(-0.001, 2) == '0,00'
+    assert _num(None, 3, 4) == '—'
+
+
+def test_pdf_respeita_formato_do_sensor():
+    r = _relatorio()
+    r['sensores'][0]['formato'] = {'casas_decimais': 1, 'digitos_inteiros': 3}
+    t = _texto(gerar_pdf(r, 'X', compress=False))
+    assert '009,5' in t and 'mín 002,0 / máx 008,0' in t
+    assert '9,50' not in t.split('Sala 2')[0]
+
+
+def test_pdf_grafico_resumo_max_min():
+    t = _texto(gerar_pdf(_relatorio(), 'X', compress=False))
+    assert 'Máximo no período:' in t and 'Mínimo:' in t
+    assert 'Laranja' in t and 'máximo' in t

@@ -3,7 +3,8 @@ import { buildReportChartOption } from './reportChartOption'
 import type { ReportSensor } from '../lib/api/contracts'
 
 const sensor = (limites: ReportSensor['limites']): ReportSensor => ({
-  sensor_code: 'S1', nome: 'Sensor 1', unidade: '°C', site: null, area: null, endereco: null, localizacao: null, limites,
+  sensor_code: 'S1', nome: 'Sensor 1', unidade: '°C', site: null, area: null, endereco: null, localizacao: null,
+  formato: { casas_decimais: 2, digitos_inteiros: 1 }, limites,
   alteracoes_limite: [], alarmes: [],
   buckets: [
     { bucket: '2026-01-10T00:00:00-03:00', avg: 20, min: 18, max: 22, n_ok: 60, n_falha: 0, estado: 'ok', fora_limite: false },

@@ -8,6 +8,7 @@ import { useLiveConnection } from '../lib/useLiveConnection'
 import { useThemeColor } from '../lib/useThemeColor'
 import { reportApi } from '../lib/api'
 import { VIOLACAO_LABEL } from '../lib/violacao'
+import { formatKpi } from '../lib/kpiFormat'
 import type { Granularidade, Report, ReportParams, ReportSensor } from '../lib/api/contracts'
 
 const UNIT_NAME = import.meta.env.VITE_UNIT_NAME ?? 'Unidade não configurada'
@@ -21,7 +22,9 @@ const fmtDataHora = (d: Date) =>
   new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     .format(d)
     .replace(',', '')
-const fmtNum = (v: number | null) => (v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 2 }))
+// Mesmo formato do PDF (api/relatorio_pdf.py:_num): casas e zero-pad do sensor, vírgula decimal.
+export const numFormatter = (f: ReportSensor['formato']) => (v: number | null) =>
+  v == null ? '—' : formatKpi(Number(v.toFixed(f.casas_decimais)) || 0, { casasDecimais: f.casas_decimais, digitosInteiros: f.digitos_inteiros }).replace('.', ',')
 const fmtDia = (iso: string) => iso.split('-').reverse().join('/')
 
 function rotuloTabela(iso: string, gran: Granularidade): string {
@@ -83,13 +86,15 @@ function ReportChart({ sensor, gran }: { sensor: ReportSensor; gran: Granularida
   const { el, chart } = useECharts()
   const crit = useThemeColor('--color-crit')
   const primary = useThemeColor('--color-primary')
+  const muted = useThemeColor('--color-muted')
   useEffect(() => {
-    chart.current?.setOption(buildReportChartOption(sensor, gran, { crit, primary }), { notMerge: true })
-  }, [sensor, gran, crit, primary, chart])
+    chart.current?.setOption(buildReportChartOption(sensor, gran, { crit, primary, muted }), { notMerge: true })
+  }, [sensor, gran, crit, primary, muted, chart])
   return <div ref={el} style={{ width: '100%', height: 260 }} />
 }
 
 function SensorReport({ sensor, gran, fim, notas }: { sensor: ReportSensor; gran: Granularidade; fim: string; notas: string[] }) {
+  const fmtNum = numFormatter(sensor.formato)
   const titleId = `rel-${sensor.sensor_code}`
   const muted = { color: 'var(--color-muted)' }
   return (

@@ -163,3 +163,14 @@ describe('RelatoriosPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Período máximo é 366 dias')
   })
 })
+
+describe('numFormatter', () => {
+  it('aplica casas, zero-pad e vírgula como o PDF', async () => {
+    const { numFormatter } = await import('./RelatoriosPage')
+    const f = numFormatter({ casas_decimais: 1, digitos_inteiros: 3 })
+    expect(f(9.5)).toBe('009,5')
+    expect(f(-2.26)).toBe('-002,3')
+    expect(f(null)).toBe('—')
+    expect(numFormatter({ casas_decimais: 2, digitos_inteiros: 1 })(-0.001)).toBe('0,00')
+  })
+})

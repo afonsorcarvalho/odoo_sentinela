@@ -12,3 +12,4 @@ from . import test_calibracao
 from . import test_faixa_plausivel
 from . import test_coletor_pubkey
 from . import test_arquivo_download
+from . import test_formato_numerico

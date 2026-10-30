@@ -29,6 +29,8 @@ _STATUS = {'aberto': 'Aberto', 'reconhecido': 'Reconhecido', 'resolvido': 'Resol
 
 _COR_LINHA = colors.HexColor('#1f4e79')
 _COR_FAIXA = colors.HexColor('#cfe0f1')
+_COR_MAX = colors.HexColor('#c45a00')
+_COR_MIN = colors.HexColor('#2a7f62')
 _COR_LIMITE = colors.HexColor('#b3261e')
 _COR_FORA = colors.HexColor('#f8d7da')
 _COR_CAB = colors.HexColor('#1b2a3a')
@@ -46,10 +48,21 @@ def slug(texto: str) -> str:
     return re.sub(r'[^a-z0-9]+', '-', ascii_.lower()).strip('-') or 'cliente'
 
 
-def _num(valor, casas=2):
+def _num(valor, casas=2, digitos=1):
+    """Vírgula decimal; parte inteira completada com zeros até `digitos` (nunca corta)."""
     if valor is None:
         return '—'
-    return f'{valor:.{casas}f}'.replace('.', ',')
+    texto = f'{abs(valor):.{casas}f}'
+    inteiro, _, fracao = texto.partition('.')
+    texto = inteiro.zfill(digitos) + (',' + fracao if fracao else '')
+    return '-' + texto if valor < 0 and float(f'{valor:.{casas}f}') != 0 else texto
+
+
+def _fmt(s):
+    """Formatador de valores do sensor conforme a config dele (padrão 2 casas, 1 dígito)."""
+    f = s.get('formato') or {}
+    casas, digitos = f.get('casas_decimais', 2), f.get('digitos_inteiros', 1)
+    return lambda v: _num(v, casas, digitos)
 
 
 def _data(d) -> str:
@@ -83,10 +96,11 @@ def _limites_texto(s) -> str:
     lim = s['limites']
     if lim is None or (lim['limite_min'] is None and lim['limite_max'] is None):
         return 'sem limite cadastrado'
-    return f"mín {_num(lim['limite_min'])} / máx {_num(lim['limite_max'])} {s['unidade']}"
+    n = _fmt(s)
+    return f"mín {n(lim['limite_min'])} / máx {n(lim['limite_max'])} {s['unidade']}"
 
 
-def _grafico(s, gran) -> Drawing:
+def _grafico(s, gran, fmt=_num) -> Drawing:
     altura = 6.2 * cm
     d = Drawing(_LARGURA, altura)
     esq, dir_, base, topo = 1.6 * cm, 0.3 * cm, 1.1 * cm, altura - 0.3 * cm
@@ -160,8 +174,21 @@ def _grafico(s, gran) -> Drawing:
                          fillColor=_COR_LIMITE))
     for seg in segmentos:
         if len(seg) > 1:
+            for chave, cor in (('max', _COR_MAX), ('min', _COR_MIN)):
+                d.add(PolyLine([c for i in seg for c in (px(i), py(buckets[i][chave]))],
+                               strokeColor=cor, strokeWidth=0.7))
             d.add(PolyLine([c for i in seg for c in (px(i), py(buckets[i]['avg']))],
                            strokeColor=_COR_LINHA, strokeWidth=1.2))
+    # extremos do período, com o valor escrito
+    validos = [i for i, b in enumerate(buckets) if b['avg'] is not None]
+    i_max = max(validos, key=lambda i: buckets[i]['max'])
+    i_min = min(validos, key=lambda i: buckets[i]['min'])
+    for i, chave, cor, dy in ((i_max, 'max', _COR_MAX, 5), (i_min, 'min', _COR_MIN, -11)):
+        x, y = px(i), py(buckets[i][chave])
+        d.add(Circle(x, y, 2, fillColor=cor, strokeColor=colors.white, strokeWidth=0.5))
+        ancora = 'start' if x < esq + larg * 0.8 else 'end'
+        d.add(String(x + (3 if ancora == 'start' else -3), y + dy, f"{'máx' if chave == 'max' else 'mín'} {fmt(buckets[i][chave])}",
+                     textAnchor=ancora, fontSize=7, fontName='Helvetica-Bold', fillColor=cor))
     for i, b in enumerate(buckets):
         if b['avg'] is None:
             continue
@@ -189,6 +216,23 @@ def _estilo_tabela(n_linhas):
     return cmds
 
 
+def _resumo(s, gran, estilos):
+    """Linha-resumo com máximo, mínimo e média do período e quando ocorreram."""
+    validos = [b for b in s['buckets'] if b['avg'] is not None]
+    if not validos:
+        return Spacer(1, 0)
+    n = _fmt(s)
+    bmax = max(validos, key=lambda b: b['max'])
+    bmin = min(validos, key=lambda b: b['min'])
+    total = sum(b['n_ok'] for b in validos)
+    media = sum(b['avg'] * b['n_ok'] for b in validos) / total if total else None
+    u = escape(s['unidade'] or '')
+    return Paragraph(
+        f"<b>Máximo no período:</b> {n(bmax['max'])} {u} ({rotulo_bucket(bmax['bucket'], gran)}) &nbsp;&nbsp; "
+        f"<b>Mínimo:</b> {n(bmin['min'])} {u} ({rotulo_bucket(bmin['bucket'], gran)}) &nbsp;&nbsp; "
+        f"<b>Média:</b> {n(media)} {u}", estilos['corpo'])
+
+
 def _tabela(s, gran, estilos):
     cab = ['Período', f"Média ({s['unidade']})", 'Mín', 'Máx', 'Leituras', 'Falhas']
     linhas = [cab]
@@ -204,7 +248,8 @@ def _tabela(s, gran, estilos):
             cmds += [('SPAN', (1, r), (3, r)), ('ALIGN', (1, r), (3, r), 'CENTER'),
                      ('TEXTCOLOR', (1, r), (3, r), _COR_LIMITE)]
         else:
-            linhas.append([rot, _num(b['avg']), _num(b['min']), _num(b['max']),
+            n = _fmt(s)
+            linhas.append([rot, n(b['avg']), n(b['min']), n(b['max']),
                            str(b['n_ok']), str(b['n_falha'])])
             if b['fora_limite']:
                 cmds += [('BACKGROUND', (0, r), (-1, r), _COR_FORA),
@@ -225,7 +270,7 @@ def _alarmes(s, tz, estilos):
         linhas.append([
             _data_hora(deteccao) if deteccao else '—',
             Paragraph(_TIPO.get(a['tipo_violacao'], a['tipo_violacao']), estilos['cel']),
-            _num(a['valor_lido']),
+            _fmt(s)(a['valor_lido']),
             _STATUS.get(a['status'], a['status']),
             _data_hora(sensor) if sensor else '—',
             _data_hora(resol) if resol else '—',
@@ -291,10 +336,10 @@ def numero_documento(relatorio: dict) -> str:
     return f'REL-{emitido:%Y%m%d-%H%M%S}'
 
 
-def _aviso_limite(a, tz, fim: str) -> str:
+def _aviso_limite(a, tz, fim: str, n=_num) -> str:
     dt = datetime.fromisoformat(a['quando']).astimezone(tz)
     campo = 'limite máximo' if a['campo'] == 'limite_max' else 'limite mínimo'
-    texto = f"Limite alterado em {_data_hora(dt)} (de {_num(a['de'])} para {_num(a['para'])}) — {campo}"
+    texto = f"Limite alterado em {_data_hora(dt)} (de {n(a['de'])} para {n(a['para'])}) — {campo}"
     if dt.date().isoformat() > fim:
         texto += ' — após o período'
     return texto
@@ -425,12 +470,16 @@ def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True, logo: O
         ], est))
         story.append(Spacer(1, 0.2 * cm))
         for a in s['alteracoes_limite']:
-            story.append(Paragraph(escape(_aviso_limite(a, tz, relatorio['fim'])), est['aviso']))
+            story.append(Paragraph(escape(_aviso_limite(a, tz, relatorio['fim'], _fmt(s))), est['aviso']))
         story.append(KeepTogether([
             Paragraph(f'2.{idx}.1 Registro gráfico', est['h3']),
-            _grafico(s, gran),
-            Paragraph('Linha: média. Faixa clara: mínimo–máximo. Tracejado: limites atuais. '
+            _grafico(s, gran, _fmt(s)),
+            Paragraph('<font color="#1f4e79"><b>Azul</b></font>: média. '
+                      '<font color="#c45a00"><b>Laranja</b></font>: máximo. '
+                      '<font color="#2a7f62"><b>Verde</b></font>: mínimo. '
+                      'Valores escritos: máximo e mínimo do período. Tracejado vermelho: limites atuais. '
                       'Ponto vermelho: período com valor fora do limite.', est['peq']),
+            _resumo(s, gran, est),
         ]))
         story.append(Paragraph(f'2.{idx}.2 Registros consolidados', est['h3']))
         story.append(_tabela(s, gran, est))

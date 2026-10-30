@@ -24,6 +24,12 @@ class Sensor(models.Model):
         string='Localização',
         help='Ponto exato de instalação (ex.: câmara 1, saída do exaustor). Sai no relatório.',
     )
+    casas_decimais = fields.Integer(
+        default=2, help='Casas decimais dos valores no relatório (0 a 6).',
+    )
+    digitos_inteiros = fields.Integer(
+        default=1, help='Mínimo de dígitos da parte inteira no relatório, completado com zeros (1 a 12).',
+    )
     ativo = fields.Boolean(default=True)
     conversor_tipo = fields.Selection(
         CONVERSOR_TIPOS, default='nenhum', required=True,
@@ -76,3 +82,11 @@ class Sensor(models.Model):
                 and c.validade_de <= hoje <= c.validade_ate)
             sensor.calibracao_vigente_id = (
                 max(candidatos, key=lambda c: c.versao) if candidatos else False)
+
+    @api.constrains('casas_decimais', 'digitos_inteiros')
+    def _check_formato_numerico(self):
+        for rec in self:
+            if not 0 <= rec.casas_decimais <= 6:
+                raise ValidationError('Casas decimais deve estar entre 0 e 6.')
+            if not 1 <= rec.digitos_inteiros <= 12:
+                raise ValidationError('Dígitos inteiros deve estar entre 1 e 12.')

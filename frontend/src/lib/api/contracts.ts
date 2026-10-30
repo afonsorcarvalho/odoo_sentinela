@@ -57,6 +57,7 @@ export type ReportSensor = {
   area: string | null
   endereco: string | null
   localizacao: string | null
+  formato: { casas_decimais: number; digitos_inteiros: number }
   limites: { limite_min: number | null; limite_max: number | null } | null
   alteracoes_limite: ReportLimiteAlteracao[]
   buckets: ReportBucket[]

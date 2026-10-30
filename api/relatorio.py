@@ -38,10 +38,11 @@ def _iso_utc(dt):
 
 
 def _local_sensor(cliente, sensor_code, area_code):
-    """Site, área (com categoria), endereço do site e localização exata do sensor."""
+    """Site, área (com categoria), endereço, localização exata e formato numérico do sensor."""
     sensores = odoo_cliente.executar(
         cliente, 'sensor_monitor.sensor', 'search_read',
-        [('sensor_code', '=', sensor_code)], fields=['localizacao'], limit=1,
+        [('sensor_code', '=', sensor_code)], fields=['localizacao', 'casas_decimais', 'digitos_inteiros'],
+        limit=1,
     )
     areas = odoo_cliente.executar(
         cliente, 'sensor_monitor.area', 'search_read',
@@ -63,6 +64,10 @@ def _local_sensor(cliente, sensor_code, area_code):
         'endereco': (site['endereco'] or None) if site else None,
         'area': nome_area,
         'localizacao': (sensores[0]['localizacao'] or None) if sensores else None,
+        'formato': {
+            'casas_decimais': sensores[0]['casas_decimais'] if sensores else 2,
+            'digitos_inteiros': sensores[0]['digitos_inteiros'] if sensores else 1,
+        },
     }
 
 

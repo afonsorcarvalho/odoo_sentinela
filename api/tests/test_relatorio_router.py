@@ -69,6 +69,7 @@ def test_relatorio_formato_e_fora_limite(monkeypatch):
         assert s['sensor_code'] == SENSOR_CODE
         assert s['nome'] and s['unidade'] and s['site'] and s['area']
         assert 'localizacao' in s and 'endereco' in s
+        assert s['formato'] == {'casas_decimais': 2, 'digitos_inteiros': 1}
         assert s['limites'] == {'limite_min': 2.0, 'limite_max': 8.0}
         assert isinstance(s['alteracoes_limite'], list) and isinstance(s['alarmes'], list)
         assert len(s['buckets']) == 24

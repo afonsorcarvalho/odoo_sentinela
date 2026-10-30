@@ -37,12 +37,33 @@ def _iso_utc(dt):
     return dt.astimezone(timezone.utc).isoformat()
 
 
-def _nome_site(cliente, area_code):
+def _local_sensor(cliente, sensor_code, area_code):
+    """Site, área (com categoria), endereço do site e localização exata do sensor."""
+    sensores = odoo_cliente.executar(
+        cliente, 'sensor_monitor.sensor', 'search_read',
+        [('sensor_code', '=', sensor_code)], fields=['localizacao'], limit=1,
+    )
     areas = odoo_cliente.executar(
         cliente, 'sensor_monitor.area', 'search_read',
-        [('area_code', '=', area_code)], fields=['site_id'], limit=1,
+        [('area_code', '=', area_code)], fields=['name', 'area_category_id', 'site_id'], limit=1,
     )
-    return areas[0]['site_id'][1] if areas and areas[0]['site_id'] else None
+    area = areas[0] if areas else None
+    site = None
+    if area and area['site_id']:
+        site = odoo_cliente.executar(
+            cliente, 'sensor_monitor.site', 'read', [area['site_id'][0]], fields=['name', 'endereco'],
+        )[0]
+    nome_area = None
+    if area:
+        nome_area = area['name']
+        if area['area_category_id']:
+            nome_area += f" ({area['area_category_id'][1]})"
+    return {
+        'site': site['name'] if site else None,
+        'endereco': (site['endereco'] or None) if site else None,
+        'area': nome_area,
+        'localizacao': (sensores[0]['localizacao'] or None) if sensores else None,
+    }
 
 
 def _serializar_bucket(b, limites):
@@ -102,7 +123,7 @@ def montar_relatorio(cliente, sensores: list[str], inicio: date, fim: date) -> d
                 'sensor_code': code,
                 'nome': meta['name'],
                 'unidade': meta['unidade'],
-                'site': _nome_site(cliente, meta['area']['area_code']),
+                **_local_sensor(cliente, code, meta['area']['area_code']),
                 'limites': limites,
                 'alteracoes_limite': alteracoes,
                 'buckets': [_serializar_bucket(b, limites) for b in buckets],

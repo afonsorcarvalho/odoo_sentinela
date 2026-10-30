@@ -54,6 +54,9 @@ export type ReportSensor = {
   nome: string
   unidade: string
   site: string | null
+  area: string | null
+  endereco: string | null
+  localizacao: string | null
   limites: { limite_min: number | null; limite_max: number | null } | null
   alteracoes_limite: ReportLimiteAlteracao[]
   buckets: ReportBucket[]

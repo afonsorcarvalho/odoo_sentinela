@@ -65,6 +65,9 @@ function sensorMock(code: string, gran: Granularidade, inicio: string, fim: stri
     nome: meta.name,
     unidade: meta.unidade,
     site: 'Site Mock',
+    area: 'Área Mock (Preparo/Esterilização)',
+    endereco: null,
+    localizacao: 'Câmara 1',
     limites: th ? { limite_min: min, limite_max: max } : null,
     // Uma alteracao e um alarme de amostra (so p/ sensores com limite) para a
     // UI ser exercitavel em modo mock. Instantes no primeiro dia do periodo.

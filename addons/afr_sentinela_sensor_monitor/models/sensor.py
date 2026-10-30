@@ -20,6 +20,10 @@ class Sensor(models.Model):
         ('i2c', 'I2C'),
     ], required=True)
     unidade = fields.Char()
+    localizacao = fields.Char(
+        string='Localização',
+        help='Ponto exato de instalação (ex.: câmara 1, saída do exaustor). Sai no relatório.',
+    )
     ativo = fields.Boolean(default=True)
     conversor_tipo = fields.Selection(
         CONVERSOR_TIPOS, default='nenhum', required=True,

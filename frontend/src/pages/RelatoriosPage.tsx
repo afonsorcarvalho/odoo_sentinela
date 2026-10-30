@@ -105,6 +105,10 @@ function SensorReport({ sensor, gran, fim, notas }: { sensor: ReportSensor; gran
         {sensor.site ?? '—'} · Unidade: {sensor.unidade} · Limites:{' '}
         {sensor.limites ? `${fmtNum(sensor.limites.limite_min)} a ${fmtNum(sensor.limites.limite_max)}` : 'não configurados'}
       </p>
+      <p className="text-sm" style={muted}>
+        Área: {sensor.area ?? '—'} · Localização: {sensor.localizacao ?? 'não informada'}
+        {sensor.endereco && <> · Endereço: {sensor.endereco}</>}
+      </p>
 
       {sensor.alteracoes_limite.length > 0 && (
         <ul className="mt-2 space-y-1 rounded-md px-3 py-2 text-sm" style={{ background: 'var(--color-warn-soft)', color: 'var(--color-ink)' }}>

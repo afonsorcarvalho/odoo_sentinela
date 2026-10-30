@@ -36,7 +36,8 @@ def _relatorio():
         'inicio': DIA, 'fim': DIA, 'granularidade': 'hora', 'fuso': 'America/Sao_Paulo',
         'emitido_em': '2026-01-11T12:30:00+00:00', 'emissor': 'Maria (maria@x.com)',
         'sensores': [
-            {'sensor_code': 'SNR-A', 'nome': 'Câmara fria <1>', 'unidade': '°C', 'site': 'Hospital Central',
+            {'sensor_code': 'SNR-A', 'nome': 'Câmara fria <1>', 'unidade': '°C', 'site': 'Hospital Central', 'area': 'CME (Preparo)',
+             'localizacao': 'Câmara 1 — saída do exaustor', 'endereco': 'Rua A, 10',
              'limites': {'limite_min': 2.0, 'limite_max': 8.0},
              'alteracoes_limite': [{'quando': '2026-01-10T11:00:00+00:00', 'campo': 'limite_max', 'de': 7.0, 'para': 8.0}],
              'buckets': buckets1,
@@ -59,6 +60,8 @@ def test_pdf_conteudo():
     assert 'Por hora' in t and 'America/Sao_Paulo' in t
     assert 'Maria (maria@x.com)' in t and '11/01/2026 09:30' in t  # emitido em local
     assert 'Câmara fria' in t and '(SNR-A)' in t
+    assert 'CME (Preparo)' in t and 'Câmara 1 — saída do exaustor' in t and 'Rua A, 10' in t
+    assert 'não informada' in t  # SNR-B sem localização
     assert 'mín 2,00 / máx 8,00 °C' in t
     assert 'sem limite cadastrado' in t
     assert 'Limite alterado em 10/01/2026 08:00 (de 7,00 para 8,00)' in t

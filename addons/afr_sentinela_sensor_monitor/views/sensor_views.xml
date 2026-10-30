@@ -27,6 +27,7 @@
                         <field name="measurement_type_id"/>
                         <field name="protocolo_origem"/>
                         <field name="unidade"/>
+                        <field name="localizacao"/>
                         <field name="ativo"/>
                         <field name="conversor_tipo"/>
                         <field name="usa_map" invisible="protocolo_origem != 'rs485'"/>

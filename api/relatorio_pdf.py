@@ -415,10 +415,13 @@ def gerar_pdf(relatorio: dict, cliente_nome: str, compress: bool = True, logo: O
         story.append(Paragraph(
             f"2.{idx} {escape(s['nome'])} ({escape(s['sensor_code'])})", est['h2']))
         story.append(_quadro([
-            ('Site', escape(s['site'] or '—')),
             ('Código', escape(s['sensor_code'])),
             ('Unidade', escape(s['unidade'] or '—')),
+            ('Site', escape(s['site'] or '—')),
+            ('Área', escape(s.get('area') or '—')),
+            ('Localização', escape(s.get('localizacao') or 'não informada')),
             ('Limites', escape(_limites_texto(s))),
+            ('Endereço', escape(s.get('endereco') or 'não informado').replace('\n', '<br/>')),
         ], est))
         story.append(Spacer(1, 0.2 * cm))
         for a in s['alteracoes_limite']:
